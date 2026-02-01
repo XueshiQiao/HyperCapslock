@@ -322,36 +322,47 @@ pub fn run() {
 
             let menu = Menu::with_items(app, &[&status_i, &toggle_i, &sep, &show_i, &quit_i])?;
 
-            let _tray = TrayIconBuilder::with_id("tray")
-                .menu(&menu)
-                .icon(app.default_window_icon().unwrap().clone())
-                .on_menu_event(move |app, event| {
-                    match event.id.as_ref() {
-                        "show" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
-                        }
-                        "quit" => {
-                            app.exit(0);
-                        }
-                        "toggle" => {
-                            let paused = !IS_PAUSED.load(Ordering::SeqCst);
-                            IS_PAUSED.store(paused, Ordering::SeqCst);
-
-                            // Update Text
-                            let _ = toggle_i.set_text(if paused { "Start Service" } else { "Stop Service" });
-                            let _ = status_i.set_text(if paused { "Status: Paused" } else { "Status: Running" });
-
-                            // Emit event to frontend
-                            let _ = app.emit("status-update", paused);
-                        }
-                        _ => {}
-                    }
-                })
-                .build(app)?;
-
+                        let _tray = TrayIconBuilder::with_id("tray")
+                            .menu(&menu)
+                            .icon(app.default_window_icon().unwrap().clone())
+                            .on_menu_event(move |app, event| {
+                                match event.id.as_ref() {
+                                    "show" => {
+                                        if let Some(window) = app.get_webview_window("main") {
+                                            let _ = window.show();
+                                            let _ = window.set_focus();
+                                        }
+                                    }
+                                    "quit" => {
+                                        app.exit(0);
+                                    }
+                                    "toggle" => {
+                                        let paused = !IS_PAUSED.load(Ordering::SeqCst);
+                                        IS_PAUSED.store(paused, Ordering::SeqCst);
+                                        
+                                        // Update Text
+                                        let _ = toggle_i.set_text(if paused { "Start Service" } else { "Stop Service" });
+                                        let _ = status_i.set_text(if paused { "Status: Paused" } else { "Status: Running" });
+                                        
+                                        // Emit event to frontend
+                                        let _ = app.emit("status-update", paused); 
+                                    }
+                                    _ => {}
+                                }
+                            })
+                            .on_tray_icon_event(|tray, event| {
+                                if let tauri::tray::TrayIconEvent::DoubleClick {
+                                    button: tauri::tray::MouseButton::Left,
+                                    ..
+                                } = event {
+                                    let app = tray.app_handle();
+                                    if let Some(window) = app.get_webview_window("main") {
+                                        let _ = window.show();
+                                        let _ = window.set_focus();
+                                    }
+                                }
+                            })
+                            .build(app)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![get_status, set_paused])
