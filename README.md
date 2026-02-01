@@ -16,6 +16,10 @@
 -   **Native Performance:** Built with **Rust** and the Windows API for zero-latency interception.
 -   **Modern UI:** Simple dashboard built with React + TypeScript.
 
+## Screenshots
+
+![](.\public\GlobalVimLikeNavi.png)
+
 ## Architecture
 
 This project is a hybrid application built with [Tauri](https://tauri.app/):
