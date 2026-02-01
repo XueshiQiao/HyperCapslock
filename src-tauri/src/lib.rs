@@ -13,6 +13,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 // Global state
 static CAPS_DOWN: AtomicBool = AtomicBool::new(false);
 static DID_REMAP: AtomicBool = AtomicBool::new(false);
+static IS_PAUSED: AtomicBool = AtomicBool::new(false);
 static mut HOOK: HHOOK = HHOOK(0);
 
 // Helper to send key input
@@ -44,7 +45,7 @@ unsafe extern "system" fn low_level_keyboard_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    if code < 0 {
+    if code < 0 || IS_PAUSED.load(Ordering::SeqCst) {
         return CallNextHookEx(HOOK, code, wparam, lparam);
     }
 
@@ -114,7 +115,7 @@ fn start_keyboard_hook() {
                 while GetMessageA(&mut msg, None, 0, 0).as_bool() {
                     DispatchMessageA(&msg);
                 }
-                UnhookWindowsHookEx(HOOK);
+                let _ = UnhookWindowsHookEx(HOOK);
             }
             Err(e) => {
                 eprintln!("Failed to install keyboard hook: {:?}", e);
@@ -125,7 +126,17 @@ fn start_keyboard_hook() {
 
 #[tauri::command]
 fn get_status() -> String {
-    "Running (Global Hook Active)".to_string()
+    if IS_PAUSED.load(Ordering::SeqCst) {
+        "Paused".to_string()
+    } else {
+        "Running".to_string()
+    }
+}
+
+#[tauri::command]
+fn set_paused(paused: bool) -> String {
+    IS_PAUSED.store(paused, Ordering::SeqCst);
+    get_status()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -134,7 +145,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![get_status])
+        .invoke_handler(tauri::generate_handler![get_status, set_paused])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

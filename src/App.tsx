@@ -17,35 +17,76 @@ function App() {
     fetchStatus();
   }, []);
 
-  const isRunning = status.toLowerCase().includes("running");
+  async function togglePause() {
+    try {
+      // If currently "Running", we want to pause (true). Else resume (false).
+      const shouldPause = status === "Running";
+      const newStatus = await invoke("set_paused", { paused: shouldPause });
+      setStatus(newStatus as string);
+    } catch (e) {
+      console.error("Failed to toggle pause", e);
+    }
+  }
+
+  const isRunning = status === "Running";
+  const isPaused = status === "Paused";
+
+  // Determine colors based on state
+  const statusColor = isRunning ? "text-green-400" : isPaused ? "text-amber-400" : "text-red-400";
+  const dotColor = isRunning ? "bg-green-500" : isPaused ? "bg-amber-500" : "bg-red-500";
+  const pingColor = isRunning ? "bg-green-400" : isPaused ? "bg-amber-400" : "bg-red-400";
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-background p-6 select-none">
       
       {/* Header */}
-      <div className="text-center mb-10">
+      <div className="text-center mb-8">
         <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500 mb-2">
           Global Vim-Like Navi
         </h1>
         <p className="text-slate-400 text-sm">System-wide Vim navigation for Windows</p>
       </div>
 
-      {/* Status Card */}
-      <div className="w-full max-w-md bg-surface border border-slate-700 rounded-2xl p-6 shadow-xl mb-8 flex items-center justify-between">
-        <div>
-          <h2 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Status</h2>
-          <p className={`text-xl font-medium ${isRunning ? "text-white" : "text-red-400"}`}>
-            {status}
-          </p>
+      {/* Status Card & Control */}
+      <div className="w-full max-w-md bg-surface border border-slate-700 rounded-2xl p-6 shadow-xl mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Status</h2>
+            <p className={`text-xl font-medium ${statusColor}`}>
+              {status}
+            </p>
+          </div>
+          <div className="relative flex h-3 w-3">
+            {(isRunning || isPaused) && <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${pingColor} opacity-75`}></span>}
+            <span className={`relative inline-flex rounded-full h-3 w-3 ${dotColor}`}></span>
+          </div>
         </div>
-        <div className="relative flex h-3 w-3">
-          {isRunning && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>}
-          <span className={`relative inline-flex rounded-full h-3 w-3 ${isRunning ? "bg-green-500" : "bg-red-500"}`}></span>
-        </div>
+
+        {/* Toggle Button */}
+        <button
+          onClick={togglePause}
+          className={`w-full py-3 px-4 rounded-xl font-medium transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-2
+            ${isRunning 
+              ? "bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600" 
+              : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20"
+            }`}
+        >
+          {isRunning ? (
+            <>
+              <PauseIcon />
+              <span>Pause Service (Gaming Mode)</span>
+            </>
+          ) : (
+            <>
+              <PlayIcon />
+              <span>Resume Service</span>
+            </>
+          )}
+        </button>
       </div>
 
       {/* Mappings Grid */}
-      <div className="w-full max-w-md">
+      <div className={`w-full max-w-md transition-opacity duration-300 ${isPaused ? "opacity-50 grayscale" : "opacity-100"}`}>
         <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-4 ml-1">Key Mappings</h3>
         
         <div className="grid gap-3">
@@ -102,6 +143,23 @@ function ArrowIcon({ direction }: { direction: string }) {
   return (
     <svg className={`w-4 h-4 text-primary ${rotate}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+    </svg>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
+function PauseIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   );
 }
