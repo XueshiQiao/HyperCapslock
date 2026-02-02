@@ -1,6 +1,6 @@
 [package]
 name = "global-vim-like-navi"
-version = "0.6.5"
+version = "0.6.6"
 description = "A global vim-like navigation tool."
 authors = ["XueshiQiao"]
 edition = "2021"
