@@ -3,6 +3,7 @@ use std::sync::Mutex;
 use std::thread;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
+use tauri::image::Image;
 use tauri::{AppHandle, Emitter, Manager, Wry};
 use windows::Win32::Foundation::{HMODULE, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -24,6 +25,9 @@ static mut HOOK: HHOOK = HHOOK(0);
 // Store the menu item handle safely
 static TRAY_TOGGLE_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
 static TRAY_STATUS_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
+
+static ICON_RUNNING: &[u8] = include_bytes!("../icons/icon.png");
+static ICON_DISABLED: &[u8] = include_bytes!("../icons/icon_disabled.png");
 
 // Helper to send key input
 unsafe fn send_key(vk: VIRTUAL_KEY, up: bool) {
@@ -261,6 +265,28 @@ fn start_keyboard_hook() {
     });
 }
 
+fn update_tray_visuals(app: &AppHandle, paused: bool) {
+    // Update Menu Text
+    if let Ok(guard) = TRAY_TOGGLE_ITEM.lock() {
+        if let Some(item) = &*guard {
+            let _ = item.set_text(if paused { "Start Service" } else { "Stop Service" });
+        }
+    }
+    if let Ok(guard) = TRAY_STATUS_ITEM.lock() {
+        if let Some(item) = &*guard {
+            let _ = item.set_text(if paused { "Status: Paused" } else { "Status: Running" });
+        }
+    }
+
+    // Update Tray Icon
+    let icon_bytes = if paused { ICON_DISABLED } else { ICON_RUNNING };
+    if let Ok(image) = Image::from_bytes(icon_bytes) {
+        if let Some(tray) = app.tray_by_id("tray") {
+            let _ = tray.set_icon(Some(image));
+        }
+    }
+}
+
 #[tauri::command]
 fn get_status() -> String {
     if IS_PAUSED.load(Ordering::SeqCst) {
@@ -274,17 +300,7 @@ fn get_status() -> String {
 fn set_paused(app: AppHandle, paused: bool) -> String {
     IS_PAUSED.store(paused, Ordering::SeqCst);
 
-    // Update Tray Menu Text
-    if let Ok(guard) = TRAY_TOGGLE_ITEM.lock() {
-        if let Some(item) = &*guard {
-            let _ = item.set_text(if paused { "Start Service" } else { "Stop Service" });
-        }
-    }
-    if let Ok(guard) = TRAY_STATUS_ITEM.lock() {
-        if let Some(item) = &*guard {
-            let _ = item.set_text(if paused { "Status: Paused" } else { "Status: Running" });
-        }
-    }
+    update_tray_visuals(&app, paused);
 
     // Emit event for UI to stay in sync if called from elsewhere (sanity check)
     let _ = app.emit("status-update", paused);
@@ -340,9 +356,7 @@ pub fn run() {
                                         let paused = !IS_PAUSED.load(Ordering::SeqCst);
                                         IS_PAUSED.store(paused, Ordering::SeqCst);
                                         
-                                        // Update Text
-                                        let _ = toggle_i.set_text(if paused { "Start Service" } else { "Stop Service" });
-                                        let _ = status_i.set_text(if paused { "Status: Paused" } else { "Status: Running" });
+                                        update_tray_visuals(app, paused);
                                         
                                         // Emit event to frontend
                                         let _ = app.emit("status-update", paused); 
