@@ -12,9 +12,9 @@
   "app": {
     "windows": [
       {
-        "title": "GlobalVimLikeNavi",
-        "width": 800,
-        "height": 600
+        "title": "Global Vim-Like Navi",
+        "width": 666,
+        "height": 1100
       }
     ],
     "security": {
