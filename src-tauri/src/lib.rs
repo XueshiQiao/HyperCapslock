@@ -3,8 +3,10 @@ use std::sync::Mutex;
 use std::thread;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::image::Image;
 use tauri::{AppHandle, Emitter, Manager, Wry};
+use tauri::image::Image;
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+use tauri_plugin_updater::UpdaterExt;
 use windows::Win32::Foundation::{HMODULE, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
@@ -313,6 +315,8 @@ pub fn run() {
     start_keyboard_hook();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .on_window_event(|window, event| {
@@ -324,6 +328,7 @@ pub fn run() {
         .setup(|app| {
             let status_i = MenuItem::with_id(app, "status", "Status: Running", false, None::<&str>)?;
             let toggle_i = MenuItem::with_id(app, "toggle", "Stop Service", true, None::<&str>)?;
+            let check_update_i = MenuItem::with_id(app, "check_update", "Check for Updates", true, None::<&str>)?;
             let sep = PredefinedMenuItem::separator(app)?;
             let show_i = MenuItem::with_id(app, "show", "Open window", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -336,13 +341,58 @@ pub fn run() {
                 *guard = Some(status_i.clone());
             }
 
-            let menu = Menu::with_items(app, &[&status_i, &toggle_i, &sep, &show_i, &quit_i])?;
+            let menu = Menu::with_items(app, &[&status_i, &toggle_i, &check_update_i, &sep, &show_i, &quit_i])?;
 
                         let _tray = TrayIconBuilder::with_id("tray")
                             .menu(&menu)
                             .icon(app.default_window_icon().unwrap().clone())
                             .on_menu_event(move |app, event| {
                                 match event.id.as_ref() {
+                                    "check_update" => {
+                                        let app_handle = app.clone();
+                                        tauri::async_runtime::spawn(async move {
+                                            if let Ok(updater) = app_handle.updater() {
+                                                match updater.check().await {
+                                                    Ok(Some(update)) => {
+                                                        let should_install = app_handle.dialog()
+                                                            .message(format!("Version {} is available. Do you want to install it?", update.version))
+                                                            .title("Update Available")
+                                                            .kind(MessageDialogKind::Info)
+                                                            .buttons(MessageDialogButtons::OkCancel)
+                                                            .blocking_show();
+                                                        
+                                                        if should_install {
+                                                            if let Err(e) = update.download_and_install(|_,_| {}, || {}).await {
+                                                                app_handle.dialog()
+                                                                    .message(format!("Failed to install update: {}", e))
+                                                                    .kind(MessageDialogKind::Error)
+                                                                    .blocking_show();
+                                                            } else {
+                                                                app_handle.dialog()
+                                                                    .message("Update installed. Application will restart.")
+                                                                    .kind(MessageDialogKind::Info)
+                                                                    .blocking_show();
+                                                                app_handle.restart();
+                                                            }
+                                                        }
+                                                    }
+                                                    Ok(None) => {
+                                                         app_handle.dialog()
+                                                            .message("You are on the latest version.")
+                                                            .title("No Update Available")
+                                                            .kind(MessageDialogKind::Info)
+                                                            .blocking_show();
+                                                    }
+                                                    Err(e) => {
+                                                        app_handle.dialog()
+                                                            .message(format!("Failed to check for updates: {}", e))
+                                                            .kind(MessageDialogKind::Error)
+                                                            .blocking_show();
+                                                    }
+                                                }
+                                            }
+                                        });
+                                    }
                                     "show" => {
                                         if let Some(window) = app.get_webview_window("main") {
                                             let _ = window.show();

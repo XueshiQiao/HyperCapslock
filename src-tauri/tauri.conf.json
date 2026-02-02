@@ -22,6 +22,14 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/XueshiQiao/GlobalVimLikeNavi/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVCQzQyQzJFNUNBNzI1NDIKUldSQ0phZGNMaXpFNjlwKzJGT01MWTVPdnR1dFJnRVNvbkhTdkJITU5nRStaNWx4V2thZUI0cTAK"
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
