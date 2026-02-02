@@ -2,12 +2,16 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
+import { getVersion } from "@tauri-apps/api/app";
+import { check } from "@tauri-apps/plugin-updater";
+import { message, ask } from "@tauri-apps/plugin-dialog";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import "./App.css";
 
 function App() {
   const [status, setStatus] = useState("Initializing...");
   const [autostart, setAutostart] = useState(false);
+  const [appVersion, setAppVersion] = useState("");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
@@ -15,6 +19,8 @@ function App() {
 
     async function init() {
       try {
+        const v = await getVersion();
+        setAppVersion(v);
         const msg = await invoke("get_status");
         setStatus(msg as string);
         const auto = await isEnabled();
@@ -182,7 +188,7 @@ function App() {
           <MappingRow keyChar="D" action="Down (10x)" icon="FastDown" />
         </div>
 
-        <div className="mt-8 mb-10 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
+        <div className="mt-8 mb-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
           <p className="text-xs text-slate-400 leading-relaxed text-center">
             <span className="font-semibold text-blue-400">Pro Tip:</span> CapsLock acts as a modifier. 
             Tap it quickly to toggle standard CapsLock. Hold it + Key to navigate.
@@ -190,7 +196,48 @@ function App() {
         </div>
       </div>
 
+      <Footer version={appVersion} />
     </main>
+  );
+}
+
+function Footer({ version }: { version: string }) {
+  async function handleCheckUpdate() {
+    try {
+      const update = await check();
+      if (update) {
+        const yes = await ask(
+          `Version ${update.version} is available.\n\nRelease notes:\n${update.body}`, 
+          { title: 'Update Available', kind: 'info', okLabel: 'Update', cancelLabel: 'Cancel' }
+        );
+        if (yes) {
+          await update.downloadAndInstall();
+          // Restart is required to apply the update
+          await message('Update installed. Please restart the application.', { title: 'Success', kind: 'info' });
+        }
+      } else {
+        await message('You are on the latest version.', { title: 'No Update', kind: 'info' });
+      }
+    } catch (error: any) {
+      console.error(error);
+      await message(`Failed to check for updates: ${error?.message || error}`, { title: 'Error', kind: 'error' });
+    }
+  }
+
+  return (
+    <footer className="mt-6 mb-2 flex flex-col items-center gap-2">
+      <div className="flex items-center gap-3 text-slate-500 text-xs font-medium">
+        <span>v{version}</span>
+        <span className="w-1 h-1 rounded-full bg-slate-600"></span>
+        <span>By Xueshi Qiao</span>
+      </div>
+      <button 
+        onClick={handleCheckUpdate}
+        className="text-xs text-blue-500/80 hover:text-blue-400 hover:underline transition-colors"
+      >
+        Check for Updates
+      </button>
+    </footer>
   );
 }
 
