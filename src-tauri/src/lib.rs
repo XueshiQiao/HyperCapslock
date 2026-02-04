@@ -10,7 +10,7 @@ use tauri_plugin_updater::UpdaterExt;
 use windows::Win32::Foundation::{HMODULE, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
-    KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_A, VK_B, VK_CAPITAL, VK_D, VK_DELETE, VK_DOWN, VK_E, VK_END,
+    KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_A, VK_B, VK_BACK, VK_CAPITAL, VK_D, VK_DELETE, VK_DOWN, VK_E, VK_END,
     VK_H, VK_HOME, VK_I, VK_J, VK_K, VK_L, VK_LCONTROL, VK_LEFT, VK_N, VK_O, VK_RETURN, VK_RIGHT,
     VK_U, VK_UP, VK_W,
 };
@@ -151,7 +151,7 @@ unsafe extern "system" fn low_level_keyboard_proc(
 
             // Editing
             VK_I => {
-                send_key(VK_DELETE, is_up);
+                send_key(VK_BACK, is_up);
                 handled = true;
             }
 

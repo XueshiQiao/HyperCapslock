@@ -170,7 +170,7 @@ function App() {
 
           <div className="h-2"></div>
 
-          <MappingRow keyChar="I" action="Delete" icon="Delete" />
+          <MappingRow keyChar="I" action="Backspace" icon="Delete" />
           
           <div className="h-2"></div>
 

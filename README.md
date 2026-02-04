@@ -28,7 +28,7 @@
 -   `CapsLock` + `D` → **Down 10x** (Fast Scroll Down)
 
 ### Editing Shortcuts
--   `CapsLock` + `I` → **Delete**
+-   `CapsLock` + `I` → **Backspace**
 -   `CapsLock` + `O` → **New Line** (End + Enter)
 -   `CapsLock` + `N` → **Docstring Snippet** (Inserts `""""""` and centers cursor)
 
