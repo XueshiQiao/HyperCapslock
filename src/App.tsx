@@ -103,11 +103,11 @@ function App() {
       if (autostart) {
         await disable();
         setAutostart(false);
-        showToast("Start with Windows disabled", "success");
+        showToast("Autostart disabled", "success");
       } else {
         await enable();
         setAutostart(true);
-        showToast("Start with Windows enabled", "success");
+        showToast("Autostart enabled", "success");
       }
     } catch (e) {
       console.error("Failed to toggle autostart", e);
@@ -146,7 +146,7 @@ function App() {
         <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500 mb-2">
           Global Vim-Like Navi
         </h1>
-        <p className="text-slate-400 text-sm">System-wide Vim navigation for Windows</p>
+        <p className="text-slate-400 text-sm">System-wide Vim navigation</p>
       </div>
 
       {/* Status Card */}
@@ -180,7 +180,7 @@ function App() {
       <div className="w-full max-w-md bg-surface border border-slate-700 rounded-2xl p-6 shadow-xl mb-8 flex items-center justify-between">
         <div>
            <h2 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Settings</h2>
-           <p className="text-slate-200 font-medium">Start with Windows</p>
+           <p className="text-slate-200 font-medium">Start at Login</p>
         </div>
         <button 
            onClick={toggleAutostart} 
@@ -211,7 +211,7 @@ function App() {
             />
             <input 
                 type="text" 
-                placeholder="Command (e.g. calc.exe)"
+                placeholder="Command (e.g. open -a Calculator)"
                 value={newCommand}
                 onChange={(e) => setNewCommand(e.target.value)}
                 className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors"
