@@ -1534,7 +1534,7 @@ dependencies = [
 
 [[package]]
 name = "hyper-capslock"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "core-foundation",
  "core-graphics",

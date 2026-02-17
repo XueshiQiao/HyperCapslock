@@ -193,6 +193,19 @@ fn set_paused(app: AppHandle, paused: bool) -> String {
     get_status()
 }
 
+#[cfg(target_os = "macos")]
+fn handle_reopen_event(app_handle: &AppHandle, event: &tauri::RunEvent) {
+    if let tauri::RunEvent::Reopen { .. } = event {
+        if let Some(window) = app_handle.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn handle_reopen_event(_: &AppHandle, _: &tauri::RunEvent) {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(target_os = "windows")]
@@ -357,12 +370,7 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            if let tauri::RunEvent::Reopen { .. } = event {
-                if let Some(window) = app_handle.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
-            }
+            handle_reopen_event(&app_handle, &event);
         });
 }
 
