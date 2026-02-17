@@ -129,6 +129,10 @@ fn get_status() -> String {
 #[tauri::command]
 fn set_paused(app: AppHandle, paused: bool) -> String {
     IS_PAUSED.store(paused, Ordering::SeqCst);
+    eprintln!(
+        "[HYPERCAPS][STATE] Service {}",
+        if paused { "paused" } else { "resumed" }
+    );
 
     update_tray_visuals(&app, paused);
 

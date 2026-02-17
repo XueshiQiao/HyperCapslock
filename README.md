@@ -101,6 +101,23 @@ The output file will be located at:
 On Windows, applications running with lower privileges cannot intercept keys from applications running with higher privileges (Administrator).
 -   If you want this tool to work inside Task Manager, Admin Powershell, or other Admin-level apps, you must run `tauri-app.exe` as **Administrator**.
 
+## macOS Troubleshooting
+
+If hotkeys stop working intermittently on macOS:
+
+1. Check permissions:
+   - `System Settings > Privacy & Security > Accessibility`
+   - `System Settings > Privacy & Security > Input Monitoring` (if enabled in your setup)
+   - Remove and re-add the app if needed, then relaunch.
+2. Check runtime logs:
+   - File log: `/tmp/hypercapslock-macos.log`
+   - You can also run from terminal and watch stderr output.
+3. Look for these log patterns:
+   - `Event tap disabled by system` (tap timeout / dropped by macOS)
+   - `hidutil remap failed` (CapsLock->F18 remap not applied)
+   - `Failed to create CGEventTap` (permission or tap creation issue)
+   - `Caps(F18) down` and `Caps remap handled keydown` (normal hotkey path)
+
 ## License
 
 This project is licensed under the **GNU General Public License v3.0**. See the [LICENSE](LICENSE) file for details.

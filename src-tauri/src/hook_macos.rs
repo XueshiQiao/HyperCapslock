@@ -1,6 +1,9 @@
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, OnceLock};
 use std::thread;
+use std::time::{SystemTime, UNIX_EPOCH};
 
+use core_foundation::base::TCFType;
 use core_foundation::runloop::CFRunLoop;
 use core_graphics::event::{
     CGEvent, CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions,
@@ -35,6 +38,47 @@ const KC_D: u16 = 0x02;
 const KC_O: u16 = 0x1F;
 const KC_I: u16 = 0x22;
 const KC_N: u16 = 0x2D;
+
+const MACOS_LOG_PATH: &str = "/tmp/hypercapslock-macos.log";
+static LOG_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+static EVENT_TAP_PORT: AtomicUsize = AtomicUsize::new(0);
+
+fn log_macos(level: &str, msg: &str) {
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let line = format!("[HYPERCAPS][macOS][{}][{}] {}", ts, level, msg);
+    eprintln!("{}", line);
+
+    let lock = LOG_LOCK.get_or_init(|| Mutex::new(()));
+    if let Ok(_guard) = lock.lock() {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(MACOS_LOG_PATH)
+        {
+            use std::io::Write;
+            let _ = writeln!(f, "{}", line);
+        }
+    }
+}
+
+fn reenable_event_tap() -> bool {
+    extern "C" {
+        fn CGEventTapEnable(tap: *mut std::ffi::c_void, enable: bool);
+    }
+
+    let tap_port = EVENT_TAP_PORT.load(Ordering::SeqCst);
+    if tap_port == 0 {
+        return false;
+    }
+
+    unsafe {
+        CGEventTapEnable(tap_port as *mut std::ffi::c_void, true);
+    }
+    true
+}
 
 fn mac_keycode_to_js_keycode(mac_keycode: u16) -> Option<u16> {
     match mac_keycode {
@@ -105,10 +149,12 @@ fn toggle_caps_lock() {
     unsafe {
         let matching = IOServiceMatching(b"IOHIDSystem\0".as_ptr() as *const i8);
         if matching.is_null() {
+            log_macos("ERROR", "IOServiceMatching(IOHIDSystem) returned null.");
             return;
         }
         let service = IOServiceGetMatchingService(0, matching);
         if service == 0 {
+            log_macos("ERROR", "IOServiceGetMatchingService(IOHIDSystem) returned 0.");
             return;
         }
 
@@ -116,12 +162,21 @@ fn toggle_caps_lock() {
         let kr = IOServiceOpen(service, mach_task_self_, KIO_HID_PARAM_CONNECT_TYPE, &mut connect);
         IOObjectRelease(service);
         if kr != 0 {
+            log_macos("ERROR", &format!("IOServiceOpen failed with code {}.", kr));
             return;
         }
 
         let mut current_state = false;
         IOHIDGetModifierLockState(connect, KIO_HID_CAPS_LOCK_STATE, &mut current_state);
         IOHIDSetModifierLockState(connect, KIO_HID_CAPS_LOCK_STATE, !current_state);
+        log_macos(
+            "INFO",
+            &format!(
+                "CapsLock toggled via IOKit: previous_state={} new_state={}",
+                current_state,
+                !current_state
+            ),
+        );
 
         IOServiceClose(connect);
     }
@@ -157,11 +212,21 @@ fn handle_caps_remap(keycode: u16, key_down: bool, shift_held: bool) -> bool {
             if let Some(mappings) = &*guard {
                 if let Some(cmd) = mappings.get(&js_keycode) {
                     let cmd_str = cmd.clone();
+                    log_macos(
+                        "INFO",
+                        &format!(
+                            "Shell mapping triggered: keycode={} js_key={} command={}",
+                            keycode, js_keycode, cmd_str
+                        ),
+                    );
                     thread::spawn(move || {
-                        let _ = std::process::Command::new("sh")
+                        let spawn_result = std::process::Command::new("sh")
                             .arg("-c")
                             .arg(&cmd_str)
                             .spawn();
+                        if let Err(e) = spawn_result {
+                            log_macos("ERROR", &format!("Failed to spawn shell mapping: {}", e));
+                        }
                     });
                     return true;
                 }
@@ -333,18 +398,22 @@ fn setup_capslock_remap() -> bool {
 
     match output {
         Ok(o) if o.status.success() => {
-            eprintln!("[HIDUTIL] CapsLock remapped to F18 successfully.");
+            log_macos("INFO", "hidutil remapped CapsLock to F18 successfully.");
             true
         }
         Ok(o) => {
-            eprintln!(
-                "[HIDUTIL] Failed to remap CapsLock: {}",
-                String::from_utf8_lossy(&o.stderr)
+            log_macos(
+                "ERROR",
+                &format!(
+                    "hidutil remap failed (status={}): {}",
+                    o.status,
+                    String::from_utf8_lossy(&o.stderr)
+                ),
             );
             false
         }
         Err(e) => {
-            eprintln!("[HIDUTIL] Failed to run hidutil: {}", e);
+            log_macos("ERROR", &format!("Failed to execute hidutil remap command: {}", e));
             false
         }
     }
@@ -358,26 +427,49 @@ pub fn cleanup_capslock_remap() {
 
     match output {
         Ok(o) if o.status.success() => {
-            eprintln!("[HIDUTIL] CapsLock remap removed.");
+            log_macos("INFO", "hidutil remap removed.");
         }
-        _ => {
-            eprintln!("[HIDUTIL] Warning: failed to remove CapsLock remap.");
+        Ok(o) => {
+            log_macos(
+                "WARN",
+                &format!(
+                    "Failed to remove hidutil remap (status={}): {}",
+                    o.status,
+                    String::from_utf8_lossy(&o.stderr)
+                ),
+            );
+        }
+        Err(e) => {
+            log_macos("WARN", &format!("Failed to execute hidutil cleanup command: {}", e));
         }
     }
 }
 
 pub fn start_keyboard_hook() {
+    EVENT_TAP_PORT.store(0, Ordering::SeqCst);
+    log_macos("INFO", "Starting macOS keyboard hook.");
+    log_macos("INFO", &format!("Log file path: {}", MACOS_LOG_PATH));
+
     if !check_accessibility_permission() {
-        eprintln!("Accessibility permission not granted. Prompting user...");
+        log_macos(
+            "WARN",
+            "Accessibility permission not granted. Prompting system dialog.",
+        );
         prompt_accessibility_permission();
+    } else {
+        log_macos("INFO", "Accessibility permission already granted.");
     }
 
     // Remap CapsLock → F18 via hidutil so we get proper KeyDown/KeyUp events
     if !setup_capslock_remap() {
-        eprintln!("Warning: Could not remap CapsLock via hidutil. CapsLock modifier may not work correctly.");
+        log_macos(
+            "WARN",
+            "Could not remap CapsLock via hidutil. Caps modifier may be unreliable.",
+        );
     }
 
     thread::spawn(|| {
+        log_macos("INFO", "macOS hook thread spawned.");
         let current = CFRunLoop::get_current();
 
         let tap = CGEventTap::new(
@@ -394,6 +486,23 @@ pub fn start_keyboard_hook() {
                 if event_type_matches(event_type, CGEventType::TapDisabledByTimeout)
                     || event_type_matches(event_type, CGEventType::TapDisabledByUserInput)
                 {
+                    if reenable_event_tap() {
+                        log_macos(
+                            "WARN",
+                            &format!(
+                                "Event tap disabled by system (event_type={:?}); requested re-enable.",
+                                event_type
+                            ),
+                        );
+                    } else {
+                        log_macos(
+                            "ERROR",
+                            &format!(
+                                "Event tap disabled by system (event_type={:?}); could not re-enable because tap port is unknown.",
+                                event_type
+                            ),
+                        );
+                    }
                     return None;
                 }
 
@@ -422,11 +531,15 @@ pub fn start_keyboard_hook() {
                     if is_down {
                         CAPS_DOWN.store(true, Ordering::SeqCst);
                         DID_REMAP.store(false, Ordering::SeqCst);
+                        log_macos("INFO", "Caps(F18) down.");
                     } else if is_up {
                         CAPS_DOWN.store(false, Ordering::SeqCst);
                         if !DID_REMAP.load(Ordering::SeqCst) {
                             // Tap only — toggle CapsLock via IOKit
+                            log_macos("INFO", "Caps(F18) tap detected (no remap). Toggling CapsLock.");
                             toggle_caps_lock();
+                        } else {
+                            log_macos("INFO", "Caps(F18) up after remap sequence.");
                         }
                     }
                     // Swallow the F18 event
@@ -450,6 +563,15 @@ pub fn start_keyboard_hook() {
 
                     if handle_caps_remap(keycode, key_down, shift_held) {
                         DID_REMAP.store(true, Ordering::SeqCst);
+                        if key_down {
+                            log_macos(
+                                "INFO",
+                                &format!(
+                                    "Caps remap handled keydown: keycode={} shift={}",
+                                    keycode, shift_held
+                                ),
+                            );
+                        }
                         event.set_type(CGEventType::Null);
                         return None;
                     }
@@ -461,6 +583,10 @@ pub fn start_keyboard_hook() {
 
         match tap {
             Ok(tap) => unsafe {
+                EVENT_TAP_PORT.store(
+                    tap.mach_port.as_concrete_TypeRef() as usize,
+                    Ordering::SeqCst,
+                );
                 let loop_source = tap
                     .mach_port
                     .create_runloop_source(0)
@@ -470,12 +596,14 @@ pub fn start_keyboard_hook() {
                     core_foundation::runloop::kCFRunLoopCommonModes,
                 );
                 tap.enable();
-                println!("macOS keyboard event tap installed successfully.");
+                log_macos("INFO", "macOS keyboard event tap installed and enabled.");
                 CFRunLoop::run_current();
             },
             Err(()) => {
-                eprintln!(
-                    "Failed to create CGEventTap. Ensure Accessibility permission is granted."
+                EVENT_TAP_PORT.store(0, Ordering::SeqCst);
+                log_macos(
+                    "ERROR",
+                    "Failed to create CGEventTap. Check Accessibility/Input Monitoring permissions.",
                 );
             }
         }
