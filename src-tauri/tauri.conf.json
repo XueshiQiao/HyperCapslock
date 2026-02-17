@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Global Vim-like Navi",
+  "productName": "HyperCapslock",
   "version": "0.6.8",
-  "identifier": "me.xueshi.globalvimlikenavi",
+  "identifier": "me.xueshi.hypercapslock",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1421",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Global Vim-Like Navi",
+        "title": "HyperCapslock",
         "width": 666,
         "height": 1100,
         "visible": false
@@ -25,7 +25,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/XueshiQiao/GlobalVimLikeNavi/releases/latest/download/latest.json"
+        "https://github.com/XueshiQiao/HyperCapslock/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVCQzQyQzJFNUNBNzI1NDIKUldSQ0phZGNMaXpFNjlwKzJGT01MWTVPdnR1dFJnRVNvbkhTdkJITU5nRStaNWx4V2thZUI0cTAK"
     }

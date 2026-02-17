@@ -1,4 +1,4 @@
-# How Global Vim-Like Navi Works
+# How HyperCapslock Works
 
 This document explains the technical implementation of the key remapping logic using Tauri and the Windows API.
 

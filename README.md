@@ -1,6 +1,6 @@
-# Global Vim-Like Navi
+# HyperCapslock
 
-**Global Vim-Like Navi** is a lightweight Windows utility that brings Vim-style navigation (H/J/K/L) to the entire operating system. It allows you to use `CapsLock` + `Key` as shortcuts in any application.
+**HyperCapslock** is a lightweight Windows utility that brings Vim-style navigation (H/J/K/L) to the entire operating system. It allows you to use `CapsLock` + `Key` as shortcuts in any application.
 
 ## Features
 
@@ -39,7 +39,7 @@
 
 ## Screenshots
 
-![](public/GlobalVimLikeNavi.png)
+![](public/HyperCapslock.png)
 
 ## Architecture
 
@@ -67,8 +67,8 @@ For a deep dive into the technical implementation, see [how_does_it_work.md](how
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/XueshiQiao/GlobalVimLikeNavi.git
-    cd GlobalVimLikeNavi
+    git clone https://github.com/XueshiQiao/HyperCapslock.git
+    cd HyperCapslock
     ```
 
 2.  **Install dependencies:**

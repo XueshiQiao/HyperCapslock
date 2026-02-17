@@ -2,5 +2,5 @@
 #![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
 
 fn main() {
-    global_vim_like_navi_lib::run()
+    hyper_capslock_lib::run()
 }
