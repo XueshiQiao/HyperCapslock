@@ -8,11 +8,18 @@ import { message, ask } from "@tauri-apps/plugin-dialog";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import "./App.css";
 
+type PermissionStatuses = {
+  platform: "macos" | "other";
+  accessibility: "granted" | "not_granted" | "not_required";
+  input_monitoring: "granted" | "not_granted" | "not_required";
+};
+
 function App() {
   const [status, setStatus] = useState("Initializing...");
   const [autostart, setAutostart] = useState(false);
   const [appVersion, setAppVersion] = useState("");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [permissions, setPermissions] = useState<PermissionStatuses | null>(null);
   
   // Mappings State
   const [mappings, setMappings] = useState<Record<string, string>>({});
@@ -34,6 +41,7 @@ function App() {
 
         const maps = await invoke("get_mappings");
         setMappings(maps as Record<string, string>);
+        await refreshPermissions();
 
         unlisten = await listen<boolean>("status-update", (event) => {
           const paused = event.payload;
@@ -57,6 +65,17 @@ function App() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
+
+  async function refreshPermissions(showFeedback = false) {
+    try {
+      const p = await invoke("get_permission_statuses");
+      setPermissions(p as PermissionStatuses);
+      if (showFeedback) showToast("Permissions refreshed", "success");
+    } catch (e) {
+      console.error("Failed to fetch permission statuses", e);
+      if (showFeedback) showToast("Failed to refresh permissions", "error");
+    }
+  }
 
   async function addMapping() {
     if (!newKey || !newCommand) return;
@@ -188,6 +207,31 @@ function App() {
         >
            <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${autostart ? 'translate-x-6' : 'translate-x-0'}`} />
         </button>
+      </div>
+
+      {/* Permissions Card */}
+      <div className="w-full max-w-md bg-surface border border-slate-700 rounded-2xl p-6 shadow-xl mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Permissions</h2>
+            <p className="text-slate-200 font-medium">Authority Status</p>
+          </div>
+          <button
+            onClick={() => refreshPermissions(true)}
+            className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
+        <div className="space-y-2 text-sm">
+          <PermissionRow label="Accessibility" status={permissions?.accessibility ?? "not_required"} />
+          <PermissionRow label="Input Monitoring" status={permissions?.input_monitoring ?? "not_required"} />
+        </div>
+        <p className="text-[11px] text-slate-500 mt-3">
+          {permissions?.platform === "macos"
+            ? "Required on macOS for reliable global hotkeys."
+            : "These permissions are only required on macOS."}
+        </p>
       </div>
 
       {/* Shell Mappings Card */}
@@ -334,6 +378,30 @@ function Footer({ version }: { version: string }) {
         Check for Updates
       </button>
     </footer>
+  );
+}
+
+function PermissionRow({
+  label,
+  status,
+}: {
+  label: string;
+  status: "granted" | "not_granted" | "not_required";
+}) {
+  const text =
+    status === "granted" ? "Granted" : status === "not_granted" ? "Not Granted" : "Not Required";
+  const color =
+    status === "granted"
+      ? "bg-green-900/30 text-green-300 border-green-700/50"
+      : status === "not_granted"
+      ? "bg-red-900/30 text-red-300 border-red-700/50"
+      : "bg-slate-800 text-slate-400 border-slate-600";
+
+  return (
+    <div className="flex items-center justify-between bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2">
+      <span className="text-slate-300">{label}</span>
+      <span className={`text-xs px-2 py-1 rounded-md border ${color}`}>{text}</span>
+    </div>
   );
 }
 

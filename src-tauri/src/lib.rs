@@ -23,6 +23,58 @@ static TRAY_TOGGLE_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
 static TRAY_STATUS_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
 static SHELL_MAPPINGS: Mutex<Option<HashMap<u16, String>>> = Mutex::new(None);
 
+#[derive(serde::Serialize)]
+struct PermissionStatuses {
+    platform: &'static str,
+    accessibility: &'static str,
+    input_monitoring: &'static str,
+}
+
+#[cfg(target_os = "macos")]
+fn macos_accessibility_granted() -> bool {
+    extern "C" {
+        fn AXIsProcessTrusted() -> bool;
+    }
+    unsafe { AXIsProcessTrusted() }
+}
+
+#[cfg(target_os = "macos")]
+fn macos_input_monitoring_granted() -> bool {
+    extern "C" {
+        fn CGPreflightListenEventAccess() -> bool;
+    }
+    unsafe { CGPreflightListenEventAccess() }
+}
+
+#[tauri::command]
+fn get_permission_statuses() -> PermissionStatuses {
+    #[cfg(target_os = "macos")]
+    {
+        return PermissionStatuses {
+            platform: "macos",
+            accessibility: if macos_accessibility_granted() {
+                "granted"
+            } else {
+                "not_granted"
+            },
+            input_monitoring: if macos_input_monitoring_granted() {
+                "granted"
+            } else {
+                "not_granted"
+            },
+        };
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        PermissionStatuses {
+            platform: "other",
+            accessibility: "not_required",
+            input_monitoring: "not_required",
+        }
+    }
+}
+
 fn get_config_path(app: &AppHandle) -> Option<PathBuf> {
     app.path()
         .app_data_dir()
@@ -297,6 +349,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_status,
             set_paused,
+            get_permission_statuses,
             add_mapping,
             remove_mapping,
             get_mappings
