@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+echo "Running Rust formatter (cargo fmt --)..."
+(
+  cd src-tauri
+  cargo fmt --
+)
+
+if ! git diff --quiet -- src-tauri; then
+  echo "Rust files were reformatted. Review and stage the changes, then commit again."
+  exit 1
+fi
