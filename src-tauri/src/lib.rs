@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -17,6 +17,7 @@ mod hook_windows;
 
 // Global state (shared across platforms)
 static CAPS_DOWN: AtomicBool = AtomicBool::new(false);
+static CAPS_PRESSED_AT_MS: AtomicU64 = AtomicU64::new(0);
 static DID_REMAP: AtomicBool = AtomicBool::new(false);
 static IS_PAUSED: AtomicBool = AtomicBool::new(false);
 static TRAY_TOGGLE_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);

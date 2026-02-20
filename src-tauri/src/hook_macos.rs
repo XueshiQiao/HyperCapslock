@@ -11,7 +11,7 @@ use core_graphics::event::{
 };
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
-use crate::{CAPS_DOWN, DID_REMAP, IS_PAUSED, SHELL_MAPPINGS};
+use crate::{CAPS_DOWN, CAPS_PRESSED_AT_MS, DID_REMAP, IS_PAUSED, SHELL_MAPPINGS};
 
 // Magic value stamped on injected events to prevent feedback loops
 const INJECTED_EVENT_MAGIC: i64 = 0x4756_4C4E; // "GVLN"
@@ -40,6 +40,7 @@ const KC_I: u16 = 0x22;
 const KC_N: u16 = 0x2D;
 
 const MACOS_LOG_PATH: &str = "/tmp/hypercapslock-macos.log";
+const CAPS_TAP_MAX_MS: u64 = 500;
 static LOG_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 static EVENT_TAP_PORT: AtomicUsize = AtomicUsize::new(0);
 
@@ -62,6 +63,13 @@ fn log_macos(level: &str, msg: &str) {
             let _ = writeln!(f, "{}", line);
         }
     }
+}
+
+fn now_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 fn reenable_event_tap() -> bool {
@@ -572,19 +580,38 @@ pub fn start_keyboard_hook() {
                     let is_up = event_type_matches(event_type, CGEventType::KeyUp);
 
                     if is_down {
-                        CAPS_DOWN.store(true, Ordering::SeqCst);
-                        DID_REMAP.store(false, Ordering::SeqCst);
-                        log_macos("INFO", "Caps(F18) down.");
+                        let was_down = CAPS_DOWN.swap(true, Ordering::SeqCst);
+                        if !was_down {
+                            CAPS_PRESSED_AT_MS.store(now_millis(), Ordering::SeqCst);
+                            DID_REMAP.store(false, Ordering::SeqCst);
+                            log_macos("INFO", "Caps(F18) down.");
+                        }
                     } else if is_up {
-                        CAPS_DOWN.store(false, Ordering::SeqCst);
-                        if !DID_REMAP.load(Ordering::SeqCst) {
-                            // Tap only — toggle CapsLock via IOKit
-                            log_macos(
-                                "INFO",
-                                "Caps(F18) tap detected (no remap). Toggling CapsLock.",
-                            );
-                            toggle_caps_lock();
-                        } else {
+                        let was_down = CAPS_DOWN.swap(false, Ordering::SeqCst);
+                        let pressed_at_ms = CAPS_PRESSED_AT_MS.swap(0, Ordering::SeqCst);
+                        let held_ms = now_millis().saturating_sub(pressed_at_ms);
+
+                        if was_down && !DID_REMAP.load(Ordering::SeqCst) {
+                            if held_ms <= CAPS_TAP_MAX_MS {
+                                // Toggle native CapsLock only for short taps.
+                                log_macos(
+                                    "INFO",
+                                    &format!(
+                                        "Caps(F18) short tap detected ({}ms). Toggling CapsLock.",
+                                        held_ms
+                                    ),
+                                );
+                                toggle_caps_lock();
+                            } else {
+                                log_macos(
+                                    "INFO",
+                                    &format!(
+                                        "Caps(F18) held {}ms (> {}ms). Suppressing native CapsLock toggle.",
+                                        held_ms, CAPS_TAP_MAX_MS
+                                    ),
+                                );
+                            }
+                        } else if was_down {
                             log_macos("INFO", "Caps(F18) up after remap sequence.");
                         }
                     }

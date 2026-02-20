@@ -1,5 +1,6 @@
 use std::os::windows::process::CommandExt;
 use std::thread;
+use std::time::{SystemTime, UNIX_EPOCH};
 use windows::Win32::Foundation::{HMODULE, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
@@ -12,10 +13,18 @@ use windows::Win32::UI::WindowsAndMessaging::{
     KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
 };
 
-use crate::{CAPS_DOWN, DID_REMAP, IS_PAUSED, SHELL_MAPPINGS};
+use crate::{CAPS_DOWN, CAPS_PRESSED_AT_MS, DID_REMAP, IS_PAUSED, SHELL_MAPPINGS};
 use std::sync::atomic::Ordering;
 
 static mut HOOK: HHOOK = HHOOK(0);
+const CAPS_TAP_MAX_MS: u64 = 500;
+
+fn now_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
 
 unsafe fn send_key(vk: VIRTUAL_KEY, up: bool) {
     let mut flags = KEYBD_EVENT_FLAGS(0);
@@ -91,14 +100,23 @@ unsafe extern "system" fn low_level_keyboard_proc(
 
     if vk == VK_CAPITAL {
         if is_down {
-            CAPS_DOWN.store(true, Ordering::SeqCst);
-            DID_REMAP.store(false, Ordering::SeqCst);
+            let was_down = CAPS_DOWN.swap(true, Ordering::SeqCst);
+            if !was_down {
+                CAPS_PRESSED_AT_MS.store(now_millis(), Ordering::SeqCst);
+                DID_REMAP.store(false, Ordering::SeqCst);
+            }
             return LRESULT(1);
         } else if is_up {
-            CAPS_DOWN.store(false, Ordering::SeqCst);
-            if !DID_REMAP.load(Ordering::SeqCst) {
-                send_key(VK_CAPITAL, false);
-                send_key(VK_CAPITAL, true);
+            let was_down = CAPS_DOWN.swap(false, Ordering::SeqCst);
+            let pressed_at_ms = CAPS_PRESSED_AT_MS.swap(0, Ordering::SeqCst);
+            let held_ms = now_millis().saturating_sub(pressed_at_ms);
+
+            if was_down && !DID_REMAP.load(Ordering::SeqCst) {
+                // Toggle native CapsLock only for short taps; long holds are modifier-only.
+                if held_ms <= CAPS_TAP_MAX_MS {
+                    send_key(VK_CAPITAL, false);
+                    send_key(VK_CAPITAL, true);
+                }
             }
             return LRESULT(1);
         }
