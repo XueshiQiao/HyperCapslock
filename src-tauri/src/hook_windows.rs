@@ -3,9 +3,9 @@ use std::thread;
 use windows::Win32::Foundation::{HMODULE, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
-    KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_A, VK_BACK, VK_CAPITAL, VK_D,
-    VK_DOWN, VK_E, VK_END, VK_H, VK_HOME, VK_I, VK_J, VK_K, VK_L, VK_LCONTROL, VK_LEFT, VK_N,
-    VK_O, VK_P, VK_RETURN, VK_RIGHT, VK_SHIFT, VK_U, VK_UP, VK_Y,
+    KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_A, VK_BACK, VK_CAPITAL, VK_D, VK_DOWN,
+    VK_E, VK_END, VK_H, VK_HOME, VK_I, VK_J, VK_K, VK_L, VK_LCONTROL, VK_LEFT, VK_N, VK_O, VK_P,
+    VK_RETURN, VK_RIGHT, VK_SHIFT, VK_U, VK_UP, VK_Y,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageA, GetMessageA, SetWindowsHookExA, UnhookWindowsHookEx, HHOOK,
@@ -230,8 +230,7 @@ unsafe extern "system" fn low_level_keyboard_proc(
 
 pub fn start_keyboard_hook() {
     thread::spawn(|| unsafe {
-        let hook =
-            SetWindowsHookExA(WH_KEYBOARD_LL, Some(low_level_keyboard_proc), HMODULE(0), 0);
+        let hook = SetWindowsHookExA(WH_KEYBOARD_LL, Some(low_level_keyboard_proc), HMODULE(0), 0);
 
         match hook {
             Ok(h) => {

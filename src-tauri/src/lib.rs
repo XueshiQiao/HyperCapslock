@@ -10,10 +10,10 @@ use tauri::{AppHandle, Emitter, Manager, Wry};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_updater::UpdaterExt;
 
-#[cfg(target_os = "windows")]
-mod hook_windows;
 #[cfg(target_os = "macos")]
 mod hook_macos;
+#[cfg(target_os = "windows")]
+mod hook_windows;
 
 // Global state (shared across platforms)
 static CAPS_DOWN: AtomicBool = AtomicBool::new(false);

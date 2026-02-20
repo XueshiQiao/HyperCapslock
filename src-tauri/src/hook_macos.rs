@@ -82,42 +82,42 @@ fn reenable_event_tap() -> bool {
 
 fn mac_keycode_to_js_keycode(mac_keycode: u16) -> Option<u16> {
     match mac_keycode {
-        0x00 => Some(65),  // A
-        0x0B => Some(66),  // B
-        0x08 => Some(67),  // C
-        0x02 => Some(68),  // D
-        0x0E => Some(69),  // E
-        0x03 => Some(70),  // F
-        0x05 => Some(71),  // G
-        0x04 => Some(72),  // H
-        0x22 => Some(73),  // I
-        0x26 => Some(74),  // J
-        0x28 => Some(75),  // K
-        0x25 => Some(76),  // L
-        0x2E => Some(77),  // M
-        0x2D => Some(78),  // N
-        0x1F => Some(79),  // O
-        0x23 => Some(80),  // P
-        0x0C => Some(81),  // Q
-        0x0F => Some(82),  // R
-        0x01 => Some(83),  // S
-        0x11 => Some(84),  // T
-        0x20 => Some(85),  // U
-        0x09 => Some(86),  // V
-        0x0D => Some(87),  // W
-        0x07 => Some(88),  // X
-        0x10 => Some(89),  // Y
-        0x06 => Some(90),  // Z
-        0x1D => Some(48),  // 0
-        0x12 => Some(49),  // 1
-        0x13 => Some(50),  // 2
-        0x14 => Some(51),  // 3
-        0x15 => Some(52),  // 4
-        0x16 => Some(53),  // 5
-        0x17 => Some(54),  // 6
-        0x18 => Some(55),  // 7
-        0x19 => Some(56),  // 8
-        0x1A => Some(57),  // 9
+        0x00 => Some(65), // A
+        0x0B => Some(66), // B
+        0x08 => Some(67), // C
+        0x02 => Some(68), // D
+        0x0E => Some(69), // E
+        0x03 => Some(70), // F
+        0x05 => Some(71), // G
+        0x04 => Some(72), // H
+        0x22 => Some(73), // I
+        0x26 => Some(74), // J
+        0x28 => Some(75), // K
+        0x25 => Some(76), // L
+        0x2E => Some(77), // M
+        0x2D => Some(78), // N
+        0x1F => Some(79), // O
+        0x23 => Some(80), // P
+        0x0C => Some(81), // Q
+        0x0F => Some(82), // R
+        0x01 => Some(83), // S
+        0x11 => Some(84), // T
+        0x20 => Some(85), // U
+        0x09 => Some(86), // V
+        0x0D => Some(87), // W
+        0x07 => Some(88), // X
+        0x10 => Some(89), // Y
+        0x06 => Some(90), // Z
+        0x1D => Some(48), // 0
+        0x12 => Some(49), // 1
+        0x13 => Some(50), // 2
+        0x14 => Some(51), // 3
+        0x15 => Some(52), // 4
+        0x16 => Some(53), // 5
+        0x17 => Some(54), // 6
+        0x18 => Some(55), // 7
+        0x19 => Some(56), // 8
+        0x1A => Some(57), // 9
         _ => None,
     }
 }
@@ -218,10 +218,7 @@ fn active_modifier_flags(flags: CGEventFlags) -> CGEventFlags {
 }
 
 fn is_builtin_arrow_caps_remap_key(keycode: u16) -> bool {
-    matches!(
-        keycode,
-        KC_H | KC_J | KC_K | KC_L
-    )
+    matches!(keycode, KC_H | KC_J | KC_K | KC_L)
 }
 
 fn handle_caps_remap(keycode: u16, key_down: bool, active_modifiers: CGEventFlags) -> bool {
