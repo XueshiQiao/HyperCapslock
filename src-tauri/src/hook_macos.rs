@@ -6,8 +6,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use core_foundation::base::TCFType;
 use core_foundation::runloop::CFRunLoop;
 use core_graphics::event::{
-    CGEvent, CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions,
-    CGEventTapPlacement, CGEventType, EventField,
+    CGEvent, CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
+    CGEventType, EventField,
 };
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
@@ -154,12 +154,20 @@ fn toggle_caps_lock() {
         }
         let service = IOServiceGetMatchingService(0, matching);
         if service == 0 {
-            log_macos("ERROR", "IOServiceGetMatchingService(IOHIDSystem) returned 0.");
+            log_macos(
+                "ERROR",
+                "IOServiceGetMatchingService(IOHIDSystem) returned 0.",
+            );
             return;
         }
 
         let mut connect: u32 = 0;
-        let kr = IOServiceOpen(service, mach_task_self_, KIO_HID_PARAM_CONNECT_TYPE, &mut connect);
+        let kr = IOServiceOpen(
+            service,
+            mach_task_self_,
+            KIO_HID_PARAM_CONNECT_TYPE,
+            &mut connect,
+        );
         IOObjectRelease(service);
         if kr != 0 {
             log_macos("ERROR", &format!("IOServiceOpen failed with code {}.", kr));
@@ -173,8 +181,7 @@ fn toggle_caps_lock() {
             "INFO",
             &format!(
                 "CapsLock toggled via IOKit: previous_state={} new_state={}",
-                current_state,
-                !current_state
+                current_state, !current_state
             ),
         );
 
@@ -186,10 +193,7 @@ fn post_key(keycode: u16, key_down: bool, flags: CGEventFlags) {
     if let Ok(source) = CGEventSource::new(CGEventSourceStateID::Private) {
         if let Ok(event) = CGEvent::new_keyboard_event(source, keycode, key_down) {
             event.set_flags(flags);
-            event.set_integer_value_field(
-                EventField::EVENT_SOURCE_USER_DATA,
-                INJECTED_EVENT_MAGIC,
-            );
+            event.set_integer_value_field(EventField::EVENT_SOURCE_USER_DATA, INJECTED_EVENT_MAGIC);
             event.post(CGEventTapLocation::HID);
         }
     }
@@ -200,13 +204,33 @@ fn post_key_tap(keycode: u16, flags: CGEventFlags) {
     post_key(keycode, false, flags);
 }
 
-fn post_key_simple(keycode: u16, key_down: bool) {
-    post_key(keycode, key_down, CGEventFlags::empty());
+fn post_key_simple(keycode: u16, key_down: bool, flags: CGEventFlags) {
+    post_key(keycode, key_down, flags);
 }
 
-fn handle_caps_remap(keycode: u16, key_down: bool, shift_held: bool) -> bool {
+fn active_modifier_flags(flags: CGEventFlags) -> CGEventFlags {
+    flags
+        & (CGEventFlags::CGEventFlagShift
+            | CGEventFlags::CGEventFlagControl
+            | CGEventFlags::CGEventFlagAlternate
+            | CGEventFlags::CGEventFlagCommand
+            | CGEventFlags::CGEventFlagSecondaryFn)
+}
+
+fn is_builtin_arrow_caps_remap_key(keycode: u16) -> bool {
+    matches!(
+        keycode,
+        KC_H | KC_J | KC_K | KC_L
+    )
+}
+
+fn handle_caps_remap(keycode: u16, key_down: bool, active_modifiers: CGEventFlags) -> bool {
+    let shift_held = active_modifiers.contains(CGEventFlags::CGEventFlagShift);
+
     // Check for Shell Mappings (Caps + Shift + Key) => command executing
-    if shift_held && key_down {
+    if shift_held && key_down && !is_builtin_arrow_caps_remap_key(keycode) {
+        // Built-in Caps remaps must win so modifier-aware navigation keeps working
+        // (e.g. Caps+Shift+H should always be Shift+Left selection, not a shell command).
         if let Some(js_keycode) = mac_keycode_to_js_keycode(keycode) {
             let guard = SHELL_MAPPINGS.lock().unwrap();
             if let Some(mappings) = &*guard {
@@ -237,25 +261,25 @@ fn handle_caps_remap(keycode: u16, key_down: bool, shift_held: bool) -> bool {
     match keycode {
         // HJKL — Arrow keys
         KC_H => {
-            post_key_simple(KC_LEFT, key_down);
+            post_key_simple(KC_LEFT, key_down, active_modifiers);
             true
         }
         KC_J => {
-            post_key_simple(KC_DOWN, key_down);
+            post_key_simple(KC_DOWN, key_down, active_modifiers);
             true
         }
         KC_K => {
-            post_key_simple(KC_UP, key_down);
+            post_key_simple(KC_UP, key_down, active_modifiers);
             true
         }
         KC_L => {
-            post_key_simple(KC_RIGHT, key_down);
+            post_key_simple(KC_RIGHT, key_down, active_modifiers);
             true
         }
 
         // Backspace
         KC_I => {
-            post_key_simple(KC_DELETE, key_down);
+            post_key_simple(KC_DELETE, key_down, active_modifiers);
             true
         }
 
@@ -283,25 +307,41 @@ fn handle_caps_remap(keycode: u16, key_down: bool, shift_held: bool) -> bool {
 
         // Word Forward (P): Option+Right
         KC_P => {
-            post_key(KC_RIGHT, key_down, CGEventFlags::CGEventFlagAlternate);
+            post_key(
+                KC_RIGHT,
+                key_down,
+                active_modifiers | CGEventFlags::CGEventFlagAlternate,
+            );
             true
         }
 
         // Word Back (Y): Option+Left
         KC_Y => {
-            post_key(KC_LEFT, key_down, CGEventFlags::CGEventFlagAlternate);
+            post_key(
+                KC_LEFT,
+                key_down,
+                active_modifiers | CGEventFlags::CGEventFlagAlternate,
+            );
             true
         }
 
         // Home (Start of line): Cmd+Left
         KC_A => {
-            post_key(KC_LEFT, key_down, CGEventFlags::CGEventFlagCommand);
+            post_key(
+                KC_LEFT,
+                key_down,
+                active_modifiers | CGEventFlags::CGEventFlagCommand,
+            );
             true
         }
 
         // End of line: Cmd+Right
         KC_E => {
-            post_key(KC_RIGHT, key_down, CGEventFlags::CGEventFlagCommand);
+            post_key(
+                KC_RIGHT,
+                key_down,
+                active_modifiers | CGEventFlags::CGEventFlagCommand,
+            );
             true
         }
 
@@ -309,7 +349,7 @@ fn handle_caps_remap(keycode: u16, key_down: bool, shift_held: bool) -> bool {
         KC_U => {
             if key_down {
                 for _ in 0..10 {
-                    post_key_tap(KC_UP, CGEventFlags::empty());
+                    post_key_tap(KC_UP, active_modifiers);
                 }
             }
             true
@@ -319,7 +359,7 @@ fn handle_caps_remap(keycode: u16, key_down: bool, shift_held: bool) -> bool {
         KC_D => {
             if key_down {
                 for _ in 0..10 {
-                    post_key_tap(KC_DOWN, CGEventFlags::empty());
+                    post_key_tap(KC_DOWN, active_modifiers);
                 }
             }
             true
@@ -413,7 +453,10 @@ fn setup_capslock_remap() -> bool {
             false
         }
         Err(e) => {
-            log_macos("ERROR", &format!("Failed to execute hidutil remap command: {}", e));
+            log_macos(
+                "ERROR",
+                &format!("Failed to execute hidutil remap command: {}", e),
+            );
             false
         }
     }
@@ -440,7 +483,10 @@ pub fn cleanup_capslock_remap() {
             );
         }
         Err(e) => {
-            log_macos("WARN", &format!("Failed to execute hidutil cleanup command: {}", e));
+            log_macos(
+                "WARN",
+                &format!("Failed to execute hidutil cleanup command: {}", e),
+            );
         }
     }
 }
@@ -536,7 +582,10 @@ pub fn start_keyboard_hook() {
                         CAPS_DOWN.store(false, Ordering::SeqCst);
                         if !DID_REMAP.load(Ordering::SeqCst) {
                             // Tap only — toggle CapsLock via IOKit
-                            log_macos("INFO", "Caps(F18) tap detected (no remap). Toggling CapsLock.");
+                            log_macos(
+                                "INFO",
+                                "Caps(F18) tap detected (no remap). Toggling CapsLock.",
+                            );
                             toggle_caps_lock();
                         } else {
                             log_macos("INFO", "Caps(F18) up after remap sequence.");
@@ -559,9 +608,10 @@ pub fn start_keyboard_hook() {
                 // Handle remapping when CapsLock is held
                 if CAPS_DOWN.load(Ordering::SeqCst) {
                     let key_down = event_type_matches(event_type, CGEventType::KeyDown);
-                    let shift_held = flags.contains(CGEventFlags::CGEventFlagShift);
+                    let active_modifiers = active_modifier_flags(flags);
+                    let shift_held = active_modifiers.contains(CGEventFlags::CGEventFlagShift);
 
-                    if handle_caps_remap(keycode, key_down, shift_held) {
+                    if handle_caps_remap(keycode, key_down, active_modifiers) {
                         DID_REMAP.store(true, Ordering::SeqCst);
                         if key_down {
                             log_macos(
