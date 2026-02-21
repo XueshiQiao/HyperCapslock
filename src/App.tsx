@@ -125,6 +125,7 @@ function actionToPresentation(action: ActionConfig): ActionPresentation {
 }
 
 const CARD_WIDTH_CLASS = "w-full max-w-[580px]";
+const MODERN_CARD_CLASS = "relative overflow-hidden border border-slate-700/80 rounded-2xl shadow-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900";
 const ACTION_GROUP_ORDER: Array<{ key: ActionGroupKey; label: string }> = [
   { key: "directional", label: "Directional" },
   { key: "jump", label: "Jump" },
@@ -335,78 +336,94 @@ function App() {
         <p className="text-slate-400 text-sm">System-wide Vim navigation</p>
       </div>
 
-      {/* Status Card */}
-      <div className={`${CARD_WIDTH_CLASS} bg-surface border border-slate-700 rounded-2xl p-6 shadow-xl mb-6`}>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Status</h2>
-            <p className={`text-xl font-medium ${statusColor}`}>
-              {status}
-            </p>
-          </div>
-          <div className="relative flex h-3 w-3">
-            {(isRunning || isPaused) && <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${pingColor} opacity-75`}></span>}
-            <span className={`relative inline-flex rounded-full h-3 w-3 ${dotColor}`}></span>
+      {/* Status + Settings Row */}
+      <div className={`${CARD_WIDTH_CLASS} grid grid-cols-2 gap-3 mb-8`}>
+        <div className={`${MODERN_CARD_CLASS} p-5`}>
+          <div className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full bg-blue-500/15 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-cyan-400/10 blur-2xl" />
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="relative flex h-3 w-3">
+                {(isRunning || isPaused) && <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${pingColor} opacity-75`}></span>}
+                <span className={`relative inline-flex rounded-full h-3 w-3 ${dotColor}`}></span>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Status</p>
+                <p className={`text-lg font-semibold leading-tight ${statusColor}`}>{status}</p>
+              </div>
+            </div>
+            <button
+              onClick={togglePause}
+              className={`w-full px-4 py-2 rounded-xl font-medium transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-2 border
+                ${isRunning
+                  ? "bg-slate-700/90 hover:bg-slate-600 text-slate-100 border-slate-500"
+                  : "bg-blue-600 hover:bg-blue-500 text-white border-blue-400/60 shadow-lg shadow-blue-900/20"
+                }`}
+            >
+              {isRunning ? <><PauseIcon /><span>Pause</span></> : <><PlayIcon /><span>Resume</span></>}
+            </button>
           </div>
         </div>
 
-        <button
-          onClick={togglePause}
-          className={`w-full py-3 px-4 rounded-xl font-medium transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-2
-            ${isRunning
-              ? "bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600"
-              : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20"
-            }`}
-        >
-          {isRunning ? <><PauseIcon /><span>Pause Service (Gaming Mode)</span></> : <><PlayIcon /><span>Resume Service</span></>}
-        </button>
-      </div>
-
-      {/* Settings Card */}
-      <div className={`${CARD_WIDTH_CLASS} bg-surface border border-slate-700 rounded-2xl p-6 shadow-xl mb-8 flex items-center justify-between`}>
-        <div>
-           <h2 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Settings</h2>
-           <p className="text-slate-200 font-medium">Start at Login</p>
+        <div className={`${MODERN_CARD_CLASS} p-5 flex flex-col justify-between`}>
+          <div className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full bg-violet-500/12 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-cyan-400/10 blur-2xl" />
+          <div className="relative">
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Settings</p>
+              <p className="text-sm text-slate-200 font-medium mt-1">Start at Login</p>
+              <p className="text-[11px] text-slate-500 mt-1">Launch automatically when you sign in.</p>
+            </div>
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={toggleAutostart}
+                className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 ease-in-out cursor-pointer ${autostart ? 'bg-primary' : 'bg-slate-600'}`}
+              >
+                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${autostart ? 'translate-x-6' : 'translate-x-0'}`} />
+              </button>
+            </div>
+          </div>
         </div>
-        <button
-           onClick={toggleAutostart}
-           className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 ease-in-out cursor-pointer ${autostart ? 'bg-primary' : 'bg-slate-600'}`}
-        >
-           <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${autostart ? 'translate-x-6' : 'translate-x-0'}`} />
-        </button>
       </div>
 
       {/* Permissions Card */}
-      <div className={`${CARD_WIDTH_CLASS} bg-surface border border-slate-700 rounded-2xl p-6 shadow-xl mb-8`}>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Permissions</h2>
-            <p className="text-slate-200 font-medium">Authority Status</p>
+      <div className={`${CARD_WIDTH_CLASS} ${MODERN_CARD_CLASS} p-6 mb-8`}>
+        <div className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full bg-emerald-500/12 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-blue-500/10 blur-2xl" />
+        <div className="relative">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Permissions</h2>
+              <p className="text-slate-200 font-medium">Authority Status</p>
+            </div>
+            <button
+              onClick={() => refreshPermissions(true)}
+              className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+            >
+              Refresh
+            </button>
           </div>
-          <button
-            onClick={() => refreshPermissions(true)}
-            className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
-          >
-            Refresh
-          </button>
+          <div className="space-y-2 text-sm">
+            <PermissionRow label="Accessibility" status={permissions?.accessibility ?? "not_required"} />
+            <PermissionRow label="Input Monitoring" status={permissions?.input_monitoring ?? "not_required"} />
+          </div>
+          <p className="text-[11px] text-slate-500 mt-3">
+            {permissions?.platform === "macos"
+              ? "Required on macOS for reliable global hotkeys."
+              : "These permissions are only required on macOS."}
+          </p>
         </div>
-        <div className="space-y-2 text-sm">
-          <PermissionRow label="Accessibility" status={permissions?.accessibility ?? "not_required"} />
-          <PermissionRow label="Input Monitoring" status={permissions?.input_monitoring ?? "not_required"} />
-        </div>
-        <p className="text-[11px] text-slate-500 mt-3">
-          {permissions?.platform === "macos"
-            ? "Required on macOS for reliable global hotkeys."
-            : "These permissions are only required on macOS."}
-        </p>
       </div>
 
-      <div className={`${CARD_WIDTH_CLASS} bg-surface border border-slate-700 rounded-2xl p-6 shadow-xl mb-8`}>
-        <h2 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-4">
-          Action Mappings (Caps+Key)
-        </h2>
+      <div className={`${CARD_WIDTH_CLASS} ${MODERN_CARD_CLASS} p-6 mb-8`}>
+        <div className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full bg-indigo-500/12 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-cyan-500/10 blur-2xl" />
+        <div className="relative">
+          <h2 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-4">
+            Action Mappings (Caps+Key)
+          </h2>
 
-        <div className="grid grid-cols-3 gap-2 mb-2">
+          <div className="grid grid-cols-3 gap-2 mb-2">
           <FormSelect
             value={newWithShift ? "with_shift" : "plain"}
             onChange={(value) => setNewWithShift(value === "with_shift")}
@@ -443,149 +460,150 @@ function App() {
               { value: "command", label: "Command" },
             ]}
           />
-        </div>
-
-        {newActionKind === "directional" && (
-          <div className="mb-2">
-            <FormSelect
-              value={newDirectionalAction}
-              onChange={(value) => setNewDirectionalAction(value as DirectionalAction)}
-              options={[
-                { value: "left", label: "Left" },
-                { value: "right", label: "Right" },
-                { value: "up", label: "Up" },
-                { value: "down", label: "Down" },
-                { value: "word_forward", label: "Word Forward" },
-                { value: "word_back", label: "Word Back" },
-                { value: "home", label: "Home" },
-                { value: "end", label: "End" },
-              ]}
-            />
           </div>
-        )}
 
-        {newActionKind === "jump" && (
-          <div className="grid grid-cols-2 gap-2 mb-2">
-            <FormSelect
-              value={newJumpDirection}
-              onChange={(value) => setNewJumpDirection(value as JumpDirection)}
-              options={[
-                { value: "up", label: "Up" },
-                { value: "down", label: "Down" },
-              ]}
-            />
-            <input
-              type="number"
-              min={1}
-              max={99}
-              value={newJumpCount}
-              onChange={(e) => setNewJumpCount(Number(e.target.value))}
-              className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors"
-            />
-          </div>
-        )}
-
-        {newActionKind === "independent" && (
-          <div className="mb-2">
-            <FormSelect
-              value={newIndependentAction}
-              onChange={(value) => setNewIndependentAction(value as IndependentAction)}
-              options={[
-                { value: "backspace", label: "Backspace" },
-                { value: "next_line", label: "Next Line" },
-                { value: "insert_quotes", label: "Insert quotes" },
-              ]}
-            />
-          </div>
-        )}
-
-        {newActionKind === "input_source" && (
-          <div className="mb-2">
-            <input
-              type="text"
-              placeholder="Input Source ID (e.g. com.apple.keylayout.ABC)"
-              value={newInputSourceId}
-              onChange={(e) => setNewInputSourceId(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors font-mono"
-            />
-          </div>
-        )}
-
-        {newActionKind === "command" && (
-          <div className="mb-2">
-            <input
-              type="text"
-              placeholder="Command (e.g. open -a Calculator)"
-              value={newCommand}
-              onChange={(e) => setNewCommand(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors"
-            />
-          </div>
-        )}
-
-        <button
-          onClick={upsertActionMapping}
-          disabled={!canSaveAction}
-          className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 py-2 transition-colors text-sm font-medium mb-3"
-        >
-          Save Mapping
-        </button>
-
-        <p className="text-[11px] text-slate-500 mb-3">
-          Defaults include directional, jump, next-line, quote insertion, and on macOS:
-          <code className="text-slate-400 block">Caps+, → com.apple.keylayout.ABC</code>
-          <code className="text-slate-400 block">Caps+. → com.tencent.inputmethod.wetype.pinyin</code>
-        </p>
-
-        <div className="space-y-4">
-          {groupedMappings.map((group) => (
-            <div key={group.key} className="space-y-2">
-              <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-1">
-                {group.label}
-              </h3>
-              {group.entries.map((entry) => {
-                const presentation = actionToPresentation(entry.action);
-                return (
-                  <div
-                    key={`${entry.key}-${entry.with_shift ? "s" : "n"}`}
-                    className="flex items-center justify-between bg-slate-800/50 rounded-lg p-2 px-3 border border-slate-700/50 hover:border-slate-500 transition-colors group"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Kbd>Caps</Kbd>
-                      <span className="text-slate-500 font-light text-xs">+</span>
-                      {entry.with_shift && (
-                        <>
-                          <Kbd>Shift</Kbd>
-                          <span className="text-slate-500 font-light text-xs">+</span>
-                        </>
-                      )}
-                      <Kbd>{keyCodeToDisplay(entry.key)}</Kbd>
-                    </div>
-                    <div className="flex items-center gap-3 overflow-hidden flex-1 justify-end">
-                      <div
-                        className="flex items-center gap-2 overflow-hidden max-w-[260px]"
-                        title={`${presentation.category}: ${presentation.value}`}
-                      >
-                        <span className="text-xs text-slate-400 shrink-0">
-                          {presentation.category}:
-                        </span>
-                        <span className={`text-xs truncate ${presentation.valueClassName ?? "text-blue-300"}`}>
-                          {presentation.value}
-                        </span>
-                        <ActionIcon icon={presentation.icon} className={presentation.iconClassName} />
-                      </div>
-                      <button onClick={() => removeActionMapping(entry.key, entry.with_shift)} className="text-slate-600 hover:text-red-400 transition-colors">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+          {newActionKind === "directional" && (
+            <div className="mb-2">
+              <FormSelect
+                value={newDirectionalAction}
+                onChange={(value) => setNewDirectionalAction(value as DirectionalAction)}
+                options={[
+                  { value: "left", label: "Left" },
+                  { value: "right", label: "Right" },
+                  { value: "up", label: "Up" },
+                  { value: "down", label: "Down" },
+                  { value: "word_forward", label: "Word Forward" },
+                  { value: "word_back", label: "Word Back" },
+                  { value: "home", label: "Home" },
+                  { value: "end", label: "End" },
+                ]}
+              />
             </div>
-          ))}
-          {actionMappings.length === 0 && (
-            <div className="text-center text-slate-500 text-xs py-2 italic">No action mappings yet</div>
           )}
+
+          {newActionKind === "jump" && (
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <FormSelect
+                value={newJumpDirection}
+                onChange={(value) => setNewJumpDirection(value as JumpDirection)}
+                options={[
+                  { value: "up", label: "Up" },
+                  { value: "down", label: "Down" },
+                ]}
+              />
+              <input
+                type="number"
+                min={1}
+                max={99}
+                value={newJumpCount}
+                onChange={(e) => setNewJumpCount(Number(e.target.value))}
+                className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+              />
+            </div>
+          )}
+
+          {newActionKind === "independent" && (
+            <div className="mb-2">
+              <FormSelect
+                value={newIndependentAction}
+                onChange={(value) => setNewIndependentAction(value as IndependentAction)}
+                options={[
+                  { value: "backspace", label: "Backspace" },
+                  { value: "next_line", label: "Next Line" },
+                  { value: "insert_quotes", label: "Insert quotes" },
+                ]}
+              />
+            </div>
+          )}
+
+          {newActionKind === "input_source" && (
+            <div className="mb-2">
+              <input
+                type="text"
+                placeholder="Input Source ID (e.g. com.apple.keylayout.ABC)"
+                value={newInputSourceId}
+                onChange={(e) => setNewInputSourceId(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors font-mono"
+              />
+            </div>
+          )}
+
+          {newActionKind === "command" && (
+            <div className="mb-2">
+              <input
+                type="text"
+                placeholder="Command (e.g. open -a Calculator)"
+                value={newCommand}
+                onChange={(e) => setNewCommand(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+              />
+            </div>
+          )}
+
+          <button
+            onClick={upsertActionMapping}
+            disabled={!canSaveAction}
+            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 py-2 transition-colors text-sm font-medium mb-3"
+          >
+            Save Mapping
+          </button>
+
+          <p className="text-[11px] text-slate-500 mb-3">
+            Defaults include directional, jump, next-line, quote insertion, and on macOS:
+            <code className="text-slate-400 block">Caps+, → com.apple.keylayout.ABC</code>
+            <code className="text-slate-400 block">Caps+. → com.tencent.inputmethod.wetype.pinyin</code>
+          </p>
+
+          <div className="space-y-4">
+            {groupedMappings.map((group) => (
+              <div key={group.key} className="space-y-2">
+                <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-1">
+                  {group.label}
+                </h3>
+                {group.entries.map((entry) => {
+                  const presentation = actionToPresentation(entry.action);
+                  return (
+                    <div
+                      key={`${entry.key}-${entry.with_shift ? "s" : "n"}`}
+                      className="flex items-center justify-between bg-slate-800/50 rounded-lg p-2 px-3 border border-slate-700/50 hover:border-slate-500 transition-colors group"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Kbd>Caps</Kbd>
+                        <span className="text-slate-500 font-light text-xs">+</span>
+                        {entry.with_shift && (
+                          <>
+                            <Kbd>Shift</Kbd>
+                            <span className="text-slate-500 font-light text-xs">+</span>
+                          </>
+                        )}
+                        <Kbd>{keyCodeToDisplay(entry.key)}</Kbd>
+                      </div>
+                      <div className="flex items-center gap-3 overflow-hidden flex-1 justify-end">
+                        <div
+                          className="flex items-center gap-2 overflow-hidden max-w-[260px]"
+                          title={`${presentation.category}: ${presentation.value}`}
+                        >
+                          <span className="text-xs text-slate-400 shrink-0">
+                            {presentation.category}:
+                          </span>
+                          <span className={`text-xs truncate ${presentation.valueClassName ?? "text-blue-300"}`}>
+                            {presentation.value}
+                          </span>
+                          <ActionIcon icon={presentation.icon} className={presentation.iconClassName} />
+                        </div>
+                        <button onClick={() => removeActionMapping(entry.key, entry.with_shift)} className="text-slate-600 hover:text-red-400 transition-colors">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            {actionMappings.length === 0 && (
+              <div className="text-center text-slate-500 text-xs py-2 italic">No action mappings yet</div>
+            )}
+          </div>
         </div>
       </div>
 
