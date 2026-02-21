@@ -295,7 +295,7 @@ function App() {
   })).filter((group) => group.entries.length > 0);
 
   return (
-    <div className="min-h-screen w-full bg-[#09090b] text-white/90 font-sans relative pb-10">
+    <div className="h-screen w-full bg-[#09090b] text-white/90 overflow-y-auto font-sans relative pb-10 scroll-smooth">
       
       {/* Immersive background effects */}
       <div className="pointer-events-none fixed top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-600/10 blur-[140px]" />
