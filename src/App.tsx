@@ -427,122 +427,123 @@ function App() {
             Action Mappings (Caps+Key)
           </h2>
 
-          <div className="grid grid-cols-3 gap-2 mb-2">
-          <FormSelect
-            value={newWithShift ? "with_shift" : "plain"}
-            onChange={(value) => setNewWithShift(value === "with_shift")}
-            wrapperClassName="col-span-1"
-            options={[
-              { value: "plain", label: "Caps" },
-              { value: "with_shift", label: "Caps + Shift" },
-            ]}
-          />
-          <input
-            type="text"
-            placeholder="Press Key"
-            value={newKeyDisplay}
-            readOnly
-            onKeyDown={(e) => {
-              e.preventDefault();
-              if (["Shift", "Control", "Alt", "Meta", "CapsLock"].includes(e.key)) return;
-              setNewKey(e.keyCode);
-              setNewKeyDisplay(keyCodeToDisplay(e.keyCode));
-            }}
-            className="col-span-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-center text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors cursor-pointer"
-          />
-          <FormSelect
-            value={newActionKind}
-            onChange={(value) => setNewActionKind(value as ActionConfig["kind"])}
-            wrapperClassName="col-span-1"
-            options={[
-              { value: "directional", label: "Directional" },
-              { value: "jump", label: "Jump" },
-              { value: "independent", label: "Independent" },
-              ...(permissions?.platform === "macos"
-                ? [{ value: "input_source", label: "Input Source" }]
-                : []),
-              { value: "command", label: "Command" },
-            ]}
-          />
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mb-1">
+            <FormSelect
+              value={newWithShift ? "with_shift" : "plain"}
+              onChange={(value) => setNewWithShift(value === "with_shift")}
+              wrapperClassName="col-span-1"
+              options={[
+                { value: "plain", label: "Caps" },
+                { value: "with_shift", label: "Caps + Shift" },
+              ]}
+            />
+            <span className="text-slate-500 text-sm font-medium select-none">+</span>
+            <input
+              type="text"
+              placeholder="Press Key"
+              value={newKeyDisplay}
+              readOnly
+              onKeyDown={(e) => {
+                e.preventDefault();
+                if (["Shift", "Control", "Alt", "Meta", "CapsLock"].includes(e.key)) return;
+                setNewKey(e.keyCode);
+                setNewKeyDisplay(keyCodeToDisplay(e.keyCode));
+              }}
+              className="col-span-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-center text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors cursor-pointer"
+            />
           </div>
 
-          {newActionKind === "directional" && (
-            <div className="mb-2">
-              <FormSelect
-                value={newDirectionalAction}
-                onChange={(value) => setNewDirectionalAction(value as DirectionalAction)}
-                options={[
-                  { value: "left", label: "Left" },
-                  { value: "right", label: "Right" },
-                  { value: "up", label: "Up" },
-                  { value: "down", label: "Down" },
-                  { value: "word_forward", label: "Word Forward" },
-                  { value: "word_back", label: "Word Back" },
-                  { value: "home", label: "Home" },
-                  { value: "end", label: "End" },
-                ]}
-              />
-            </div>
-          )}
+          <div className="flex justify-center mb-1">
+            <span className="text-slate-500 text-base font-medium select-none">↓</span>
+          </div>
 
-          {newActionKind === "jump" && (
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <FormSelect
-                value={newJumpDirection}
-                onChange={(value) => setNewJumpDirection(value as JumpDirection)}
-                options={[
-                  { value: "up", label: "Up" },
-                  { value: "down", label: "Down" },
-                ]}
-              />
-              <input
-                type="number"
-                min={1}
-                max={99}
-                value={newJumpCount}
-                onChange={(e) => setNewJumpCount(Number(e.target.value))}
-                className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors"
-              />
-            </div>
-          )}
+          <div className="grid grid-cols-[minmax(130px,1fr)_minmax(0,3fr)] items-center gap-2 mb-2">
+            <FormSelect
+              value={newActionKind}
+              onChange={(value) => setNewActionKind(value as ActionConfig["kind"])}
+              wrapperClassName="col-span-1"
+              options={[
+                { value: "directional", label: "Directional" },
+                { value: "jump", label: "Jump" },
+                { value: "independent", label: "Independent" },
+                ...(permissions?.platform === "macos"
+                  ? [{ value: "input_source", label: "Input Source" }]
+                  : []),
+                { value: "command", label: "Command" },
+              ]}
+            />
+            <div className="min-w-0">
+              {newActionKind === "directional" && (
+                <FormSelect
+                  value={newDirectionalAction}
+                  onChange={(value) => setNewDirectionalAction(value as DirectionalAction)}
+                  options={[
+                    { value: "left", label: "Left" },
+                    { value: "right", label: "Right" },
+                    { value: "up", label: "Up" },
+                    { value: "down", label: "Down" },
+                    { value: "word_forward", label: "Word Forward" },
+                    { value: "word_back", label: "Word Back" },
+                    { value: "home", label: "Home" },
+                    { value: "end", label: "End" },
+                  ]}
+                />
+              )}
 
-          {newActionKind === "independent" && (
-            <div className="mb-2">
-              <FormSelect
-                value={newIndependentAction}
-                onChange={(value) => setNewIndependentAction(value as IndependentAction)}
-                options={[
-                  { value: "backspace", label: "Backspace" },
-                  { value: "next_line", label: "Next Line" },
-                  { value: "insert_quotes", label: "Insert quotes" },
-                ]}
-              />
-            </div>
-          )}
+              {newActionKind === "jump" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <FormSelect
+                    value={newJumpDirection}
+                    onChange={(value) => setNewJumpDirection(value as JumpDirection)}
+                    options={[
+                      { value: "up", label: "Up" },
+                      { value: "down", label: "Down" },
+                    ]}
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={newJumpCount}
+                    onChange={(e) => setNewJumpCount(Number(e.target.value))}
+                    className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors"
+                  />
+                </div>
+              )}
 
-          {newActionKind === "input_source" && (
-            <div className="mb-2">
-              <input
-                type="text"
-                placeholder="Input Source ID (e.g. com.apple.keylayout.ABC)"
-                value={newInputSourceId}
-                onChange={(e) => setNewInputSourceId(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors font-mono"
-              />
-            </div>
-          )}
+              {newActionKind === "independent" && (
+                <FormSelect
+                  value={newIndependentAction}
+                  onChange={(value) => setNewIndependentAction(value as IndependentAction)}
+                  options={[
+                    { value: "backspace", label: "Backspace" },
+                    { value: "next_line", label: "Next Line" },
+                    { value: "insert_quotes", label: "Insert quotes" },
+                  ]}
+                />
+              )}
 
-          {newActionKind === "command" && (
-            <div className="mb-2">
-              <input
-                type="text"
-                placeholder="Command (e.g. open -a Calculator)"
-                value={newCommand}
-                onChange={(e) => setNewCommand(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors"
-              />
+              {newActionKind === "input_source" && (
+                <input
+                  type="text"
+                  placeholder="Input Source ID (e.g. com.apple.keylayout.ABC)"
+                  value={newInputSourceId}
+                  onChange={(e) => setNewInputSourceId(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors font-mono"
+                />
+              )}
+
+              {newActionKind === "command" && (
+                <input
+                  type="text"
+                  placeholder="Command (e.g. open -a Calculator)"
+                  value={newCommand}
+                  onChange={(e) => setNewCommand(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors"
+                />
+              )}
             </div>
-          )}
+          </div>
 
           <button
             onClick={upsertActionMapping}
