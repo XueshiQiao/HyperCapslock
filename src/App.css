@@ -1,40 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #09090b;
-  --color-surface: rgba(255, 255, 255, 0.03);
-  --color-surface-hover: rgba(255, 255, 255, 0.06);
-  --color-border: rgba(255, 255, 255, 0.08);
+  --color-background: #0f172a;
+  --color-surface: #1e293b;
   --color-primary: #3b82f6;
-  --color-primary-hover: #2563eb;
-  --color-text-main: rgba(255, 255, 255, 0.9);
-  --color-text-dim: rgba(255, 255, 255, 0.5);
-  
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --color-success: #22c55e;
 }
 
 body {
-  @apply bg-background text-text-main antialiased;
-  font-family: var(--font-sans);
+  @apply bg-background text-white antialiased;
+  font-family: 'Inter', sans-serif;
   margin: 0;
   padding: 0;
-  overflow: hidden; /* App takes full screen, custom scrollbar inside */
-}
-
-/* Custom modern scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
 }
 
 @keyframes slide-up {
@@ -49,34 +26,5 @@ body {
 }
 
 .animate-slide-up {
-  animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes dropdown-fade {
-  from {
-    transform: translateY(-10px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.animate-dropdown {
-  animation: dropdown-fade 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Glow effects */
-.glow-primary {
-  box-shadow: 0 0 20px -5px rgba(59, 130, 246, 0.5);
-}
-.glow-success {
-  box-shadow: 0 0 20px -5px rgba(34, 197, 94, 0.5);
-}
-.glow-warning {
-  box-shadow: 0 0 20px -5px rgba(245, 158, 11, 0.5);
-}
-.glow-danger {
-  box-shadow: 0 0 20px -5px rgba(239, 68, 68, 0.5);
+  animation: slide-up 0.3s ease-out forwards;
 }
