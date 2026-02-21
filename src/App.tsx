@@ -46,6 +46,8 @@ type SelectOption = {
   label: string;
 };
 
+type ActionGroupKey = ActionConfig["kind"];
+
 const SPECIAL_KEY_DISPLAY: Record<number, string> = {
   8: "Del",
   13: "Enter",
@@ -123,6 +125,13 @@ function actionToPresentation(action: ActionConfig): ActionPresentation {
 }
 
 const CARD_WIDTH_CLASS = "w-full max-w-[580px]";
+const ACTION_GROUP_ORDER: Array<{ key: ActionGroupKey; label: string }> = [
+  { key: "directional", label: "Directional" },
+  { key: "jump", label: "Jump" },
+  { key: "independent", label: "Independent" },
+  { key: "input_source", label: "Input Source" },
+  { key: "command", label: "Commit" },
+];
 
 function App() {
   const [status, setStatus] = useState("Initializing...");
@@ -294,6 +303,10 @@ function App() {
   const pingColor = isRunning ? "bg-green-400" : isPaused ? "bg-amber-400" : "bg-red-400";
   const draftAction = buildDraftAction();
   const canSaveAction = !!newKey && !!draftAction;
+  const groupedMappings = ACTION_GROUP_ORDER.map((group) => ({
+    ...group,
+    entries: actionMappings.filter((entry) => entry.action.kind === group.key),
+  })).filter((group) => group.entries.length > 0);
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-background p-6 select-none overflow-y-auto relative">
@@ -524,45 +537,52 @@ function App() {
           <code className="text-slate-400 block">Caps+. → com.tencent.inputmethod.wetype.pinyin</code>
         </p>
 
-        <div className="space-y-2">
-          {actionMappings.map((entry) => {
-            const presentation = actionToPresentation(entry.action);
-            return (
-              <div
-                key={`${entry.key}-${entry.with_shift ? "s" : "n"}`}
-                className="flex items-center justify-between bg-slate-800/50 rounded-lg p-2 px-3 border border-slate-700/50 hover:border-slate-500 transition-colors group"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <Kbd>Caps</Kbd>
-                  <span className="text-slate-500 font-light text-xs">+</span>
-                  {entry.with_shift && (
-                    <>
-                      <Kbd>Shift</Kbd>
-                      <span className="text-slate-500 font-light text-xs">+</span>
-                    </>
-                  )}
-                  <Kbd>{keyCodeToDisplay(entry.key)}</Kbd>
-                </div>
-                <div className="flex items-center gap-3 overflow-hidden flex-1 justify-end">
+        <div className="space-y-4">
+          {groupedMappings.map((group) => (
+            <div key={group.key} className="space-y-2">
+              <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-1">
+                {group.label}
+              </h3>
+              {group.entries.map((entry) => {
+                const presentation = actionToPresentation(entry.action);
+                return (
                   <div
-                    className="flex items-center gap-2 overflow-hidden max-w-[260px]"
-                    title={`${presentation.category}: ${presentation.value}`}
+                    key={`${entry.key}-${entry.with_shift ? "s" : "n"}`}
+                    className="flex items-center justify-between bg-slate-800/50 rounded-lg p-2 px-3 border border-slate-700/50 hover:border-slate-500 transition-colors group"
                   >
-                    <span className="text-xs text-slate-400 shrink-0">
-                      {presentation.category}:
-                    </span>
-                    <span className={`text-xs truncate ${presentation.valueClassName ?? "text-blue-300"}`}>
-                      {presentation.value}
-                    </span>
-                    <ActionIcon icon={presentation.icon} className={presentation.iconClassName} />
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Kbd>Caps</Kbd>
+                      <span className="text-slate-500 font-light text-xs">+</span>
+                      {entry.with_shift && (
+                        <>
+                          <Kbd>Shift</Kbd>
+                          <span className="text-slate-500 font-light text-xs">+</span>
+                        </>
+                      )}
+                      <Kbd>{keyCodeToDisplay(entry.key)}</Kbd>
+                    </div>
+                    <div className="flex items-center gap-3 overflow-hidden flex-1 justify-end">
+                      <div
+                        className="flex items-center gap-2 overflow-hidden max-w-[260px]"
+                        title={`${presentation.category}: ${presentation.value}`}
+                      >
+                        <span className="text-xs text-slate-400 shrink-0">
+                          {presentation.category}:
+                        </span>
+                        <span className={`text-xs truncate ${presentation.valueClassName ?? "text-blue-300"}`}>
+                          {presentation.value}
+                        </span>
+                        <ActionIcon icon={presentation.icon} className={presentation.iconClassName} />
+                      </div>
+                      <button onClick={() => removeActionMapping(entry.key, entry.with_shift)} className="text-slate-600 hover:text-red-400 transition-colors">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
                   </div>
-                  <button onClick={() => removeActionMapping(entry.key, entry.with_shift)} className="text-slate-600 hover:text-red-400 transition-colors">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          ))}
           {actionMappings.length === 0 && (
             <div className="text-center text-slate-500 text-xs py-2 italic">No action mappings yet</div>
           )}
