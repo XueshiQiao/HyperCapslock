@@ -98,3 +98,12 @@ jobs:
           repository: XueshiQiao/XueshiQiao.github.io
           event-type: app_released
 
+      - name: Trigger Homebrew Tap Update
+        if: success()
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.HOMEBREW_TAP_PAT }}
+          repository: XueshiQiao/homebrew_tap
+          event-type: update_cask
+          client-payload: '{"app_token": "hypercapslock"}'
+
