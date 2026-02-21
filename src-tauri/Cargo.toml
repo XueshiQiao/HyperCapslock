@@ -1,6 +1,6 @@
 [package]
 name = "hyper-capslock"
-version = "0.8.4"
+version = "0.8.5"
 description = "Make your Capslock Powerful again!"
 authors = ["XueshiQiao"]
 edition = "2021"
