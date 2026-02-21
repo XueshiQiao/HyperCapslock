@@ -537,8 +537,14 @@ fn load_action_mappings_from_disk(app: &AppHandle) {
     }
 }
 
+#[cfg(not(target_os = "macos"))]
 static ICON_RUNNING: &[u8] = include_bytes!("../icons/icon.png");
+#[cfg(not(target_os = "macos"))]
 static ICON_DISABLED: &[u8] = include_bytes!("../icons/icon_disabled.png");
+#[cfg(target_os = "macos")]
+static ICON_TRAY_TEMPLATE_RUNNING: &[u8] = include_bytes!("../icons/capslock.fill.png");
+#[cfg(target_os = "macos")]
+static ICON_TRAY_TEMPLATE_PAUSED: &[u8] = include_bytes!("../icons/capslock.png");
 
 fn update_tray_visuals(app: &AppHandle, paused: bool) {
     if let Ok(guard) = TRAY_TOGGLE_ITEM.lock() {
@@ -560,10 +566,20 @@ fn update_tray_visuals(app: &AppHandle, paused: bool) {
         }
     }
 
+    #[cfg(target_os = "macos")]
+    // macOS menu bar uses template icons (alpha mask) for proper monochrome rendering.
+    let icon_bytes = if paused {
+        ICON_TRAY_TEMPLATE_PAUSED
+    } else {
+        ICON_TRAY_TEMPLATE_RUNNING
+    };
+    #[cfg(not(target_os = "macos"))]
     let icon_bytes = if paused { ICON_DISABLED } else { ICON_RUNNING };
     if let Ok(image) = Image::from_bytes(icon_bytes) {
         if let Some(tray) = app.tray_by_id("tray") {
             let _ = tray.set_icon(Some(image));
+            #[cfg(target_os = "macos")]
+            let _ = tray.set_icon_as_template(true);
         }
     }
 }
@@ -778,9 +794,20 @@ pub fn run() {
                 ],
             )?;
 
-            let _tray = TrayIconBuilder::with_id("tray")
+            #[cfg(target_os = "macos")]
+            let tray_icon = Image::from_bytes(ICON_TRAY_TEMPLATE_RUNNING)
+                .unwrap_or_else(|_| app.default_window_icon().unwrap().clone());
+            #[cfg(not(target_os = "macos"))]
+            let tray_icon = app.default_window_icon().unwrap().clone();
+
+            let tray_builder = TrayIconBuilder::with_id("tray")
                 .menu(&menu)
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(tray_icon);
+
+            #[cfg(target_os = "macos")]
+            let tray_builder = tray_builder.icon_as_template(true);
+
+            let _tray = tray_builder
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "check_update" => {
                         let app_handle = app.clone();
