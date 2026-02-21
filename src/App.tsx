@@ -338,7 +338,7 @@ function App() {
 
       {/* Status + Settings Row */}
       <div className={`${CARD_WIDTH_CLASS} grid grid-cols-2 gap-3 mb-8`}>
-        <div className={`${MODERN_CARD_CLASS} p-5`}>
+        <div className={`${MODERN_CARD_CLASS} p-5 transition-all duration-200 hover:border-slate-500 hover:shadow-2xl hover:shadow-blue-900/20`}>
           <div className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full bg-blue-500/15 blur-2xl" />
           <div className="pointer-events-none absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-cyan-400/10 blur-2xl" />
           <div className="relative">
@@ -365,7 +365,7 @@ function App() {
           </div>
         </div>
 
-        <div className={`${MODERN_CARD_CLASS} p-5 flex flex-col justify-between`}>
+        <div className={`${MODERN_CARD_CLASS} p-5 flex flex-col justify-between transition-all duration-200 hover:border-slate-500 hover:shadow-2xl hover:shadow-violet-900/20`}>
           <div className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full bg-violet-500/12 blur-2xl" />
           <div className="pointer-events-none absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-cyan-400/10 blur-2xl" />
           <div className="relative">
@@ -377,7 +377,11 @@ function App() {
             <div className="flex justify-end mt-4">
               <button
                 onClick={toggleAutostart}
-                className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 ease-in-out cursor-pointer ${autostart ? 'bg-primary' : 'bg-slate-600'}`}
+                className={`w-12 h-6 rounded-full p-1 border transition-all duration-200 ease-in-out cursor-pointer ${
+                  autostart
+                    ? "bg-primary border-blue-400/70 hover:bg-blue-500 hover:border-blue-300"
+                    : "bg-slate-600 border-slate-500 hover:bg-slate-500 hover:border-slate-400"
+                }`}
               >
                 <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${autostart ? 'translate-x-6' : 'translate-x-0'}`} />
               </button>
@@ -387,7 +391,7 @@ function App() {
       </div>
 
       {/* Permissions Card */}
-      <div className={`${CARD_WIDTH_CLASS} ${MODERN_CARD_CLASS} p-6 mb-8`}>
+      <div className={`${CARD_WIDTH_CLASS} ${MODERN_CARD_CLASS} p-6 mb-8 transition-all duration-200 hover:border-slate-500 hover:shadow-2xl hover:shadow-emerald-900/20`}>
         <div className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full bg-emerald-500/12 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-blue-500/10 blur-2xl" />
         <div className="relative">
@@ -398,7 +402,7 @@ function App() {
             </div>
             <button
               onClick={() => refreshPermissions(true)}
-              className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 border border-slate-600 hover:bg-slate-600 hover:border-slate-400 text-slate-200 transition-colors"
             >
               Refresh
             </button>
@@ -444,7 +448,7 @@ function App() {
               setNewKey(e.keyCode);
               setNewKeyDisplay(keyCodeToDisplay(e.keyCode));
             }}
-            className="col-span-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-center text-sm focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
+            className="col-span-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-center text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors cursor-pointer"
           />
           <FormSelect
             value={newActionKind}
@@ -497,7 +501,7 @@ function App() {
                 max={99}
                 value={newJumpCount}
                 onChange={(e) => setNewJumpCount(Number(e.target.value))}
-                className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors"
               />
             </div>
           )}
@@ -523,7 +527,7 @@ function App() {
                 placeholder="Input Source ID (e.g. com.apple.keylayout.ABC)"
                 value={newInputSourceId}
                 onChange={(e) => setNewInputSourceId(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors font-mono"
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors font-mono"
               />
             </div>
           )}
@@ -535,7 +539,7 @@ function App() {
                 placeholder="Command (e.g. open -a Calculator)"
                 value={newCommand}
                 onChange={(e) => setNewCommand(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors"
               />
             </div>
           )}
@@ -644,7 +648,7 @@ function Footer({ version }: { version: string }) {
       </div>
       <button
         onClick={handleCheckUpdate}
-        className="text-xs text-blue-500/80 hover:text-blue-400 hover:underline transition-colors"
+        className="text-xs text-blue-500/80 hover:text-blue-400 hover:underline transition-colors rounded-md px-2 py-1 hover:bg-blue-500/10"
       >
         Check for Updates
       </button>
@@ -669,9 +673,9 @@ function PermissionRow({
       : "bg-slate-800 text-slate-400 border-slate-600";
 
   return (
-    <div className="flex items-center justify-between bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2">
+    <div className="group flex items-center justify-between bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 transition-colors hover:bg-slate-800/70 hover:border-slate-500">
       <span className="text-slate-300">{label}</span>
-      <span className={`text-xs px-2 py-1 rounded-md border ${color}`}>{text}</span>
+      <span className={`text-xs px-2 py-1 rounded-md border transition-colors group-hover:border-slate-400 ${color}`}>{text}</span>
     </div>
   );
 }
@@ -719,7 +723,7 @@ function FormSelect({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((prev) => !prev)}
-        className={`w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 pr-9 text-slate-200 text-sm text-left focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${className}`}
+        className={`w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 pr-9 text-slate-200 text-sm text-left focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${className}`}
       >
         {selected?.label ?? ""}
       </button>
@@ -746,7 +750,7 @@ function FormSelect({
                 }}
                 className={`w-full text-left px-3 py-2 text-sm transition-colors ${
                   active
-                    ? "bg-blue-600/25 text-blue-300"
+                    ? "bg-blue-600/25 text-blue-300 hover:bg-blue-600/35"
                     : "text-slate-200 hover:bg-slate-800"
                 }`}
               >
