@@ -354,10 +354,10 @@ function App() {
             </div>
             <button
               onClick={togglePause}
-              className={`w-full px-4 py-2 rounded-xl font-medium transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-2 border
+              className={`w-full px-4 py-2 rounded-xl font-medium transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-2
                 ${isRunning
-                  ? "bg-slate-700/90 hover:bg-slate-600 text-slate-100 border-slate-500"
-                  : "bg-blue-600 hover:bg-blue-500 text-white border-blue-400/60 shadow-lg shadow-blue-900/20"
+                  ? "bg-slate-700/90 hover:bg-slate-600 text-slate-100"
+                  : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20"
                 }`}
             >
               {isRunning ? <><PauseIcon /><span>Pause</span></> : <><PlayIcon /><span>Resume</span></>}
@@ -402,7 +402,7 @@ function App() {
             </div>
             <button
               onClick={() => refreshPermissions(true)}
-              className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 border border-slate-600 hover:bg-slate-600 hover:border-slate-400 text-slate-200 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
             >
               Refresh
             </button>
@@ -666,17 +666,17 @@ function PermissionRow({
 }) {
   const text =
     status === "granted" ? "Granted" : status === "not_granted" ? "Not Granted" : "Not Required";
-  const color =
+  const badgeClass =
     status === "granted"
-      ? "bg-green-900/30 text-green-300 border-green-700/50"
+      ? "text-xs px-2 py-1 rounded-md transition-colors bg-green-900/30 text-green-300"
       : status === "not_granted"
-      ? "bg-red-900/30 text-red-300 border-red-700/50"
-      : "bg-slate-800 text-slate-400 border-slate-600";
+      ? "text-xs px-2 py-1 rounded-md border transition-colors group-hover:border-slate-400 bg-red-900/30 text-red-300 border-red-700/50"
+      : "text-xs px-2 py-1 rounded-md border transition-colors group-hover:border-slate-400 bg-slate-800 text-slate-400 border-slate-600";
 
   return (
     <div className="group flex items-center justify-between bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 transition-colors hover:bg-slate-800/70 hover:border-slate-500">
       <span className="text-slate-300">{label}</span>
-      <span className={`text-xs px-2 py-1 rounded-md border transition-colors group-hover:border-slate-400 ${color}`}>{text}</span>
+      <span className={badgeClass}>{text}</span>
     </div>
   );
 }
