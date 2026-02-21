@@ -1,3 +1,4 @@
+use std::ffi::c_void;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::thread;
@@ -46,6 +47,13 @@ const MACOS_LOG_PATH: &str = "/tmp/hypercapslock-macos.log";
 const CAPS_TAP_MAX_MS: u64 = 200;
 static LOG_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 static EVENT_TAP_PORT: AtomicUsize = AtomicUsize::new(0);
+
+#[repr(C)]
+struct DispatchObject {
+    _private: [u8; 0],
+}
+
+type DispatchQueue = *mut DispatchObject;
 
 fn log_macos(level: &str, msg: &str) {
     let ts = SystemTime::now()
@@ -168,6 +176,60 @@ fn switch_input_source_by_id(input_source_id: &str) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+extern "C" fn switch_input_source_on_main_queue(context: *mut c_void) {
+    let source_id = unsafe { Box::from_raw(context as *mut String) };
+    let result = std::panic::catch_unwind(|| switch_input_source_by_id(&source_id));
+
+    match result {
+        Ok(Ok(())) => {
+            log_macos(
+                "INFO",
+                &format!(
+                    "Input source mapping switched on main queue: source_id={}",
+                    source_id
+                ),
+            );
+        }
+        Ok(Err(e)) => {
+            log_macos(
+                "WARN",
+                &format!(
+                    "Input source mapping failed on main queue: source_id={} error={}",
+                    source_id, e
+                ),
+            );
+        }
+        Err(_) => {
+            log_macos(
+                "ERROR",
+                &format!(
+                    "Input source mapping panicked on main queue: source_id={}",
+                    source_id
+                ),
+            );
+        }
+    }
+}
+
+fn queue_input_source_switch_on_main(source_id: String) {
+    #[link(name = "System", kind = "dylib")]
+    extern "C" {
+        static _dispatch_main_q: DispatchObject;
+        fn dispatch_async_f(
+            queue: DispatchQueue,
+            context: *mut c_void,
+            work: extern "C" fn(*mut c_void),
+        );
+    }
+
+    let context_ptr = Box::into_raw(Box::new(source_id)) as *mut c_void;
+    unsafe {
+        // HIToolbox asserts these APIs run on the main queue; calling from the event-tap thread can crash.
+        let main_queue = &_dispatch_main_q as *const _ as DispatchQueue;
+        dispatch_async_f(main_queue, context_ptr, switch_input_source_on_main_queue);
+    }
 }
 
 fn mac_keycode_to_js_keycode(mac_keycode: u16) -> Option<u16> {
@@ -338,26 +400,14 @@ fn try_handle_input_source_mapping(keycode: u16, key_down: bool, shift_held: boo
         return false;
     };
 
-    match switch_input_source_by_id(&input_source_id) {
-        Ok(()) => {
-            log_macos(
-                "INFO",
-                &format!(
-                    "Input source mapping switched: keycode={} js_key={} source_id={}",
-                    keycode, js_keycode, input_source_id
-                ),
-            );
-        }
-        Err(e) => {
-            log_macos(
-                "WARN",
-                &format!(
-                    "Input source mapping failed: keycode={} js_key={} source_id={} error={}",
-                    keycode, js_keycode, input_source_id, e
-                ),
-            );
-        }
-    }
+    log_macos(
+        "INFO",
+        &format!(
+            "Queueing input source mapping switch: keycode={} js_key={} source_id={}",
+            keycode, js_keycode, input_source_id
+        ),
+    );
+    queue_input_source_switch_on_main(input_source_id);
 
     true
 }
