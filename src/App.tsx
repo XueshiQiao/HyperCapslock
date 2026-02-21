@@ -298,8 +298,8 @@ function App() {
     <div className="min-h-screen w-full bg-[#09090b] text-white/90 font-sans relative pb-10">
       
       {/* Immersive background effects */}
-      <div className="pointer-events-none fixed top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-600/10 blur-[140px] will-change-transform" />
-      <div className="pointer-events-none fixed bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-purple-600/10 blur-[140px] will-change-transform" />
+      <div className="pointer-events-none fixed top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-600/10 blur-[140px]" />
+      <div className="pointer-events-none fixed bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-purple-600/10 blur-[140px]" />
 
       {/* Toast Notification */}
       {toast && (
@@ -332,7 +332,7 @@ function App() {
         {/* Top Control Panel */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           {/* Status Card */}
-          <div className="bg-[#12121a]/95 border border-white/10 rounded-3xl p-6 shadow-2xl transition-all hover:bg-white/[0.03] hover:border-white/20 flex flex-col justify-between group relative overflow-hidden">
+          <div className="bg-white/[0.02] border border-white/10 backdrop-blur-2xl rounded-3xl p-6 shadow-2xl transition-all hover:bg-white/[0.03] hover:border-white/20 flex flex-col justify-between group relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-[50px] -mr-10 -mt-10 pointer-events-none group-hover:bg-blue-500/10 transition-colors" />
             <div className="relative">
               <div className="flex items-center gap-4 mb-6">
@@ -359,7 +359,7 @@ function App() {
           </div>
 
           {/* Autostart & Permissions Card */}
-          <div className="bg-[#12121a]/95 border border-white/10 rounded-3xl p-6 shadow-2xl transition-all hover:bg-white/[0.03] hover:border-white/20 flex flex-col relative overflow-hidden">
+          <div className="bg-white/[0.02] border border-white/10 backdrop-blur-2xl rounded-3xl p-6 shadow-2xl transition-all hover:bg-white/[0.03] hover:border-white/20 flex flex-col relative overflow-hidden">
             <div className="absolute top-0 left-0 w-32 h-32 bg-white/5 rounded-full blur-[50px] -ml-10 -mt-10 pointer-events-none transition-colors" />
             <div className="relative flex-1 flex flex-col justify-between">
               
@@ -401,7 +401,7 @@ function App() {
         </section>
 
         {/* Action Mappings Manager */}
-        <section className="bg-[#12121a]/95 border border-white/10 rounded-3xl shadow-2xl relative overflow-hidden flex flex-col group/maps">
+        <section className="bg-white/[0.02] border border-white/10 backdrop-blur-2xl rounded-3xl shadow-2xl relative overflow-hidden flex flex-col group/maps">
           <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none" />
           
           <div className="p-6 md:p-8 relative">
