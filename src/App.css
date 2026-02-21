@@ -18,23 +18,7 @@ body {
   font-family: var(--font-sans);
   margin: 0;
   padding: 0;
-  overflow: hidden; /* App takes full screen, custom scrollbar inside */
-}
-
-/* Custom modern scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background-color: #09090b;
 }
 
 @keyframes slide-up {
