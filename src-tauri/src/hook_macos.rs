@@ -5,13 +5,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use core_foundation::base::TCFType;
 use core_foundation::runloop::CFRunLoop;
+use core_foundation::string::CFString;
 use core_graphics::event::{
     CGEvent, CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
     CGEventType, EventField,
 };
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
-use crate::{CAPS_DOWN, CAPS_PRESSED_AT_MS, DID_REMAP, IS_PAUSED, SHELL_MAPPINGS};
+use crate::{
+    CAPS_DOWN, CAPS_PRESSED_AT_MS, DID_REMAP, INPUT_SOURCE_MAPPINGS, IS_PAUSED, SHELL_MAPPINGS,
+};
 
 // Magic value stamped on injected events to prevent feedback loops
 const INJECTED_EVENT_MAGIC: i64 = 0x4756_4C4E; // "GVLN"
@@ -40,7 +43,7 @@ const KC_I: u16 = 0x22;
 const KC_N: u16 = 0x2D;
 
 const MACOS_LOG_PATH: &str = "/tmp/hypercapslock-macos.log";
-const CAPS_TAP_MAX_MS: u64 = 500;
+const CAPS_TAP_MAX_MS: u64 = 200;
 static LOG_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 static EVENT_TAP_PORT: AtomicUsize = AtomicUsize::new(0);
 
@@ -88,44 +91,125 @@ fn reenable_event_tap() -> bool {
     true
 }
 
+fn switch_input_source_by_id(input_source_id: &str) -> Result<(), String> {
+    #[link(name = "Carbon", kind = "framework")]
+    extern "C" {
+        fn TISCreateInputSourceList(
+            properties: *const std::ffi::c_void,
+            include_all_installed: u8,
+        ) -> *const std::ffi::c_void;
+        fn TISSelectInputSource(input_source: *const std::ffi::c_void) -> i32;
+        static kTISPropertyInputSourceID: *const std::ffi::c_void;
+    }
+    extern "C" {
+        fn CFDictionaryCreate(
+            allocator: *const std::ffi::c_void,
+            keys: *const *const std::ffi::c_void,
+            values: *const *const std::ffi::c_void,
+            num_values: isize,
+            key_callbacks: *const std::ffi::c_void,
+            value_callbacks: *const std::ffi::c_void,
+        ) -> *const std::ffi::c_void;
+        fn CFArrayGetCount(the_array: *const std::ffi::c_void) -> isize;
+        fn CFArrayGetValueAtIndex(
+            the_array: *const std::ffi::c_void,
+            idx: isize,
+        ) -> *const std::ffi::c_void;
+        fn CFRelease(cf: *const std::ffi::c_void);
+        static kCFTypeDictionaryKeyCallBacks: std::ffi::c_void;
+        static kCFTypeDictionaryValueCallBacks: std::ffi::c_void;
+    }
+
+    let source_id = CFString::new(input_source_id);
+
+    unsafe {
+        let keys = [kTISPropertyInputSourceID];
+        let values = [source_id.as_concrete_TypeRef() as *const std::ffi::c_void];
+        let filter = CFDictionaryCreate(
+            std::ptr::null(),
+            keys.as_ptr(),
+            values.as_ptr(),
+            1,
+            &kCFTypeDictionaryKeyCallBacks as *const _ as *const std::ffi::c_void,
+            &kCFTypeDictionaryValueCallBacks as *const _ as *const std::ffi::c_void,
+        );
+        if filter.is_null() {
+            return Err("CFDictionaryCreate returned null".to_string());
+        }
+
+        let input_sources = TISCreateInputSourceList(filter, 0);
+        CFRelease(filter);
+
+        if input_sources.is_null() {
+            return Err("TISCreateInputSourceList returned null".to_string());
+        }
+
+        let count = CFArrayGetCount(input_sources);
+        if count <= 0 {
+            CFRelease(input_sources);
+            return Err(format!("Input source not found: {}", input_source_id));
+        }
+
+        let source = CFArrayGetValueAtIndex(input_sources, 0);
+        if source.is_null() {
+            CFRelease(input_sources);
+            return Err("Resolved input source pointer is null".to_string());
+        }
+
+        let status = TISSelectInputSource(source);
+        CFRelease(input_sources);
+
+        if status != 0 {
+            return Err(format!(
+                "TISSelectInputSource failed with status {}",
+                status
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 fn mac_keycode_to_js_keycode(mac_keycode: u16) -> Option<u16> {
     match mac_keycode {
-        0x00 => Some(65), // A
-        0x0B => Some(66), // B
-        0x08 => Some(67), // C
-        0x02 => Some(68), // D
-        0x0E => Some(69), // E
-        0x03 => Some(70), // F
-        0x05 => Some(71), // G
-        0x04 => Some(72), // H
-        0x22 => Some(73), // I
-        0x26 => Some(74), // J
-        0x28 => Some(75), // K
-        0x25 => Some(76), // L
-        0x2E => Some(77), // M
-        0x2D => Some(78), // N
-        0x1F => Some(79), // O
-        0x23 => Some(80), // P
-        0x0C => Some(81), // Q
-        0x0F => Some(82), // R
-        0x01 => Some(83), // S
-        0x11 => Some(84), // T
-        0x20 => Some(85), // U
-        0x09 => Some(86), // V
-        0x0D => Some(87), // W
-        0x07 => Some(88), // X
-        0x10 => Some(89), // Y
-        0x06 => Some(90), // Z
-        0x1D => Some(48), // 0
-        0x12 => Some(49), // 1
-        0x13 => Some(50), // 2
-        0x14 => Some(51), // 3
-        0x15 => Some(52), // 4
-        0x16 => Some(53), // 5
-        0x17 => Some(54), // 6
-        0x18 => Some(55), // 7
-        0x19 => Some(56), // 8
-        0x1A => Some(57), // 9
+        0x00 => Some(65),  // A
+        0x0B => Some(66),  // B
+        0x08 => Some(67),  // C
+        0x02 => Some(68),  // D
+        0x0E => Some(69),  // E
+        0x03 => Some(70),  // F
+        0x05 => Some(71),  // G
+        0x04 => Some(72),  // H
+        0x22 => Some(73),  // I
+        0x26 => Some(74),  // J
+        0x28 => Some(75),  // K
+        0x25 => Some(76),  // L
+        0x2E => Some(77),  // M
+        0x2D => Some(78),  // N
+        0x1F => Some(79),  // O
+        0x23 => Some(80),  // P
+        0x0C => Some(81),  // Q
+        0x0F => Some(82),  // R
+        0x01 => Some(83),  // S
+        0x11 => Some(84),  // T
+        0x20 => Some(85),  // U
+        0x09 => Some(86),  // V
+        0x0D => Some(87),  // W
+        0x07 => Some(88),  // X
+        0x10 => Some(89),  // Y
+        0x06 => Some(90),  // Z
+        0x1D => Some(48),  // 0
+        0x12 => Some(49),  // 1
+        0x13 => Some(50),  // 2
+        0x14 => Some(51),  // 3
+        0x15 => Some(52),  // 4
+        0x16 => Some(53),  // 5
+        0x17 => Some(54),  // 6
+        0x18 => Some(55),  // 7
+        0x19 => Some(56),  // 8
+        0x1A => Some(57),  // 9
+        0x2B => Some(188), // ,
+        0x2F => Some(190), // .
         _ => None,
     }
 }
@@ -229,8 +313,61 @@ fn is_builtin_arrow_caps_remap_key(keycode: u16) -> bool {
     matches!(keycode, KC_H | KC_J | KC_K | KC_L)
 }
 
+fn is_builtin_caps_remap_key(keycode: u16) -> bool {
+    matches!(
+        keycode,
+        KC_H | KC_J | KC_K | KC_L | KC_I | KC_N | KC_P | KC_Y | KC_A | KC_E | KC_U | KC_D | KC_O
+    )
+}
+
+fn try_handle_input_source_mapping(keycode: u16, key_down: bool, shift_held: bool) -> bool {
+    if !key_down || shift_held || is_builtin_caps_remap_key(keycode) {
+        return false;
+    }
+
+    let Some(js_keycode) = mac_keycode_to_js_keycode(keycode) else {
+        return false;
+    };
+
+    let input_source_id = {
+        let guard = INPUT_SOURCE_MAPPINGS.lock().unwrap();
+        guard.as_ref().and_then(|m| m.get(&js_keycode)).cloned()
+    };
+
+    let Some(input_source_id) = input_source_id else {
+        return false;
+    };
+
+    match switch_input_source_by_id(&input_source_id) {
+        Ok(()) => {
+            log_macos(
+                "INFO",
+                &format!(
+                    "Input source mapping switched: keycode={} js_key={} source_id={}",
+                    keycode, js_keycode, input_source_id
+                ),
+            );
+        }
+        Err(e) => {
+            log_macos(
+                "WARN",
+                &format!(
+                    "Input source mapping failed: keycode={} js_key={} source_id={} error={}",
+                    keycode, js_keycode, input_source_id, e
+                ),
+            );
+        }
+    }
+
+    true
+}
+
 fn handle_caps_remap(keycode: u16, key_down: bool, active_modifiers: CGEventFlags) -> bool {
     let shift_held = active_modifiers.contains(CGEventFlags::CGEventFlagShift);
+
+    if try_handle_input_source_mapping(keycode, key_down, shift_held) {
+        return true;
+    }
 
     // Check for Shell Mappings (Caps + Shift + Key) => command executing
     if shift_held && key_down && !is_builtin_arrow_caps_remap_key(keycode) {

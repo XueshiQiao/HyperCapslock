@@ -5,6 +5,7 @@
 ## Features
 
 -   **Global Remapping:** Works in every application (Editors, Browser, Explorer, etc.).
+-   **macOS Input Source Mappings:** Configure `CapsLock` + `Key` to switch to a specific macOS input source ID (for example ABC / WeChat).
 -   **Smart CapsLock Handling:**
     -   If used as a modifier (held down with mapped keys), the CapsLock state (and light) does **not** toggle.
     -   If tapped and released quickly (without pressing other keys), it toggles CapsLock on/off as normal.
@@ -36,6 +37,14 @@
 -   `CapsLock` + `Shift` + `[Key]` → **Execute Shell Command**
     -   User configurable via the UI.
     -   Example: `CapsLock` + `Shift` + `C` → `calc.exe`
+
+### macOS Input Source Mappings
+-   `CapsLock` + `[Key]` → **Switch macOS input source** (by exact input source ID)
+-   User configurable via the UI on macOS.
+-   First-run defaults:
+    -   `CapsLock` + `,` → `com.apple.keylayout.ABC`
+    -   `CapsLock` + `.` → `com.tencent.inputmethod.wetype.pinyin`
+-   Mapping targets use exact source IDs (no fuzzy display-name matching).
 
 ## Screenshots
 

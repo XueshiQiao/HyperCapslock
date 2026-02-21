@@ -43,7 +43,10 @@ flowchart TD
     Q --> SWALLOW
     P -- No --> R{"Built-in remap?"}
 
-    O -- No --> R
+    O -- No --> IM{"Input source mapping<br/>exists for key?"}
+    IM -- Yes --> IMS["Switch input source<br/>by exact source ID<br/>DID_REMAP = true"]
+    IMS --> SWALLOW
+    IM -- No --> R
     R -- "H/J/K/L" --> S["Inject arrow key<br/>DID_REMAP = true"]
     S --> SWALLOW
     R -- "U/D" --> Y["Inject 10x Up/Down<br/>DID_REMAP = true"]
@@ -105,6 +108,7 @@ sequenceDiagram
 | `core-graphics 0.24` | CGEventTap, CGEvent creation, event posting |
 | `core-foundation 0.10` | CFRunLoop for the event tap thread |
 | `hidutil` | HID-level CapsLock → F18 remap |
+| Carbon Text Input Source APIs | Input source switching by exact source ID (`TIS*`) |
 | IOKit FFI | Hardware CapsLock toggle for tap-only behavior |
 | Accessibility API | Permission check via `AXIsProcessTrusted()` |
 
@@ -232,6 +236,25 @@ Shell mappings are stored as **JavaScript keyCodes** (u16) in the shared `SHELL_
 
 Shell commands are executed with `sh -c` on macOS (vs `cmd /C` on Windows).
 
+## Input Source Mappings (macOS)
+
+Input-source mappings are stored as **JavaScript keyCodes** (u16) mapped to exact macOS input source IDs in `INPUT_SOURCE_MAPPINGS`.
+
+- Trigger: `Caps + Key` (non-shift path), checked before built-in remaps.
+- Behavior: if mapping exists, the event is swallowed and the app attempts to switch input source via native Text Input Source APIs (`TISCreateInputSourceList` + `TISSelectInputSource`).
+- Failure mode: non-blocking. The key event is still consumed, and a warning is logged.
+- Built-in remap keys remain reserved and are not overridden by input-source mappings.
+
+Persistence file: `input_source_mappings.json` (app data directory).
+
+Default mappings are seeded on first load:
+- `188` (`,`) → `com.apple.keylayout.ABC`
+- `190` (`.`) → `com.tencent.inputmethod.wetype.pinyin`
+
+Additional keycode notes in `mac_keycode_to_js_keycode()`:
+- mac keycode `0x2B` → JS keycode `188` (comma)
+- mac keycode `0x2F` → JS keycode `190` (period)
+
 ## Accessibility Permission
 
 CGEventTap requires **Accessibility permission** in System Settings > Privacy & Security > Accessibility. On startup:
@@ -253,7 +276,7 @@ mod hook_windows;
 mod hook_macos;
 ```
 
-Shared state (`CAPS_DOWN`, `DID_REMAP`, `IS_PAUSED`, `SHELL_MAPPINGS`) lives in `lib.rs` and is imported by both platform modules via `use crate::*`.
+Shared state (`CAPS_DOWN`, `DID_REMAP`, `IS_PAUSED`, `SHELL_MAPPINGS`, `INPUT_SOURCE_MAPPINGS`) lives in `lib.rs` and is imported by both platform modules via `use crate::*`.
 
 ## Dependencies
 

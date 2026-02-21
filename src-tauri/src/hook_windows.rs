@@ -17,7 +17,7 @@ use crate::{CAPS_DOWN, CAPS_PRESSED_AT_MS, DID_REMAP, IS_PAUSED, SHELL_MAPPINGS}
 use std::sync::atomic::Ordering;
 
 static mut HOOK: HHOOK = HHOOK(0);
-const CAPS_TAP_MAX_MS: u64 = 500;
+const CAPS_TAP_MAX_MS: u64 = 200;
 
 fn now_millis() -> u64 {
     SystemTime::now()

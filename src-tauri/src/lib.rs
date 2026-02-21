@@ -23,6 +23,12 @@ static IS_PAUSED: AtomicBool = AtomicBool::new(false);
 static TRAY_TOGGLE_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
 static TRAY_STATUS_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
 static SHELL_MAPPINGS: Mutex<Option<HashMap<u16, String>>> = Mutex::new(None);
+static INPUT_SOURCE_MAPPINGS: Mutex<Option<HashMap<u16, String>>> = Mutex::new(None);
+
+const DEFAULT_ABC_KEYCODE: u16 = 188;
+const DEFAULT_WECHAT_KEYCODE: u16 = 190;
+const DEFAULT_ABC_INPUT_SOURCE_ID: &str = "com.apple.keylayout.ABC";
+const DEFAULT_WECHAT_INPUT_SOURCE_ID: &str = "com.tencent.inputmethod.wetype.pinyin";
 
 #[derive(serde::Serialize)]
 struct PermissionStatuses {
@@ -76,7 +82,7 @@ fn get_permission_statuses() -> PermissionStatuses {
     }
 }
 
-fn get_config_path(app: &AppHandle) -> Option<PathBuf> {
+fn get_shell_mappings_path(app: &AppHandle) -> Option<PathBuf> {
     app.path()
         .app_data_dir()
         .ok()
@@ -84,7 +90,7 @@ fn get_config_path(app: &AppHandle) -> Option<PathBuf> {
 }
 
 fn load_mappings_from_disk(app: &AppHandle) {
-    if let Some(path) = get_config_path(app) {
+    if let Some(path) = get_shell_mappings_path(app) {
         if let Ok(content) = fs::read_to_string(path) {
             if let Ok(mappings) = serde_json::from_str::<HashMap<u16, String>>(&content) {
                 *SHELL_MAPPINGS.lock().unwrap() = Some(mappings);
@@ -99,8 +105,84 @@ fn load_mappings_from_disk(app: &AppHandle) {
 }
 
 fn save_mappings_to_disk(app: &AppHandle) {
-    if let Some(path) = get_config_path(app) {
+    if let Some(path) = get_shell_mappings_path(app) {
         if let Some(mappings) = &*SHELL_MAPPINGS.lock().unwrap() {
+            if let Ok(content) = serde_json::to_string(mappings) {
+                if let Some(parent) = path.parent() {
+                    let _ = fs::create_dir_all(parent);
+                }
+                let _ = fs::write(path, content);
+            }
+        }
+    }
+}
+
+fn get_input_source_mappings_path(app: &AppHandle) -> Option<PathBuf> {
+    app.path()
+        .app_data_dir()
+        .ok()
+        .map(|p| p.join("input_source_mappings.json"))
+}
+
+fn apply_default_input_source_mappings(map: &mut HashMap<u16, String>) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        let mut changed = false;
+        if !map.contains_key(&DEFAULT_ABC_KEYCODE) {
+            map.insert(DEFAULT_ABC_KEYCODE, DEFAULT_ABC_INPUT_SOURCE_ID.to_string());
+            changed = true;
+        }
+        if !map.contains_key(&DEFAULT_WECHAT_KEYCODE) {
+            map.insert(
+                DEFAULT_WECHAT_KEYCODE,
+                DEFAULT_WECHAT_INPUT_SOURCE_ID.to_string(),
+            );
+            changed = true;
+        }
+        changed
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = map;
+        false
+    }
+}
+
+fn should_seed_default_input_source_mappings(
+    loaded_from_disk: bool,
+    mappings: &HashMap<u16, String>,
+) -> bool {
+    !loaded_from_disk || mappings.is_empty()
+}
+
+fn load_input_source_mappings_from_disk(app: &AppHandle) {
+    let mut loaded_from_disk = false;
+    let mut mappings = HashMap::new();
+
+    if let Some(path) = get_input_source_mappings_path(app) {
+        if let Ok(content) = fs::read_to_string(path) {
+            loaded_from_disk = true;
+            mappings = serde_json::from_str::<HashMap<u16, String>>(&content).unwrap_or_default();
+        }
+    }
+
+    let defaults_applied = if should_seed_default_input_source_mappings(loaded_from_disk, &mappings)
+    {
+        apply_default_input_source_mappings(&mut mappings)
+    } else {
+        false
+    };
+    *INPUT_SOURCE_MAPPINGS.lock().unwrap() = Some(mappings);
+
+    if defaults_applied {
+        save_input_source_mappings_to_disk(app);
+    }
+}
+
+fn save_input_source_mappings_to_disk(app: &AppHandle) {
+    if let Some(path) = get_input_source_mappings_path(app) {
+        if let Some(mappings) = &*INPUT_SOURCE_MAPPINGS.lock().unwrap() {
             if let Ok(content) = serde_json::to_string(mappings) {
                 if let Some(parent) = path.parent() {
                     let _ = fs::create_dir_all(parent);
@@ -171,6 +253,34 @@ fn get_mappings() -> HashMap<u16, String> {
 }
 
 #[tauri::command]
+fn add_input_source_mapping(app: AppHandle, key: u16, input_source_id: String) {
+    {
+        let mut guard = INPUT_SOURCE_MAPPINGS.lock().unwrap();
+        if let Some(map) = guard.as_mut() {
+            map.insert(key, input_source_id);
+        }
+    }
+    save_input_source_mappings_to_disk(&app);
+}
+
+#[tauri::command]
+fn remove_input_source_mapping(app: AppHandle, key: u16) {
+    {
+        let mut guard = INPUT_SOURCE_MAPPINGS.lock().unwrap();
+        if let Some(map) = guard.as_mut() {
+            map.remove(&key);
+        }
+    }
+    save_input_source_mappings_to_disk(&app);
+}
+
+#[tauri::command]
+fn get_input_source_mappings() -> HashMap<u16, String> {
+    let guard = INPUT_SOURCE_MAPPINGS.lock().unwrap();
+    guard.clone().unwrap_or_default()
+}
+
+#[tauri::command]
 fn get_status() -> String {
     if IS_PAUSED.load(Ordering::SeqCst) {
         "Paused".to_string()
@@ -227,6 +337,7 @@ pub fn run() {
         })
         .setup(|app| {
             load_mappings_from_disk(app.handle());
+            load_input_source_mappings_from_disk(app.handle());
             let status_i =
                 MenuItem::with_id(app, "status", "Status: Running", false, None::<&str>)?;
             let toggle_i =
@@ -366,7 +477,10 @@ pub fn run() {
             get_permission_statuses,
             add_mapping,
             remove_mapping,
-            get_mappings
+            get_mappings,
+            add_input_source_mapping,
+            remove_input_source_mapping,
+            get_input_source_mappings
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -379,6 +493,12 @@ pub fn run() {
 mod tests {
     use std::collections::HashMap;
 
+    use crate::{
+        apply_default_input_source_mappings, should_seed_default_input_source_mappings,
+        DEFAULT_ABC_INPUT_SOURCE_ID, DEFAULT_ABC_KEYCODE, DEFAULT_WECHAT_INPUT_SOURCE_ID,
+        DEFAULT_WECHAT_KEYCODE,
+    };
+
     #[test]
     fn test_mapping_serialization() {
         let mut map = HashMap::new();
@@ -389,5 +509,45 @@ mod tests {
 
         let decoded: HashMap<u16, String> = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.get(&65).unwrap(), "calc.exe");
+    }
+
+    #[test]
+    fn test_input_source_mapping_serialization() {
+        let mut map = HashMap::new();
+        map.insert(188, "com.apple.keylayout.ABC".to_string());
+
+        let json = serde_json::to_string(&map).unwrap();
+        let decoded: HashMap<u16, String> = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.get(&188).unwrap(), "com.apple.keylayout.ABC");
+    }
+
+    #[test]
+    fn test_default_seed_decision_for_missing_or_empty_data() {
+        let mut map = HashMap::new();
+        assert!(should_seed_default_input_source_mappings(false, &map));
+        assert!(should_seed_default_input_source_mappings(true, &map));
+
+        map.insert(188, "com.apple.keylayout.ABC".to_string());
+        assert!(!should_seed_default_input_source_mappings(true, &map));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_default_input_source_mappings_seeded_when_missing() {
+        let mut map = HashMap::new();
+
+        let changed = apply_default_input_source_mappings(&mut map);
+        assert!(changed);
+        assert_eq!(
+            map.get(&DEFAULT_ABC_KEYCODE).unwrap(),
+            DEFAULT_ABC_INPUT_SOURCE_ID
+        );
+        assert_eq!(
+            map.get(&DEFAULT_WECHAT_KEYCODE).unwrap(),
+            DEFAULT_WECHAT_INPUT_SOURCE_ID
+        );
+
+        let changed_again = apply_default_input_source_mappings(&mut map);
+        assert!(!changed_again);
     }
 }

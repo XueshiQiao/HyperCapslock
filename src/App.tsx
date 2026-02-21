@@ -14,18 +14,45 @@ type PermissionStatuses = {
   input_monitoring: "granted" | "not_granted" | "not_required";
 };
 
+const SPECIAL_KEY_DISPLAY: Record<number, string> = {
+  8: "Del",
+  13: "Enter",
+  37: "←",
+  38: "↑",
+  39: "→",
+  40: "↓",
+  186: ";",
+  187: "=",
+  188: ",",
+  189: "-",
+  190: ".",
+  191: "/",
+  220: "\\",
+  222: "'"
+};
+
+function keyCodeToDisplay(keyCode: number): string {
+  if (SPECIAL_KEY_DISPLAY[keyCode]) return SPECIAL_KEY_DISPLAY[keyCode];
+  const key = String.fromCharCode(keyCode);
+  return /^[A-Z0-9]$/.test(key) ? key : `Key ${keyCode}`;
+}
+
 function App() {
   const [status, setStatus] = useState("Initializing...");
   const [autostart, setAutostart] = useState(false);
   const [appVersion, setAppVersion] = useState("");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [permissions, setPermissions] = useState<PermissionStatuses | null>(null);
-  
+
   // Mappings State
   const [mappings, setMappings] = useState<Record<string, string>>({});
   const [newKey, setNewKey] = useState<number | null>(null);
   const [newKeyDisplay, setNewKeyDisplay] = useState("");
   const [newCommand, setNewCommand] = useState("");
+  const [inputSourceMappings, setInputSourceMappings] = useState<Record<string, string>>({});
+  const [newInputSourceKey, setNewInputSourceKey] = useState<number | null>(null);
+  const [newInputSourceKeyDisplay, setNewInputSourceKeyDisplay] = useState("");
+  const [newInputSourceId, setNewInputSourceId] = useState("");
 
   useEffect(() => {
     let unlisten: () => void;
@@ -41,6 +68,8 @@ function App() {
 
         const maps = await invoke("get_mappings");
         setMappings(maps as Record<string, string>);
+        const inputMaps = await invoke("get_input_source_mappings");
+        setInputSourceMappings(inputMaps as Record<string, string>);
         await refreshPermissions();
 
         unlisten = await listen<boolean>("status-update", (event) => {
@@ -93,6 +122,25 @@ function App() {
     }
   }
 
+  async function addInputSourceMapping() {
+    if (!newInputSourceKey || !newInputSourceId.trim()) return;
+    try {
+      await invoke("add_input_source_mapping", {
+        key: newInputSourceKey,
+        inputSourceId: newInputSourceId.trim(),
+      });
+      const maps = await invoke("get_input_source_mappings");
+      setInputSourceMappings(maps as Record<string, string>);
+      setNewInputSourceKey(null);
+      setNewInputSourceKeyDisplay("");
+      setNewInputSourceId("");
+      showToast("Input source mapping added", "success");
+    } catch (e) {
+      console.error(e);
+      showToast("Failed to add input source mapping", "error");
+    }
+  }
+
   async function removeMapping(key: number) {
     try {
         await invoke("remove_mapping", { key });
@@ -102,6 +150,18 @@ function App() {
     } catch (e) {
         console.error(e);
         showToast("Failed to remove mapping", "error");
+    }
+  }
+
+  async function removeInputSourceMapping(key: number) {
+    try {
+      await invoke("remove_input_source_mapping", { key });
+      const maps = await invoke("get_input_source_mappings");
+      setInputSourceMappings(maps as Record<string, string>);
+      showToast("Input source mapping removed", "success");
+    } catch (e) {
+      console.error(e);
+      showToast("Failed to remove input source mapping", "error");
     }
   }
 
@@ -143,12 +203,12 @@ function App() {
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-background p-6 select-none overflow-y-auto relative">
-      
+
       {/* Toast Notification */}
       {toast && (
         <div className={`fixed bottom-10 left-1/2 z-50 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-slide-up border whitespace-nowrap ${
-          toast.type === "success" 
-            ? "bg-slate-800 border-green-500/50 text-green-400" 
+          toast.type === "success"
+            ? "bg-slate-800 border-green-500/50 text-green-400"
             : "bg-slate-800 border-red-500/50 text-red-400"
         }`}>
           {toast.type === "success" ? (
@@ -186,8 +246,8 @@ function App() {
         <button
           onClick={togglePause}
           className={`w-full py-3 px-4 rounded-xl font-medium transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-2
-            ${isRunning 
-              ? "bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600" 
+            ${isRunning
+              ? "bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600"
               : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20"
             }`}
         >
@@ -201,8 +261,8 @@ function App() {
            <h2 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Settings</h2>
            <p className="text-slate-200 font-medium">Start at Login</p>
         </div>
-        <button 
-           onClick={toggleAutostart} 
+        <button
+           onClick={toggleAutostart}
            className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 ease-in-out cursor-pointer ${autostart ? 'bg-primary' : 'bg-slate-600'}`}
         >
            <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${autostart ? 'translate-x-6' : 'translate-x-0'}`} />
@@ -237,10 +297,10 @@ function App() {
       {/* Shell Mappings Card */}
       <div className="w-full max-w-md bg-surface border border-slate-700 rounded-2xl p-6 shadow-xl mb-8">
         <h2 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-4">Custom Shell Mappings (Caps+Shift+Key)</h2>
-        
+
         <div className="flex gap-2 mb-4">
-            <input 
-                type="text" 
+            <input
+                type="text"
                 placeholder="Press Key"
                 value={newKeyDisplay}
                 readOnly
@@ -249,18 +309,18 @@ function App() {
                     // Basic filtering
                     if (["Shift", "Control", "Alt", "Meta", "CapsLock"].includes(e.key)) return;
                     setNewKey(e.keyCode);
-                    setNewKeyDisplay(e.key.toUpperCase());
+                    setNewKeyDisplay(keyCodeToDisplay(e.keyCode));
                 }}
                 className="w-24 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-center text-sm focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
             />
-            <input 
-                type="text" 
+            <input
+                type="text"
                 placeholder="Command (e.g. open -a Calculator)"
                 value={newCommand}
                 onChange={(e) => setNewCommand(e.target.value)}
                 className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors"
             />
-            <button 
+            <button
                 onClick={addMapping}
                 disabled={!newKey || !newCommand}
                 className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 transition-colors"
@@ -277,7 +337,7 @@ function App() {
                         <span className="text-slate-500 font-light text-xs">+</span>
                         <Kbd>S</Kbd>
                         <span className="text-slate-500 font-light text-xs">+</span>
-                        <Kbd>{String.fromCharCode(parseInt(k))}</Kbd>
+                        <Kbd>{keyCodeToDisplay(parseInt(k))}</Kbd>
                     </div>
                     <div className="flex items-center gap-3 overflow-hidden flex-1 justify-end">
                         <span className="text-xs text-slate-400 truncate max-w-[150px] font-mono" title={cmd}>{cmd}</span>
@@ -293,16 +353,77 @@ function App() {
         </div>
       </div>
 
+      {permissions?.platform === "macos" && (
+        <div className="w-full max-w-md bg-surface border border-slate-700 rounded-2xl p-6 shadow-xl mb-8">
+          <h2 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-4">Input Source Mappings (Caps+Key)</h2>
+
+          <div className="flex gap-2 mb-4">
+              <input
+                  type="text"
+                  placeholder="Press Key"
+                  value={newInputSourceKeyDisplay}
+                  readOnly
+                  onKeyDown={(e) => {
+                      e.preventDefault();
+                      if (["Shift", "Control", "Alt", "Meta", "CapsLock"].includes(e.key)) return;
+                      setNewInputSourceKey(e.keyCode);
+                      setNewInputSourceKeyDisplay(keyCodeToDisplay(e.keyCode));
+                  }}
+                  className="w-24 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-center text-sm focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
+              />
+              <input
+                  type="text"
+                  placeholder="Input Source ID (e.g. com.apple.keylayout.ABC)"
+                  value={newInputSourceId}
+                  onChange={(e) => setNewInputSourceId(e.target.value)}
+                  className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors font-mono"
+              />
+              <button
+                  onClick={addInputSourceMapping}
+                  disabled={!newInputSourceKey || !newInputSourceId.trim()}
+                  className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 transition-colors"
+              >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              </button>
+          </div>
+
+          <p className="text-[11px] text-slate-500 mb-3">
+            Defaults: <code className="text-slate-400 block">Caps+, → com.apple.keylayout.ABC</code> and <code className="text-slate-400 block">Caps+. → com.tencent.inputmethod.wetype.pinyin</code>Built-in Caps navigation keys remain reserved.
+          </p>
+
+          <div className="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+              {Object.entries(inputSourceMappings).map(([k, sourceId]) => (
+                  <div key={k} className="flex items-center justify-between bg-slate-800/50 rounded-lg p-2 px-3 border border-slate-700/50 group">
+                      <div className="flex items-center gap-2 min-w-0">
+                          <Kbd>Caps</Kbd>
+                          <span className="text-slate-500 font-light text-xs">+</span>
+                          <Kbd>{keyCodeToDisplay(parseInt(k))}</Kbd>
+                      </div>
+                      <div className="flex items-center gap-3 overflow-hidden flex-1 justify-end">
+                          <span className="text-xs text-slate-400 truncate max-w-[190px] font-mono" title={sourceId}>{sourceId}</span>
+                          <button onClick={() => removeInputSourceMapping(parseInt(k))} className="text-slate-600 hover:text-red-400 transition-colors">
+                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                      </div>
+                  </div>
+              ))}
+              {Object.keys(inputSourceMappings).length === 0 && (
+                  <div className="text-center text-slate-500 text-xs py-2 italic">No input source mappings yet</div>
+              )}
+          </div>
+        </div>
+      )}
+
       {/* Mappings Grid */}
       <div className={`w-full max-w-md transition-opacity duration-300 ${isPaused ? "opacity-50 grayscale" : "opacity-100"}`}>
         <h3 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-4 ml-1">Key Mappings</h3>
-        
+
         <div className="grid gap-2">
           <MappingRow keyChar="H" action="Left" icon="Left" />
           <MappingRow keyChar="J" action="Down" icon="Down" />
           <MappingRow keyChar="K" action="Up" icon="Up" />
           <MappingRow keyChar="L" action="Right" icon="Right" />
-          
+
           <div className="h-2"></div>
 
           <MappingRow keyChar="P" action="Word Forward" icon="WordRight" />
@@ -311,13 +432,13 @@ function App() {
           <div className="h-2"></div>
 
           <MappingRow keyChar="I" action="Backspace" icon="Delete" />
-          
+
           <div className="h-2"></div>
 
           <MappingRow keyChar="N" action='Insert """|"""' icon="Code" />
 
           <div className="h-2"></div>
-          
+
           <MappingRow keyChar="A" action="Home" icon="Home" />
           <MappingRow keyChar="E" action="End" icon="End" />
           <MappingRow keyChar="O" action="Next Line" icon="Enter" />
@@ -330,7 +451,7 @@ function App() {
 
         <div className="mt-8 mb-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
           <p className="text-xs text-slate-400 leading-relaxed text-center">
-            <span className="font-semibold text-blue-400">Pro Tip:</span> CapsLock acts as a modifier. 
+            <span className="font-semibold text-blue-400">Pro Tip:</span> CapsLock acts as a modifier.
             Tap it quickly to toggle standard CapsLock. Hold it + Key to navigate.
           </p>
         </div>
@@ -347,7 +468,7 @@ function Footer({ version }: { version: string }) {
       const update = await check();
       if (update) {
         const yes = await ask(
-          `Version ${update.version} is available.\n\nRelease notes:\n${update.body}`, 
+          `Version ${update.version} is available.\n\nRelease notes:\n${update.body}`,
           { title: 'Update Available', kind: 'info', okLabel: 'Update', cancelLabel: 'Cancel' }
         );
         if (yes) {
@@ -371,7 +492,7 @@ function Footer({ version }: { version: string }) {
         <span className="w-1 h-1 rounded-full bg-slate-600"></span>
         <span>By Xueshi Qiao</span>
       </div>
-      <button 
+      <button
         onClick={handleCheckUpdate}
         className="text-xs text-blue-500/80 hover:text-blue-400 hover:underline transition-colors"
       >
@@ -431,7 +552,7 @@ function Kbd({ children }: { children: React.ReactNode }) {
 
 function ActionIcon({ icon }: { icon: string }) {
   const commonClasses = "w-4 h-4 text-primary";
-  
+
   switch (icon) {
     case "Left": return <svg className={`${commonClasses} rotate-180`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>;
     case "Right": return <svg className={`${commonClasses}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>;
