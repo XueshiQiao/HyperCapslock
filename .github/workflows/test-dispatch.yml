@@ -1,0 +1,14 @@
+name: Test Dispatch
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Apps Gallery Update
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GALLERY_UPDATE_PAT }}
+          repository: XueshiQiao/apps_gallery
+          event-type: app_released
