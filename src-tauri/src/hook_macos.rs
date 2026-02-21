@@ -14,7 +14,8 @@ use core_graphics::event::{
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
 use crate::{
-    CAPS_DOWN, CAPS_PRESSED_AT_MS, DID_REMAP, INPUT_SOURCE_MAPPINGS, IS_PAUSED, SHELL_MAPPINGS,
+    ActionConfig, ActionMappingEntry, DirectionalActionKind, IndependentActionKind, JumpDirection,
+    ACTION_MAPPINGS, CAPS_DOWN, CAPS_PRESSED_AT_MS, DID_REMAP, IS_PAUSED,
 };
 
 // Magic value stamped on injected events to prevent feedback loops
@@ -29,19 +30,6 @@ const KC_LEFT: u16 = 0x7B;
 const KC_RIGHT: u16 = 0x7C;
 const KC_DOWN: u16 = 0x7D;
 const KC_UP: u16 = 0x7E;
-const KC_H: u16 = 0x04;
-const KC_J: u16 = 0x26;
-const KC_K: u16 = 0x28;
-const KC_L: u16 = 0x25;
-const KC_P: u16 = 0x23;
-const KC_Y: u16 = 0x10;
-const KC_A: u16 = 0x00;
-const KC_E: u16 = 0x0E;
-const KC_U: u16 = 0x20;
-const KC_D: u16 = 0x02;
-const KC_O: u16 = 0x1F;
-const KC_I: u16 = 0x22;
-const KC_N: u16 = 0x2D;
 
 const MACOS_LOG_PATH: &str = "/tmp/hypercapslock-macos.log";
 const CAPS_TAP_MAX_MS: u64 = 200;
@@ -371,203 +359,150 @@ fn active_modifier_flags(flags: CGEventFlags) -> CGEventFlags {
             | CGEventFlags::CGEventFlagSecondaryFn)
 }
 
-fn is_builtin_arrow_caps_remap_key(keycode: u16) -> bool {
-    matches!(keycode, KC_H | KC_J | KC_K | KC_L)
-}
-
-fn is_builtin_caps_remap_key(keycode: u16) -> bool {
-    matches!(
-        keycode,
-        KC_H | KC_J | KC_K | KC_L | KC_I | KC_N | KC_P | KC_Y | KC_A | KC_E | KC_U | KC_D | KC_O
+fn allow_shift_fallback(action: &ActionConfig) -> bool {
+    !matches!(
+        action,
+        ActionConfig::InputSource { .. } | ActionConfig::Command { .. }
     )
 }
 
-fn try_handle_input_source_mapping(keycode: u16, key_down: bool, shift_held: bool) -> bool {
-    if !key_down || shift_held || is_builtin_caps_remap_key(keycode) {
-        return false;
+fn resolve_action_mapping(js_keycode: u16, shift_held: bool) -> Option<ActionMappingEntry> {
+    let guard = ACTION_MAPPINGS.lock().unwrap();
+    let mappings = guard.as_ref()?;
+
+    if let Some(entry) = mappings
+        .iter()
+        .find(|m| m.key == js_keycode && m.with_shift == shift_held)
+    {
+        return Some(entry.clone());
     }
 
-    let Some(js_keycode) = mac_keycode_to_js_keycode(keycode) else {
-        return false;
-    };
+    if shift_held {
+        if let Some(entry) = mappings
+            .iter()
+            .find(|m| m.key == js_keycode && !m.with_shift && allow_shift_fallback(&m.action))
+        {
+            return Some(entry.clone());
+        }
+    }
 
-    let input_source_id = {
-        let guard = INPUT_SOURCE_MAPPINGS.lock().unwrap();
-        guard.as_ref().and_then(|m| m.get(&js_keycode)).cloned()
-    };
+    None
+}
 
-    let Some(input_source_id) = input_source_id else {
-        return false;
-    };
-
-    log_macos(
-        "INFO",
-        &format!(
-            "Queueing input source mapping switch: keycode={} js_key={} source_id={}",
-            keycode, js_keycode, input_source_id
-        ),
-    );
-    queue_input_source_switch_on_main(input_source_id);
-
-    true
+fn execute_action_mapping(action: &ActionConfig, key_down: bool, active_modifiers: CGEventFlags) {
+    match action {
+        ActionConfig::Directional { action } => match action {
+            DirectionalActionKind::Left => post_key_simple(KC_LEFT, key_down, active_modifiers),
+            DirectionalActionKind::Right => post_key_simple(KC_RIGHT, key_down, active_modifiers),
+            DirectionalActionKind::Up => post_key_simple(KC_UP, key_down, active_modifiers),
+            DirectionalActionKind::Down => post_key_simple(KC_DOWN, key_down, active_modifiers),
+            DirectionalActionKind::WordForward => post_key(
+                KC_RIGHT,
+                key_down,
+                active_modifiers | CGEventFlags::CGEventFlagAlternate,
+            ),
+            DirectionalActionKind::WordBack => post_key(
+                KC_LEFT,
+                key_down,
+                active_modifiers | CGEventFlags::CGEventFlagAlternate,
+            ),
+            DirectionalActionKind::Home => post_key(
+                KC_LEFT,
+                key_down,
+                active_modifiers | CGEventFlags::CGEventFlagCommand,
+            ),
+            DirectionalActionKind::End => post_key(
+                KC_RIGHT,
+                key_down,
+                active_modifiers | CGEventFlags::CGEventFlagCommand,
+            ),
+        },
+        ActionConfig::Jump { direction, count } => {
+            if key_down {
+                let keycode = match direction {
+                    JumpDirection::Up => KC_UP,
+                    JumpDirection::Down => KC_DOWN,
+                };
+                for _ in 0..*count {
+                    post_key_tap(keycode, active_modifiers);
+                }
+            }
+        }
+        ActionConfig::Independent { action } => match action {
+            IndependentActionKind::Backspace => {
+                post_key_simple(KC_DELETE, key_down, active_modifiers);
+            }
+            IndependentActionKind::NextLine => {
+                if key_down {
+                    post_key_tap(KC_RIGHT, CGEventFlags::CGEventFlagCommand);
+                    post_key_tap(KC_RETURN, CGEventFlags::empty());
+                }
+            }
+            IndependentActionKind::InsertQuotes => {
+                if key_down {
+                    for _ in 0..6 {
+                        if let Ok(source) = CGEventSource::new(CGEventSourceStateID::Private) {
+                            if let Ok(event) = CGEvent::new_keyboard_event(source, 0, true) {
+                                event.set_string("\"");
+                                event.set_integer_value_field(
+                                    EventField::EVENT_SOURCE_USER_DATA,
+                                    INJECTED_EVENT_MAGIC,
+                                );
+                                event.post(CGEventTapLocation::HID);
+                            }
+                        }
+                    }
+                    for _ in 0..3 {
+                        post_key_tap(KC_LEFT, CGEventFlags::empty());
+                    }
+                }
+            }
+        },
+        ActionConfig::InputSource { input_source_id } => {
+            if key_down {
+                log_macos(
+                    "INFO",
+                    &format!(
+                        "Queueing input source mapping switch: source_id={}",
+                        input_source_id
+                    ),
+                );
+                queue_input_source_switch_on_main(input_source_id.clone());
+            }
+        }
+        ActionConfig::Command { command } => {
+            if key_down {
+                let cmd_str = command.clone();
+                log_macos(
+                    "INFO",
+                    &format!("Shell mapping triggered: command={}", cmd_str),
+                );
+                thread::spawn(move || {
+                    let spawn_result = std::process::Command::new("sh")
+                        .arg("-c")
+                        .arg(&cmd_str)
+                        .spawn();
+                    if let Err(e) = spawn_result {
+                        log_macos("ERROR", &format!("Failed to spawn shell mapping: {}", e));
+                    }
+                });
+            }
+        }
+    }
 }
 
 fn handle_caps_remap(keycode: u16, key_down: bool, active_modifiers: CGEventFlags) -> bool {
     let shift_held = active_modifiers.contains(CGEventFlags::CGEventFlagShift);
+    let Some(js_keycode) = mac_keycode_to_js_keycode(keycode) else {
+        return false;
+    };
 
-    if try_handle_input_source_mapping(keycode, key_down, shift_held) {
-        return true;
-    }
+    let Some(mapping) = resolve_action_mapping(js_keycode, shift_held) else {
+        return false;
+    };
 
-    // Check for Shell Mappings (Caps + Shift + Key) => command executing
-    if shift_held && key_down && !is_builtin_arrow_caps_remap_key(keycode) {
-        // Built-in Caps remaps must win so modifier-aware navigation keeps working
-        // (e.g. Caps+Shift+H should always be Shift+Left selection, not a shell command).
-        if let Some(js_keycode) = mac_keycode_to_js_keycode(keycode) {
-            let guard = SHELL_MAPPINGS.lock().unwrap();
-            if let Some(mappings) = &*guard {
-                if let Some(cmd) = mappings.get(&js_keycode) {
-                    let cmd_str = cmd.clone();
-                    log_macos(
-                        "INFO",
-                        &format!(
-                            "Shell mapping triggered: keycode={} js_key={} command={}",
-                            keycode, js_keycode, cmd_str
-                        ),
-                    );
-                    thread::spawn(move || {
-                        let spawn_result = std::process::Command::new("sh")
-                            .arg("-c")
-                            .arg(&cmd_str)
-                            .spawn();
-                        if let Err(e) = spawn_result {
-                            log_macos("ERROR", &format!("Failed to spawn shell mapping: {}", e));
-                        }
-                    });
-                    return true;
-                }
-            }
-        }
-    }
-
-    match keycode {
-        // HJKL — Arrow keys
-        KC_H => {
-            post_key_simple(KC_LEFT, key_down, active_modifiers);
-            true
-        }
-        KC_J => {
-            post_key_simple(KC_DOWN, key_down, active_modifiers);
-            true
-        }
-        KC_K => {
-            post_key_simple(KC_UP, key_down, active_modifiers);
-            true
-        }
-        KC_L => {
-            post_key_simple(KC_RIGHT, key_down, active_modifiers);
-            true
-        }
-
-        // Backspace
-        KC_I => {
-            post_key_simple(KC_DELETE, key_down, active_modifiers);
-            true
-        }
-
-        // Code snippet: insert 6 double-quotes then move cursor back 3
-        KC_N => {
-            if key_down {
-                for _ in 0..6 {
-                    if let Ok(source) = CGEventSource::new(CGEventSourceStateID::Private) {
-                        if let Ok(event) = CGEvent::new_keyboard_event(source, 0, true) {
-                            event.set_string("\"");
-                            event.set_integer_value_field(
-                                EventField::EVENT_SOURCE_USER_DATA,
-                                INJECTED_EVENT_MAGIC,
-                            );
-                            event.post(CGEventTapLocation::HID);
-                        }
-                    }
-                }
-                for _ in 0..3 {
-                    post_key_tap(KC_LEFT, CGEventFlags::empty());
-                }
-            }
-            true
-        }
-
-        // Word Forward (P): Option+Right
-        KC_P => {
-            post_key(
-                KC_RIGHT,
-                key_down,
-                active_modifiers | CGEventFlags::CGEventFlagAlternate,
-            );
-            true
-        }
-
-        // Word Back (Y): Option+Left
-        KC_Y => {
-            post_key(
-                KC_LEFT,
-                key_down,
-                active_modifiers | CGEventFlags::CGEventFlagAlternate,
-            );
-            true
-        }
-
-        // Home (Start of line): Cmd+Left
-        KC_A => {
-            post_key(
-                KC_LEFT,
-                key_down,
-                active_modifiers | CGEventFlags::CGEventFlagCommand,
-            );
-            true
-        }
-
-        // End of line: Cmd+Right
-        KC_E => {
-            post_key(
-                KC_RIGHT,
-                key_down,
-                active_modifiers | CGEventFlags::CGEventFlagCommand,
-            );
-            true
-        }
-
-        // Fast Scroll Up (10x)
-        KC_U => {
-            if key_down {
-                for _ in 0..10 {
-                    post_key_tap(KC_UP, active_modifiers);
-                }
-            }
-            true
-        }
-
-        // Fast Scroll Down (10x)
-        KC_D => {
-            if key_down {
-                for _ in 0..10 {
-                    post_key_tap(KC_DOWN, active_modifiers);
-                }
-            }
-            true
-        }
-
-        // New Line: Cmd+Right (end of line), then Enter
-        KC_O => {
-            if key_down {
-                post_key_tap(KC_RIGHT, CGEventFlags::CGEventFlagCommand);
-                post_key_tap(KC_RETURN, CGEventFlags::empty());
-            }
-            true
-        }
-
-        _ => false,
-    }
+    execute_action_mapping(&mapping.action, key_down, active_modifiers);
+    true
 }
 
 /// Check if Accessibility permission is granted.

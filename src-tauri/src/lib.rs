@@ -24,11 +24,71 @@ static TRAY_TOGGLE_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
 static TRAY_STATUS_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
 static SHELL_MAPPINGS: Mutex<Option<HashMap<u16, String>>> = Mutex::new(None);
 static INPUT_SOURCE_MAPPINGS: Mutex<Option<HashMap<u16, String>>> = Mutex::new(None);
+static ACTION_MAPPINGS: Mutex<Option<Vec<ActionMappingEntry>>> = Mutex::new(None);
 
 const DEFAULT_ABC_KEYCODE: u16 = 188;
 const DEFAULT_WECHAT_KEYCODE: u16 = 190;
 const DEFAULT_ABC_INPUT_SOURCE_ID: &str = "com.apple.keylayout.ABC";
 const DEFAULT_WECHAT_INPUT_SOURCE_ID: &str = "com.tencent.inputmethod.wetype.pinyin";
+
+const JS_H_KEYCODE: u16 = 72;
+const JS_J_KEYCODE: u16 = 74;
+const JS_K_KEYCODE: u16 = 75;
+const JS_L_KEYCODE: u16 = 76;
+const JS_P_KEYCODE: u16 = 80;
+const JS_Y_KEYCODE: u16 = 89;
+const JS_A_KEYCODE: u16 = 65;
+const JS_E_KEYCODE: u16 = 69;
+const JS_U_KEYCODE: u16 = 85;
+const JS_D_KEYCODE: u16 = 68;
+const JS_I_KEYCODE: u16 = 73;
+const JS_N_KEYCODE: u16 = 78;
+const JS_O_KEYCODE: u16 = 79;
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum DirectionalActionKind {
+    Left,
+    Right,
+    Up,
+    Down,
+    WordForward,
+    WordBack,
+    Home,
+    End,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum JumpDirection {
+    Up,
+    Down,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum IndependentActionKind {
+    Backspace,
+    NextLine,
+    InsertQuotes,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub(crate) enum ActionConfig {
+    Directional { action: DirectionalActionKind },
+    Jump { direction: JumpDirection, count: u8 },
+    Independent { action: IndependentActionKind },
+    InputSource { input_source_id: String },
+    Command { command: String },
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ActionMappingEntry {
+    pub(crate) key: u16,
+    pub(crate) with_shift: bool,
+    pub(crate) action: ActionConfig,
+}
 
 #[derive(serde::Serialize)]
 struct PermissionStatuses {
@@ -89,34 +149,6 @@ fn get_shell_mappings_path(app: &AppHandle) -> Option<PathBuf> {
         .map(|p| p.join("shell_mappings.json"))
 }
 
-fn load_mappings_from_disk(app: &AppHandle) {
-    if let Some(path) = get_shell_mappings_path(app) {
-        if let Ok(content) = fs::read_to_string(path) {
-            if let Ok(mappings) = serde_json::from_str::<HashMap<u16, String>>(&content) {
-                *SHELL_MAPPINGS.lock().unwrap() = Some(mappings);
-                return;
-            }
-        }
-    }
-    let mut guard = SHELL_MAPPINGS.lock().unwrap();
-    if guard.is_none() {
-        *guard = Some(HashMap::new());
-    }
-}
-
-fn save_mappings_to_disk(app: &AppHandle) {
-    if let Some(path) = get_shell_mappings_path(app) {
-        if let Some(mappings) = &*SHELL_MAPPINGS.lock().unwrap() {
-            if let Ok(content) = serde_json::to_string(mappings) {
-                if let Some(parent) = path.parent() {
-                    let _ = fs::create_dir_all(parent);
-                }
-                let _ = fs::write(path, content);
-            }
-        }
-    }
-}
-
 fn get_input_source_mappings_path(app: &AppHandle) -> Option<PathBuf> {
     app.path()
         .app_data_dir()
@@ -124,72 +156,384 @@ fn get_input_source_mappings_path(app: &AppHandle) -> Option<PathBuf> {
         .map(|p| p.join("input_source_mappings.json"))
 }
 
-fn apply_default_input_source_mappings(map: &mut HashMap<u16, String>) -> bool {
+fn get_action_mappings_path(app: &AppHandle) -> Option<PathBuf> {
+    app.path()
+        .app_data_dir()
+        .ok()
+        .map(|p| p.join("action_mappings.yml"))
+}
+
+fn get_action_mappings_legacy_json_path(app: &AppHandle) -> Option<PathBuf> {
+    app.path()
+        .app_data_dir()
+        .ok()
+        .map(|p| p.join("action_mappings.json"))
+}
+
+fn default_action_mappings() -> Vec<ActionMappingEntry> {
+    let mut defaults = vec![
+        ActionMappingEntry {
+            key: JS_H_KEYCODE,
+            with_shift: false,
+            action: ActionConfig::Directional {
+                action: DirectionalActionKind::Left,
+            },
+        },
+        ActionMappingEntry {
+            key: JS_J_KEYCODE,
+            with_shift: false,
+            action: ActionConfig::Directional {
+                action: DirectionalActionKind::Down,
+            },
+        },
+        ActionMappingEntry {
+            key: JS_K_KEYCODE,
+            with_shift: false,
+            action: ActionConfig::Directional {
+                action: DirectionalActionKind::Up,
+            },
+        },
+        ActionMappingEntry {
+            key: JS_L_KEYCODE,
+            with_shift: false,
+            action: ActionConfig::Directional {
+                action: DirectionalActionKind::Right,
+            },
+        },
+        ActionMappingEntry {
+            key: JS_P_KEYCODE,
+            with_shift: false,
+            action: ActionConfig::Directional {
+                action: DirectionalActionKind::WordForward,
+            },
+        },
+        ActionMappingEntry {
+            key: JS_Y_KEYCODE,
+            with_shift: false,
+            action: ActionConfig::Directional {
+                action: DirectionalActionKind::WordBack,
+            },
+        },
+        ActionMappingEntry {
+            key: JS_A_KEYCODE,
+            with_shift: false,
+            action: ActionConfig::Directional {
+                action: DirectionalActionKind::Home,
+            },
+        },
+        ActionMappingEntry {
+            key: JS_E_KEYCODE,
+            with_shift: false,
+            action: ActionConfig::Directional {
+                action: DirectionalActionKind::End,
+            },
+        },
+        ActionMappingEntry {
+            key: JS_U_KEYCODE,
+            with_shift: false,
+            action: ActionConfig::Jump {
+                direction: JumpDirection::Up,
+                count: 10,
+            },
+        },
+        ActionMappingEntry {
+            key: JS_D_KEYCODE,
+            with_shift: false,
+            action: ActionConfig::Jump {
+                direction: JumpDirection::Down,
+                count: 10,
+            },
+        },
+        ActionMappingEntry {
+            key: JS_I_KEYCODE,
+            with_shift: false,
+            action: ActionConfig::Independent {
+                action: IndependentActionKind::Backspace,
+            },
+        },
+        ActionMappingEntry {
+            key: JS_N_KEYCODE,
+            with_shift: false,
+            action: ActionConfig::Independent {
+                action: IndependentActionKind::InsertQuotes,
+            },
+        },
+        ActionMappingEntry {
+            key: JS_O_KEYCODE,
+            with_shift: false,
+            action: ActionConfig::Independent {
+                action: IndependentActionKind::NextLine,
+            },
+        },
+    ];
+
     #[cfg(target_os = "macos")]
     {
-        let mut changed = false;
-        if !map.contains_key(&DEFAULT_ABC_KEYCODE) {
-            map.insert(DEFAULT_ABC_KEYCODE, DEFAULT_ABC_INPUT_SOURCE_ID.to_string());
-            changed = true;
-        }
-        if !map.contains_key(&DEFAULT_WECHAT_KEYCODE) {
-            map.insert(
-                DEFAULT_WECHAT_KEYCODE,
-                DEFAULT_WECHAT_INPUT_SOURCE_ID.to_string(),
-            );
-            changed = true;
-        }
-        changed
+        defaults.push(ActionMappingEntry {
+            key: DEFAULT_ABC_KEYCODE,
+            with_shift: false,
+            action: ActionConfig::InputSource {
+                input_source_id: DEFAULT_ABC_INPUT_SOURCE_ID.to_string(),
+            },
+        });
+        defaults.push(ActionMappingEntry {
+            key: DEFAULT_WECHAT_KEYCODE,
+            with_shift: false,
+            action: ActionConfig::InputSource {
+                input_source_id: DEFAULT_WECHAT_INPUT_SOURCE_ID.to_string(),
+            },
+        });
     }
 
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = map;
-        false
-    }
+    defaults
 }
 
-fn should_seed_default_input_source_mappings(
-    loaded_from_disk: bool,
-    mappings: &HashMap<u16, String>,
-) -> bool {
-    !loaded_from_disk || mappings.is_empty()
-}
-
-fn load_input_source_mappings_from_disk(app: &AppHandle) {
-    let mut loaded_from_disk = false;
-    let mut mappings = HashMap::new();
-
-    if let Some(path) = get_input_source_mappings_path(app) {
+fn read_legacy_mappings(path: Option<PathBuf>) -> HashMap<u16, String> {
+    if let Some(path) = path {
         if let Ok(content) = fs::read_to_string(path) {
-            loaded_from_disk = true;
-            mappings = serde_json::from_str::<HashMap<u16, String>>(&content).unwrap_or_default();
+            return serde_json::from_str::<HashMap<u16, String>>(&content).unwrap_or_default();
         }
     }
+    HashMap::new()
+}
 
-    let defaults_applied = if should_seed_default_input_source_mappings(loaded_from_disk, &mappings)
-    {
-        apply_default_input_source_mappings(&mut mappings)
-    } else {
-        false
-    };
-    *INPUT_SOURCE_MAPPINGS.lock().unwrap() = Some(mappings);
-
-    if defaults_applied {
-        save_input_source_mappings_to_disk(app);
+fn js_keycode_name(key: u16) -> String {
+    match key {
+        48..=57 => ((b'0' + (key as u8 - 48)) as char).to_string(),
+        65..=90 => ((b'A' + (key as u8 - 65)) as char).to_string(),
+        8 => "Del".to_string(),
+        13 => "Enter".to_string(),
+        37 => "Left".to_string(),
+        38 => "Up".to_string(),
+        39 => "Right".to_string(),
+        40 => "Down".to_string(),
+        186 => ";".to_string(),
+        187 => "=".to_string(),
+        188 => ",".to_string(),
+        189 => "-".to_string(),
+        190 => ".".to_string(),
+        191 => "/".to_string(),
+        220 => "\\".to_string(),
+        222 => "'".to_string(),
+        _ => format!("Key{}", key),
     }
 }
 
-fn save_input_source_mappings_to_disk(app: &AppHandle) {
-    if let Some(path) = get_input_source_mappings_path(app) {
-        if let Some(mappings) = &*INPUT_SOURCE_MAPPINGS.lock().unwrap() {
-            if let Ok(content) = serde_json::to_string(mappings) {
-                if let Some(parent) = path.parent() {
-                    let _ = fs::create_dir_all(parent);
-                }
-                let _ = fs::write(path, content);
+fn yaml_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "''"))
+}
+
+fn directional_action_name(action: &DirectionalActionKind) -> &'static str {
+    match action {
+        DirectionalActionKind::Left => "left",
+        DirectionalActionKind::Right => "right",
+        DirectionalActionKind::Up => "up",
+        DirectionalActionKind::Down => "down",
+        DirectionalActionKind::WordForward => "word_forward",
+        DirectionalActionKind::WordBack => "word_back",
+        DirectionalActionKind::Home => "home",
+        DirectionalActionKind::End => "end",
+    }
+}
+
+fn jump_direction_name(direction: &JumpDirection) -> &'static str {
+    match direction {
+        JumpDirection::Up => "up",
+        JumpDirection::Down => "down",
+    }
+}
+
+fn independent_action_name(action: &IndependentActionKind) -> &'static str {
+    match action {
+        IndependentActionKind::Backspace => "backspace",
+        IndependentActionKind::NextLine => "next_line",
+        IndependentActionKind::InsertQuotes => "insert_quotes",
+    }
+}
+
+fn render_action_mappings_yaml_with_comments(mappings: &[ActionMappingEntry]) -> String {
+    let mut lines = vec![
+        "# HyperCapslock action mappings".to_string(),
+        "# key uses JavaScript keyCode".to_string(),
+        "# with_shift=false -> Caps+Key, with_shift=true -> Caps+Shift+Key".to_string(),
+    ];
+
+    for entry in mappings {
+        lines.push(format!(
+            "- key: {} # {}",
+            entry.key,
+            js_keycode_name(entry.key)
+        ));
+        lines.push(format!("  with_shift: {}", entry.with_shift));
+        lines.push("  action:".to_string());
+        match &entry.action {
+            ActionConfig::Directional { action } => {
+                lines.push("    kind: directional".to_string());
+                lines.push(format!("    action: {}", directional_action_name(action)));
+            }
+            ActionConfig::Jump { direction, count } => {
+                lines.push("    kind: jump".to_string());
+                lines.push(format!("    direction: {}", jump_direction_name(direction)));
+                lines.push(format!("    count: {}", count));
+            }
+            ActionConfig::Independent { action } => {
+                lines.push("    kind: independent".to_string());
+                lines.push(format!("    action: {}", independent_action_name(action)));
+            }
+            ActionConfig::InputSource { input_source_id } => {
+                lines.push("    kind: input_source".to_string());
+                lines.push(format!(
+                    "    input_source_id: {}",
+                    yaml_quote(input_source_id)
+                ));
+            }
+            ActionConfig::Command { command } => {
+                lines.push("    kind: command".to_string());
+                lines.push(format!("    command: {}", yaml_quote(command)));
             }
         }
+    }
+
+    lines.join("\n") + "\n"
+}
+
+fn upsert_action_mapping_in_vec(
+    mappings: &mut Vec<ActionMappingEntry>,
+    entry: ActionMappingEntry,
+) -> bool {
+    if let Some(existing) = mappings
+        .iter_mut()
+        .find(|m| m.key == entry.key && m.with_shift == entry.with_shift)
+    {
+        if *existing != entry {
+            *existing = entry;
+            return true;
+        }
+        return false;
+    }
+    mappings.push(entry);
+    true
+}
+
+fn remove_action_mapping_from_vec(
+    mappings: &mut Vec<ActionMappingEntry>,
+    key: u16,
+    with_shift: bool,
+) -> bool {
+    let before = mappings.len();
+    mappings.retain(|m| !(m.key == key && m.with_shift == with_shift));
+    before != mappings.len()
+}
+
+fn normalize_action_mappings(mappings: &mut Vec<ActionMappingEntry>) {
+    let mut deduped: Vec<ActionMappingEntry> = Vec::new();
+    for entry in mappings.drain(..) {
+        if let Some(existing) = deduped
+            .iter_mut()
+            .find(|m| m.key == entry.key && m.with_shift == entry.with_shift)
+        {
+            *existing = entry;
+        } else {
+            deduped.push(entry);
+        }
+    }
+    *mappings = deduped;
+}
+
+fn sync_legacy_mappings_cache_from_actions(mappings: &[ActionMappingEntry]) {
+    let mut shell = HashMap::new();
+    let mut input_sources = HashMap::new();
+
+    for entry in mappings {
+        match &entry.action {
+            ActionConfig::Command { command } if entry.with_shift => {
+                shell.insert(entry.key, command.clone());
+            }
+            ActionConfig::InputSource { input_source_id } if !entry.with_shift => {
+                input_sources.insert(entry.key, input_source_id.clone());
+            }
+            _ => {}
+        }
+    }
+
+    *SHELL_MAPPINGS.lock().unwrap() = Some(shell);
+    *INPUT_SOURCE_MAPPINGS.lock().unwrap() = Some(input_sources);
+}
+
+fn save_action_mappings_to_disk(app: &AppHandle) {
+    if let Some(path) = get_action_mappings_path(app) {
+        if let Some(mappings) = &*ACTION_MAPPINGS.lock().unwrap() {
+            let content = render_action_mappings_yaml_with_comments(mappings);
+            if let Some(parent) = path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            let _ = fs::write(path, content);
+        }
+    }
+}
+
+fn load_action_mappings_from_disk(app: &AppHandle) {
+    let mut loaded_from_disk = false;
+    let mut mappings = Vec::new();
+    let mut changed = false;
+
+    if let Some(path) = get_action_mappings_path(app) {
+        if let Ok(content) = fs::read_to_string(path) {
+            loaded_from_disk = true;
+            mappings =
+                serde_yaml::from_str::<Vec<ActionMappingEntry>>(&content).unwrap_or_default();
+        }
+    }
+
+    if !loaded_from_disk {
+        if let Some(path) = get_action_mappings_legacy_json_path(app) {
+            if let Ok(content) = fs::read_to_string(path) {
+                loaded_from_disk = true;
+                mappings =
+                    serde_json::from_str::<Vec<ActionMappingEntry>>(&content).unwrap_or_default();
+                changed = true;
+            }
+        }
+    }
+
+    if !loaded_from_disk || mappings.is_empty() {
+        mappings = default_action_mappings();
+        changed = true;
+    }
+
+    let legacy_shell = read_legacy_mappings(get_shell_mappings_path(app));
+    for (key, command) in legacy_shell {
+        changed |= upsert_action_mapping_in_vec(
+            &mut mappings,
+            ActionMappingEntry {
+                key,
+                with_shift: true,
+                action: ActionConfig::Command { command },
+            },
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let legacy_input = read_legacy_mappings(get_input_source_mappings_path(app));
+        for (key, input_source_id) in legacy_input {
+            changed |= upsert_action_mapping_in_vec(
+                &mut mappings,
+                ActionMappingEntry {
+                    key,
+                    with_shift: false,
+                    action: ActionConfig::InputSource { input_source_id },
+                },
+            );
+        }
+    }
+
+    normalize_action_mappings(&mut mappings);
+    sync_legacy_mappings_cache_from_actions(&mappings);
+    *ACTION_MAPPINGS.lock().unwrap() = Some(mappings);
+
+    if changed {
+        save_action_mappings_to_disk(app);
     }
 }
 
@@ -225,59 +569,127 @@ fn update_tray_visuals(app: &AppHandle, paused: bool) {
 }
 
 #[tauri::command]
-fn add_mapping(app: AppHandle, key: u16, command: String) {
+fn upsert_action_mapping(
+    app: AppHandle,
+    key: u16,
+    with_shift: bool,
+    action: ActionConfig,
+) -> Result<(), String> {
+    match &action {
+        ActionConfig::Command { command } if command.trim().is_empty() => {
+            return Err("command cannot be empty".to_string());
+        }
+        ActionConfig::InputSource { input_source_id } if input_source_id.trim().is_empty() => {
+            return Err("input_source_id cannot be empty".to_string());
+        }
+        ActionConfig::Jump { count, .. } if *count == 0 => {
+            return Err("jump count must be >= 1".to_string());
+        }
+        _ => {}
+    }
+
     {
-        let mut guard = SHELL_MAPPINGS.lock().unwrap();
-        if let Some(map) = guard.as_mut() {
-            map.insert(key, command);
+        let mut guard = ACTION_MAPPINGS.lock().unwrap();
+        let mappings = guard.get_or_insert_with(Vec::new);
+        let entry = ActionMappingEntry {
+            key,
+            with_shift,
+            action,
+        };
+        upsert_action_mapping_in_vec(mappings, entry);
+        normalize_action_mappings(mappings);
+        sync_legacy_mappings_cache_from_actions(mappings);
+    }
+    save_action_mappings_to_disk(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn remove_action_mapping(app: AppHandle, key: u16, with_shift: bool) {
+    {
+        let mut guard = ACTION_MAPPINGS.lock().unwrap();
+        if let Some(mappings) = guard.as_mut() {
+            remove_action_mapping_from_vec(mappings, key, with_shift);
+            sync_legacy_mappings_cache_from_actions(mappings);
         }
     }
-    save_mappings_to_disk(&app);
+    save_action_mappings_to_disk(&app);
+}
+
+#[tauri::command]
+fn get_action_mappings() -> Vec<ActionMappingEntry> {
+    ACTION_MAPPINGS.lock().unwrap().clone().unwrap_or_default()
+}
+
+// Legacy API wrappers kept for compatibility.
+#[tauri::command]
+fn add_mapping(app: AppHandle, key: u16, command: String) -> Result<(), String> {
+    upsert_action_mapping(app, key, true, ActionConfig::Command { command })
 }
 
 #[tauri::command]
 fn remove_mapping(app: AppHandle, key: u16) {
-    {
-        let mut guard = SHELL_MAPPINGS.lock().unwrap();
-        if let Some(map) = guard.as_mut() {
-            map.remove(&key);
-        }
-    }
-    save_mappings_to_disk(&app);
+    remove_action_mapping(app, key, true);
 }
 
 #[tauri::command]
 fn get_mappings() -> HashMap<u16, String> {
-    let guard = SHELL_MAPPINGS.lock().unwrap();
-    guard.clone().unwrap_or_default()
+    let mut out = HashMap::new();
+    for entry in get_action_mappings() {
+        if let ActionConfig::Command { command } = entry.action {
+            if entry.with_shift {
+                out.insert(entry.key, command);
+            }
+        }
+    }
+    out
 }
 
 #[tauri::command]
-fn add_input_source_mapping(app: AppHandle, key: u16, input_source_id: String) {
-    {
-        let mut guard = INPUT_SOURCE_MAPPINGS.lock().unwrap();
-        if let Some(map) = guard.as_mut() {
-            map.insert(key, input_source_id);
-        }
-    }
-    save_input_source_mappings_to_disk(&app);
+fn add_input_source_mapping(
+    app: AppHandle,
+    key: u16,
+    input_source_id: String,
+) -> Result<(), String> {
+    upsert_action_mapping(
+        app,
+        key,
+        false,
+        ActionConfig::InputSource { input_source_id },
+    )
 }
 
 #[tauri::command]
 fn remove_input_source_mapping(app: AppHandle, key: u16) {
-    {
-        let mut guard = INPUT_SOURCE_MAPPINGS.lock().unwrap();
-        if let Some(map) = guard.as_mut() {
-            map.remove(&key);
-        }
+    let should_remove = ACTION_MAPPINGS
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|mappings| {
+            mappings.iter().any(|m| {
+                m.key == key
+                    && !m.with_shift
+                    && matches!(m.action, ActionConfig::InputSource { .. })
+            })
+        })
+        .unwrap_or(false);
+
+    if should_remove {
+        remove_action_mapping(app, key, false);
     }
-    save_input_source_mappings_to_disk(&app);
 }
 
 #[tauri::command]
 fn get_input_source_mappings() -> HashMap<u16, String> {
-    let guard = INPUT_SOURCE_MAPPINGS.lock().unwrap();
-    guard.clone().unwrap_or_default()
+    let mut out = HashMap::new();
+    for entry in get_action_mappings() {
+        if let ActionConfig::InputSource { input_source_id } = entry.action {
+            if !entry.with_shift {
+                out.insert(entry.key, input_source_id);
+            }
+        }
+    }
+    out
 }
 
 #[tauri::command]
@@ -336,8 +748,7 @@ pub fn run() {
             }
         })
         .setup(|app| {
-            load_mappings_from_disk(app.handle());
-            load_input_source_mappings_from_disk(app.handle());
+            load_action_mappings_from_disk(app.handle());
             let status_i =
                 MenuItem::with_id(app, "status", "Status: Running", false, None::<&str>)?;
             let toggle_i =
@@ -475,6 +886,9 @@ pub fn run() {
             get_status,
             set_paused,
             get_permission_statuses,
+            upsert_action_mapping,
+            remove_action_mapping,
+            get_action_mappings,
             add_mapping,
             remove_mapping,
             get_mappings,
@@ -491,63 +905,106 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use crate::{
-        apply_default_input_source_mappings, should_seed_default_input_source_mappings,
-        DEFAULT_ABC_INPUT_SOURCE_ID, DEFAULT_ABC_KEYCODE, DEFAULT_WECHAT_INPUT_SOURCE_ID,
-        DEFAULT_WECHAT_KEYCODE,
+        default_action_mappings, render_action_mappings_yaml_with_comments,
+        upsert_action_mapping_in_vec, ActionConfig, ActionMappingEntry, DirectionalActionKind,
+        IndependentActionKind, JumpDirection, JS_H_KEYCODE, JS_N_KEYCODE, JS_U_KEYCODE,
     };
 
     #[test]
-    fn test_mapping_serialization() {
-        let mut map = HashMap::new();
-        map.insert(65, "calc.exe".to_string());
+    fn test_action_mapping_serialization() {
+        let entry = ActionMappingEntry {
+            key: 77,
+            with_shift: true,
+            action: ActionConfig::Command {
+                command: "open -a Calculator".to_string(),
+            },
+        };
 
-        let json = serde_json::to_string(&map).unwrap();
-        assert_eq!(json, "{\"65\":\"calc.exe\"}");
-
-        let decoded: HashMap<u16, String> = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.get(&65).unwrap(), "calc.exe");
+        let yaml = serde_yaml::to_string(&entry).unwrap();
+        let decoded: ActionMappingEntry = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(decoded, entry);
     }
 
     #[test]
-    fn test_input_source_mapping_serialization() {
-        let mut map = HashMap::new();
-        map.insert(188, "com.apple.keylayout.ABC".to_string());
+    fn test_yaml_render_contains_key_name_comment() {
+        let entries = vec![ActionMappingEntry {
+            key: 87,
+            with_shift: false,
+            action: ActionConfig::Directional {
+                action: DirectionalActionKind::WordForward,
+            },
+        }];
 
-        let json = serde_json::to_string(&map).unwrap();
-        let decoded: HashMap<u16, String> = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.get(&188).unwrap(), "com.apple.keylayout.ABC");
+        let yaml = render_action_mappings_yaml_with_comments(&entries);
+        assert!(yaml.contains("key: 87 # W"));
+
+        let decoded: Vec<ActionMappingEntry> = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(decoded, entries);
     }
 
     #[test]
-    fn test_default_seed_decision_for_missing_or_empty_data() {
-        let mut map = HashMap::new();
-        assert!(should_seed_default_input_source_mappings(false, &map));
-        assert!(should_seed_default_input_source_mappings(true, &map));
-
-        map.insert(188, "com.apple.keylayout.ABC".to_string());
-        assert!(!should_seed_default_input_source_mappings(true, &map));
+    fn test_default_action_mappings_include_core_behaviors() {
+        let defaults = default_action_mappings();
+        assert!(defaults.iter().any(|m| {
+            m.key == JS_H_KEYCODE
+                && !m.with_shift
+                && matches!(
+                    m.action,
+                    ActionConfig::Directional {
+                        action: DirectionalActionKind::Left
+                    }
+                )
+        }));
+        assert!(defaults.iter().any(|m| {
+            m.key == JS_U_KEYCODE
+                && matches!(
+                    m.action,
+                    ActionConfig::Jump {
+                        direction: JumpDirection::Up,
+                        count: 10
+                    }
+                )
+        }));
+        assert!(defaults.iter().any(|m| {
+            m.key == JS_N_KEYCODE
+                && matches!(
+                    m.action,
+                    ActionConfig::Independent {
+                        action: IndependentActionKind::InsertQuotes
+                    }
+                )
+        }));
     }
 
-    #[cfg(target_os = "macos")]
     #[test]
-    fn test_default_input_source_mappings_seeded_when_missing() {
-        let mut map = HashMap::new();
+    fn test_upsert_replaces_existing_binding() {
+        let mut mappings = vec![ActionMappingEntry {
+            key: 65,
+            with_shift: false,
+            action: ActionConfig::Directional {
+                action: DirectionalActionKind::Left,
+            },
+        }];
 
-        let changed = apply_default_input_source_mappings(&mut map);
+        let changed = upsert_action_mapping_in_vec(
+            &mut mappings,
+            ActionMappingEntry {
+                key: 65,
+                with_shift: false,
+                action: ActionConfig::Directional {
+                    action: DirectionalActionKind::Right,
+                },
+            },
+        );
+
         assert!(changed);
-        assert_eq!(
-            map.get(&DEFAULT_ABC_KEYCODE).unwrap(),
-            DEFAULT_ABC_INPUT_SOURCE_ID
-        );
-        assert_eq!(
-            map.get(&DEFAULT_WECHAT_KEYCODE).unwrap(),
-            DEFAULT_WECHAT_INPUT_SOURCE_ID
-        );
-
-        let changed_again = apply_default_input_source_mappings(&mut map);
-        assert!(!changed_again);
+        assert_eq!(mappings.len(), 1);
+        assert!(matches!(
+            mappings[0].action,
+            ActionConfig::Directional {
+                action: DirectionalActionKind::Right
+            }
+        ));
     }
 }
