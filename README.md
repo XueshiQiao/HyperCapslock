@@ -48,7 +48,9 @@
 
 ## Screenshots
 
-![](public/HyperCapslock.png)
+<div align="center">
+    <img src="./public/HyperCapslock.png" style="width: 720;" />
+</div>
 
 ## Architecture
 

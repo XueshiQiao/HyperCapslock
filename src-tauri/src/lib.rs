@@ -773,7 +773,8 @@ pub fn run() {
                 MenuItem::with_id(app, "check_update", "Check for Updates", true, None::<&str>)?;
             let sep = PredefinedMenuItem::separator(app)?;
             let show_i = MenuItem::with_id(app, "show", "Open window", true, None::<&str>)?;
-            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let quit_i =
+                MenuItem::with_id(app, "quit", "Quit HyperCapslock", true, None::<&str>)?;
 
             if let Ok(mut guard) = TRAY_TOGGLE_ITEM.lock() {
                 *guard = Some(toggle_i.clone());
