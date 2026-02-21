@@ -333,7 +333,7 @@ function App() {
         <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500 mb-2">
           HyperCapslock
         </h1>
-        <p className="text-slate-400 text-sm">System-wide Vim navigation</p>
+        <p className="text-slate-400 text-sm">Make your Capslock Powerful again!</p>
       </div>
 
       {/* Status + Settings Row */}

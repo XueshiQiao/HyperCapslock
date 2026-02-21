@@ -20,7 +20,7 @@ Write-Host "Updating tauri.conf.json..."
 $tauriConfPath = ".\src-tauri\tauri.conf.json"
 $tauriJson = Get-Content -Path $tauriConfPath -Raw | ConvertFrom-Json
 $tauriJson.version = $subVersion
-$tauriJson.productName = "Gloabl Vim-like Navi" # Ensure consistent formatting if needed, though mostly reading/writing
+$tauriJson.productName = "HyperCapslock" # Keep product name aligned with app branding.
 $tauriJson | ConvertTo-Json -Depth 100 | Set-Content -Path $tauriConfPath
 
 # 4. Update Cargo.toml

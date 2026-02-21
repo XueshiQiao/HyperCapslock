@@ -1,7 +1,7 @@
 [package]
 name = "hyper-capslock"
 version = "0.8.1"
-description = "A global vim-like navigation tool."
+description = "Make your Capslock Powerful again!"
 authors = ["XueshiQiao"]
 edition = "2021"
 

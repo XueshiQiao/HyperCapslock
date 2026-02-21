@@ -1,6 +1,6 @@
 # HyperCapslock
 
-**HyperCapslock** is a lightweight Windows utility that brings Vim-style navigation (H/J/K/L) to the entire operating system. It allows you to use `CapsLock` + `Key` as shortcuts in any application.
+**HyperCapslock**: Make your Capslock Powerful again!
 
 ## Features
 
