@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "HyperCapslock",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "identifier": "me.xueshi.hypercapslock",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -15,7 +15,8 @@
         "title": "HyperCapslock",
         "width": 666,
         "height": 1100,
-        "visible": false
+        "visible": false,
+        "titleBarStyle": "Overlay"
       }
     ],
     "security": {

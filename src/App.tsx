@@ -312,6 +312,19 @@ function App() {
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-background p-6 select-none overflow-y-auto relative">
 
+      {/* Drag region — invisible strip at top for window dragging */}
+      <div
+        data-tauri-drag-region
+        onMouseDown={(e) => {
+          if (e.buttons === 1) {
+            e.detail === 2
+              ? getCurrentWindow().toggleMaximize()
+              : getCurrentWindow().startDragging();
+          }
+        }}
+        className="fixed top-0 left-0 right-0 h-8 z-40"
+      />
+
       {/* Toast Notification */}
       {toast && (
         <div className={`fixed bottom-10 left-1/2 z-50 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-slide-up border whitespace-nowrap ${
