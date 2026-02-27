@@ -125,7 +125,7 @@ function actionToPresentation(action: ActionConfig): ActionPresentation {
 }
 
 const CARD_WIDTH_CLASS = "w-full max-w-[580px]";
-const MODERN_CARD_CLASS = "relative overflow-hidden border border-slate-700/80 rounded-2xl shadow-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900";
+const MODERN_CARD_CLASS = "relative overflow-hidden border border-slate-200/80 dark:border-slate-700/80 rounded-2xl shadow-xl bg-white dark:bg-slate-800";
 const ACTION_GROUP_ORDER: Array<{ key: ActionGroupKey; label: string }> = [
   { key: "directional", label: "Directional" },
   { key: "jump", label: "Jump" },
@@ -152,6 +152,16 @@ function App() {
   const [newIndependentAction, setNewIndependentAction] = useState<IndependentAction>("backspace");
   const [newInputSourceId, setNewInputSourceId] = useState("");
   const [newCommand, setNewCommand] = useState("");
+
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    const stored = localStorage.getItem("hc-theme");
+    return stored ? stored === "dark" : true;
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDark);
+    localStorage.setItem("hc-theme", isDark ? "dark" : "light");
+  }, [isDark]);
 
   useEffect(() => {
     let unlisten: () => void;
@@ -299,7 +309,7 @@ function App() {
   const isRunning = status === "Running";
   const isPaused = status === "Paused";
 
-  const statusColor = isRunning ? "text-green-400" : isPaused ? "text-amber-400" : "text-red-400";
+  const statusColor = isRunning ? "text-green-500 dark:text-green-400" : isPaused ? "text-amber-500 dark:text-amber-400" : "text-red-500 dark:text-red-400";
   const dotColor = isRunning ? "bg-green-500" : isPaused ? "bg-amber-500" : "bg-red-500";
   const pingColor = isRunning ? "bg-green-400" : isPaused ? "bg-amber-400" : "bg-red-400";
   const draftAction = buildDraftAction();
@@ -310,7 +320,7 @@ function App() {
   })).filter((group) => group.entries.length > 0);
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen bg-background p-6 select-none overflow-y-auto relative">
+    <main className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-[#0f172a] p-6 select-none overflow-y-auto relative">
 
       {/* Drag region — invisible strip at top for window dragging */}
       <div
@@ -325,33 +335,42 @@ function App() {
         className="fixed top-0 left-0 right-0 h-8 z-40"
       />
 
+      {/* Theme Toggle Button */}
+      <button
+        onClick={() => setIsDark((prev) => !prev)}
+        className="fixed top-1.5 right-3 z-50 p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+        title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+      >
+        {isDark ? <SunIcon /> : <MoonIcon />}
+      </button>
+
       {/* Toast Notification */}
       {toast && (
         <div className={`fixed bottom-10 left-1/2 z-50 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-slide-up border whitespace-nowrap ${
           toast.type === "success"
-            ? "bg-slate-800 border-green-500/50 text-green-400"
-            : "bg-slate-800 border-red-500/50 text-red-400"
+            ? "bg-white dark:bg-slate-800 border-green-500/50 text-green-600 dark:text-green-400"
+            : "bg-white dark:bg-slate-800 border-red-500/50 text-red-600 dark:text-red-400"
         }`}>
           {toast.type === "success" ? (
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
           ) : (
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           )}
-          <span className="font-medium text-sm text-slate-200">{toast.message}</span>
+          <span className="font-medium text-sm text-slate-700 dark:text-slate-200">{toast.message}</span>
         </div>
       )}
 
       {/* Header */}
       <div className="text-center mb-8 mt-10">
-        <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500 mb-2">
+        <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-500 mb-2">
           HyperCapslock
         </h1>
-        <p className="text-slate-400 text-sm">Make your Capslock Powerful again!</p>
+        <p className="text-slate-500 dark:text-slate-400 text-sm">Make your Capslock Powerful again!</p>
       </div>
 
       {/* Status + Settings Row */}
       <div className={`${CARD_WIDTH_CLASS} grid grid-cols-2 gap-3 mb-8`}>
-        <div className={`${MODERN_CARD_CLASS} p-5 transition-all duration-200 hover:border-slate-500 hover:shadow-2xl hover:shadow-blue-900/20`}>
+        <div className={`${MODERN_CARD_CLASS} p-5 transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-500 hover:shadow-2xl hover:shadow-blue-100/30 dark:hover:shadow-blue-900/20`}>
           <div className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full bg-blue-500/15 blur-2xl" />
           <div className="pointer-events-none absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-cyan-400/10 blur-2xl" />
           <div className="relative">
@@ -361,7 +380,7 @@ function App() {
                 <span className={`relative inline-flex rounded-full h-3 w-3 ${dotColor}`}></span>
               </div>
               <div>
-                <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Status</p>
+                <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">Status</p>
                 <p className={`text-lg font-semibold leading-tight ${statusColor}`}>{status}</p>
               </div>
             </div>
@@ -369,7 +388,7 @@ function App() {
               onClick={togglePause}
               className={`w-full px-4 py-2 rounded-xl font-medium transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-2
                 ${isRunning
-                  ? "bg-slate-700/90 hover:bg-slate-600 text-slate-100"
+                  ? "bg-slate-100 dark:bg-slate-700/90 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100"
                   : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20"
                 }`}
             >
@@ -378,14 +397,14 @@ function App() {
           </div>
         </div>
 
-        <div className={`${MODERN_CARD_CLASS} p-5 flex flex-col justify-between transition-all duration-200 hover:border-slate-500 hover:shadow-2xl hover:shadow-violet-900/20`}>
+        <div className={`${MODERN_CARD_CLASS} p-5 flex flex-col justify-between transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-500 hover:shadow-2xl hover:shadow-violet-100/30 dark:hover:shadow-violet-900/20`}>
           <div className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full bg-violet-500/12 blur-2xl" />
           <div className="pointer-events-none absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-cyan-400/10 blur-2xl" />
           <div className="relative">
             <div>
-              <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Settings</p>
-              <p className="text-sm text-slate-200 font-medium mt-1">Start at Login</p>
-              <p className="text-[11px] text-slate-500 mt-1">Launch automatically when you sign in.</p>
+              <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">Settings</p>
+              <p className="text-sm text-slate-800 dark:text-slate-200 font-medium mt-1">Start at Login</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Launch automatically when you sign in.</p>
             </div>
             <div className="flex justify-end mt-4">
               <button
@@ -393,7 +412,7 @@ function App() {
                 className={`w-12 h-6 rounded-full p-1 border transition-all duration-200 ease-in-out cursor-pointer ${
                   autostart
                     ? "bg-primary border-blue-400/70 hover:bg-blue-500 hover:border-blue-300"
-                    : "bg-slate-600 border-slate-500 hover:bg-slate-500 hover:border-slate-400"
+                    : "bg-slate-200 dark:bg-slate-600 border-slate-300 dark:border-slate-500 hover:bg-slate-300 dark:hover:bg-slate-500 hover:border-slate-400 dark:hover:border-slate-400"
                 }`}
               >
                 <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${autostart ? 'translate-x-6' : 'translate-x-0'}`} />
@@ -404,18 +423,18 @@ function App() {
       </div>
 
       {/* Permissions Card */}
-      <div className={`${CARD_WIDTH_CLASS} ${MODERN_CARD_CLASS} p-6 mb-8 transition-all duration-200 hover:border-slate-500 hover:shadow-2xl hover:shadow-emerald-900/20`}>
+      <div className={`${CARD_WIDTH_CLASS} ${MODERN_CARD_CLASS} p-6 mb-8 transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-500 hover:shadow-2xl hover:shadow-emerald-100/30 dark:hover:shadow-emerald-900/20`}>
         <div className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full bg-emerald-500/12 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-blue-500/10 blur-2xl" />
         <div className="relative">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Permissions</h2>
-              <p className="text-slate-200 font-medium">Authority Status</p>
+              <h2 className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Permissions</h2>
+              <p className="text-slate-800 dark:text-slate-200 font-medium">Authority Status</p>
             </div>
             <button
               onClick={() => refreshPermissions(true)}
-              className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors"
             >
               Refresh
             </button>
@@ -424,7 +443,7 @@ function App() {
             <PermissionRow label="Accessibility" status={permissions?.accessibility ?? "not_required"} />
             <PermissionRow label="Input Monitoring" status={permissions?.input_monitoring ?? "not_required"} />
           </div>
-          <p className="text-[11px] text-slate-500 mt-3">
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3">
             {permissions?.platform === "macos"
               ? "Required on macOS for reliable global hotkeys."
               : "These permissions are only required on macOS."}
@@ -436,7 +455,7 @@ function App() {
         <div className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full bg-indigo-500/12 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-cyan-500/10 blur-2xl" />
         <div className="relative">
-          <h2 className="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-4">
+          <h2 className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-semibold mb-4">
             Action Mappings (Caps+Key)
           </h2>
 
@@ -450,7 +469,7 @@ function App() {
                 { value: "with_shift", label: "Caps + Shift" },
               ]}
             />
-            <span className="text-slate-500 text-sm font-medium select-none">+</span>
+            <span className="text-slate-400 dark:text-slate-500 text-sm font-medium select-none">+</span>
             <input
               type="text"
               placeholder="Press Key"
@@ -462,12 +481,12 @@ function App() {
                 setNewKey(e.keyCode);
                 setNewKeyDisplay(keyCodeToDisplay(e.keyCode));
               }}
-              className="col-span-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-center text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors cursor-pointer"
+              className="col-span-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-center text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer"
             />
           </div>
 
           <div className="flex justify-center mb-1">
-            <span className="text-slate-500 text-base font-medium select-none">↓</span>
+            <span className="text-slate-400 dark:text-slate-500 text-base font-medium select-none">↓</span>
           </div>
 
           <div className="grid grid-cols-[minmax(130px,1fr)_minmax(0,3fr)] items-center gap-2 mb-2">
@@ -519,7 +538,7 @@ function App() {
                     max={99}
                     value={newJumpCount}
                     onChange={(e) => setNewJumpCount(Number(e.target.value))}
-                    className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors"
+                    className="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors"
                   />
                 </div>
               )}
@@ -542,7 +561,7 @@ function App() {
                   placeholder="Input Source ID (e.g. com.apple.keylayout.ABC)"
                   value={newInputSourceId}
                   onChange={(e) => setNewInputSourceId(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors font-mono"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors font-mono"
                 />
               )}
 
@@ -552,7 +571,7 @@ function App() {
                   placeholder="Command (e.g. open -a Calculator)"
                   value={newCommand}
                   onChange={(e) => setNewCommand(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors"
                 />
               )}
             </div>
@@ -566,16 +585,16 @@ function App() {
             Save Mapping
           </button>
 
-          <p className="text-[11px] text-slate-500 mb-3">
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-3">
             Defaults include directional, jump, next-line, quote insertion, and on macOS:
-            <code className="text-slate-400 block">Caps+, → com.apple.keylayout.ABC</code>
-            <code className="text-slate-400 block">Caps+. → com.tencent.inputmethod.wetype.pinyin</code>
+            <code className="text-slate-500 dark:text-slate-400 block">Caps+, → com.apple.keylayout.ABC</code>
+            <code className="text-slate-500 dark:text-slate-400 block">Caps+. → com.tencent.inputmethod.wetype.pinyin</code>
           </p>
 
           <div className="space-y-4">
             {groupedMappings.map((group) => (
               <div key={group.key} className="space-y-2">
-                <h3 className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-1">
+                <h3 className="text-[11px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-semibold px-1">
                   {group.label}
                 </h3>
                 {group.entries.map((entry) => {
@@ -583,15 +602,15 @@ function App() {
                   return (
                     <div
                       key={`${entry.key}-${entry.with_shift ? "s" : "n"}`}
-                      className="flex items-center justify-between bg-slate-800/50 rounded-lg p-2 px-3 border border-slate-700/50 hover:border-slate-500 transition-colors group"
+                      className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2 px-3 border border-slate-200/50 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-500 transition-colors group"
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <Kbd>Caps</Kbd>
-                        <span className="text-slate-500 font-light text-xs">+</span>
+                        <span className="text-slate-400 dark:text-slate-500 font-light text-xs">+</span>
                         {entry.with_shift && (
                           <>
                             <Kbd>Shift</Kbd>
-                            <span className="text-slate-500 font-light text-xs">+</span>
+                            <span className="text-slate-400 dark:text-slate-500 font-light text-xs">+</span>
                           </>
                         )}
                         <Kbd>{keyCodeToDisplay(entry.key)}</Kbd>
@@ -601,15 +620,15 @@ function App() {
                           className="flex items-center gap-2 overflow-hidden max-w-[260px]"
                           title={`${presentation.category}: ${presentation.value}`}
                         >
-                          <span className="text-xs text-slate-400 shrink-0">
+                          <span className="text-xs text-slate-500 dark:text-slate-400 shrink-0">
                             {presentation.category}:
                           </span>
-                          <span className={`text-xs truncate ${presentation.valueClassName ?? "text-blue-300"}`}>
+                          <span className={`text-xs truncate ${presentation.valueClassName ?? "text-blue-600 dark:text-blue-300"}`}>
                             {presentation.value}
                           </span>
                           <ActionIcon icon={presentation.icon} className={presentation.iconClassName} />
                         </div>
-                        <button onClick={() => removeActionMapping(entry.key, entry.with_shift)} className="text-slate-600 hover:text-red-400 transition-colors">
+                        <button onClick={() => removeActionMapping(entry.key, entry.with_shift)} className="text-slate-400 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 transition-colors">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                         </button>
                       </div>
@@ -619,7 +638,7 @@ function App() {
               </div>
             ))}
             {actionMappings.length === 0 && (
-              <div className="text-center text-slate-500 text-xs py-2 italic">No action mappings yet</div>
+              <div className="text-center text-slate-400 dark:text-slate-500 text-xs py-2 italic">No action mappings yet</div>
             )}
           </div>
         </div>
@@ -641,7 +660,6 @@ function Footer({ version }: { version: string }) {
         );
         if (yes) {
           await update.downloadAndInstall();
-          // Restart is required to apply the update
           await message('Update installed. Please restart the application.', { title: 'Success', kind: 'info' });
         }
       } else {
@@ -655,14 +673,14 @@ function Footer({ version }: { version: string }) {
 
   return (
     <footer className="mt-6 mb-2 flex flex-col items-center gap-2">
-      <div className="flex items-center gap-3 text-slate-500 text-xs font-medium">
+      <div className="flex items-center gap-3 text-slate-400 dark:text-slate-500 text-xs font-medium">
         <span>v{version}</span>
-        <span className="w-1 h-1 rounded-full bg-slate-600"></span>
+        <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600"></span>
         <span>By Xueshi Qiao</span>
       </div>
       <button
         onClick={handleCheckUpdate}
-        className="text-xs text-blue-500/80 hover:text-blue-400 hover:underline transition-colors rounded-md px-2 py-1 hover:bg-blue-500/10"
+        className="text-xs text-blue-500/80 hover:text-blue-500 dark:hover:text-blue-400 hover:underline transition-colors rounded-md px-2 py-1 hover:bg-blue-500/10"
       >
         Check for Updates
       </button>
@@ -681,14 +699,14 @@ function PermissionRow({
     status === "granted" ? "Granted" : status === "not_granted" ? "Not Granted" : "Not Required";
   const badgeClass =
     status === "granted"
-      ? "text-xs px-2 py-1 rounded-md transition-colors bg-green-900/30 text-green-300"
+      ? "text-xs px-2 py-1 rounded-md transition-colors bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
       : status === "not_granted"
-      ? "text-xs px-2 py-1 rounded-md border transition-colors group-hover:border-slate-400 bg-red-900/30 text-red-300 border-red-700/50"
-      : "text-xs px-2 py-1 rounded-md border transition-colors group-hover:border-slate-400 bg-slate-800 text-slate-400 border-slate-600";
+      ? "text-xs px-2 py-1 rounded-md border transition-colors bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700/50"
+      : "text-xs px-2 py-1 rounded-md border transition-colors bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600";
 
   return (
-    <div className="group flex items-center justify-between bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 transition-colors hover:bg-slate-800/70 hover:border-slate-500">
-      <span className="text-slate-300">{label}</span>
+    <div className="group flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:border-slate-300 dark:hover:border-slate-500">
+      <span className="text-slate-700 dark:text-slate-300">{label}</span>
       <span className={badgeClass}>{text}</span>
     </div>
   );
@@ -696,7 +714,7 @@ function PermissionRow({
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="bg-slate-700 text-slate-200 border-b-2 border-slate-900 rounded-md px-2 py-1 text-sm font-mono min-w-[32px] text-center shadow-sm group-hover:bg-slate-600 transition-colors">
+    <kbd className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-b-2 border-slate-300 dark:border-slate-900 rounded-md px-2 py-1 text-sm font-mono min-w-[32px] text-center shadow-sm group-hover:bg-slate-300 dark:group-hover:bg-slate-600 transition-colors">
       {children}
     </kbd>
   );
@@ -737,7 +755,7 @@ function FormSelect({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((prev) => !prev)}
-        className={`w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 pr-9 text-slate-200 text-sm text-left focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-700/70 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${className}`}
+        className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 pr-9 text-slate-800 dark:text-slate-200 text-sm text-left focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${className}`}
       >
         {selected?.label ?? ""}
       </button>
@@ -751,7 +769,7 @@ function FormSelect({
         </svg>
       </span>
       {open && !disabled && (
-        <div className="absolute z-30 mt-1 w-full rounded-lg border border-slate-600 bg-slate-900 shadow-xl overflow-hidden">
+        <div className="absolute z-30 mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
           {options.map((option) => {
             const active = option.value === value;
             return (
@@ -764,8 +782,8 @@ function FormSelect({
                 }}
                 className={`w-full text-left px-3 py-2 text-sm transition-colors ${
                   active
-                    ? "bg-blue-600/25 text-blue-300 hover:bg-blue-600/35"
-                    : "text-slate-200 hover:bg-slate-800"
+                    ? "bg-blue-600/25 text-blue-600 dark:text-blue-300 hover:bg-blue-600/35"
+                    : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                 }`}
               >
                 {option.label}
@@ -792,9 +810,9 @@ function ActionIcon({ icon, className }: { icon: string; className?: string }) {
     case "Home": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" /></svg>;
     case "End": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>;
     case "Enter": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>;
-    case "WordRight": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5-5 5M6 7l5 5-5 5" /></svg>; // Double arrow right
-    case "WordLeft": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5 5-5M18 17l-5-5 5-5" /></svg>; // Double arrow left
-    case "Code": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>; // < >
+    case "WordRight": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5-5 5M6 7l5 5-5 5" /></svg>;
+    case "WordLeft": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5 5-5M18 17l-5-5 5-5" /></svg>;
+    case "Code": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>;
     case "Input": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 0c2.2 2.3 3.5 5.4 3.5 10S14.2 19.7 12 22m0-20C9.8 4.3 8.5 7.4 8.5 12S9.8 19.7 12 22m-9-10h18" /></svg>;
     case "Command": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 8h8v8H8zM8 2a4 4 0 110 8M2 8a4 4 0 108 0m4 8a4 4 0 108 0m-8 6a4 4 0 110-8" /></svg>;
     default: return null;
@@ -807,6 +825,22 @@ function PlayIcon() {
 
 function PauseIcon() {
   return <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+}
+
+function SunIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+    </svg>
+  );
 }
 
 export default App;
