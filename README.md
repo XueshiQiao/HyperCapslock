@@ -1,134 +1,134 @@
 # HyperCapslock
 
-**HyperCapslock**: Make your Capslock Powerful again!
+Turn your Caps Lock into a system-wide vim-style navigation layer — without losing the original Caps Lock function.
 
-## Features
+## The Idea
 
--   **Global Remapping:** Works in every application (Editors, Browser, Explorer, etc.).
--   **macOS Input Source Mappings:** Configure `CapsLock` + `Key` to switch to a specific macOS input source ID (for example ABC / WeChat).
--   **Smart CapsLock Handling:**
-    -   If used as a modifier (held down with mapped keys), the CapsLock state (and light) does **not** toggle.
-    -   If tapped and released quickly (without pressing other keys), it toggles CapsLock on/off as normal.
--   **Native Performance:** Built with **Rust** and the Windows API for zero-latency interception.
--   **System Tray:** Supports minimizing to tray, pausing the service (Gaming Mode), and starting with Windows.
+Caps Lock sits on the home row but does almost nothing. HyperCapslock remaps it to **F18** (a key that doesn't physically exist on any keyboard), then intercepts F18 + other key combos at the OS level to simulate navigation, editing, input switching, and shell commands.
 
-## Key Mappings
+Because F18 isn't a real modifier (not Cmd, Ctrl, Shift, or Alt), **it stacks with all of them for free**:
 
-### Basic Navigation
--   `CapsLock` + `H` → **Left Arrow**
--   `CapsLock` + `J` → **Down Arrow**
--   `CapsLock` + `K` → **Up Arrow**
--   `CapsLock` + `L` → **Right Arrow**
+| Combo | Action |
+|-------|--------|
+| `Caps + H` | ← Move left |
+| `Caps + Shift + H` | ← Select left |
+| `Caps + Alt + H` | ← Move left one word |
+| `Caps + Shift + Alt + H` | ← Select left one word |
 
-### Extended Navigation
--   `CapsLock` + `P` → **Next Word** (Ctrl + Right)
--   `CapsLock` + `Y` → **Previous Word** (Ctrl + Left)
--   `CapsLock` + `A` → **Home** (Start of line)
--   `CapsLock` + `E` → **End** (End of line)
--   `CapsLock` + `U` → **Up 10x** (Fast Scroll Up)
--   `CapsLock` + `D` → **Down 10x** (Fast Scroll Down)
+No extra configuration. System modifiers pass through naturally.
 
-### Editing Shortcuts
--   `CapsLock` + `I` → **Backspace**
--   `CapsLock` + `O` → **New Line** (End + Enter)
--   `CapsLock` + `N` → **Docstring Snippet** (Inserts `""""""` and centers cursor)
+If you just **tap** Caps Lock and release without pressing anything else, it still toggles Caps Lock on/off as normal.
 
-### Shell Mappings
--   `CapsLock` + `Shift` + `[Key]` → **Execute Shell Command**
-    -   User configurable via the UI.
-    -   Example: `CapsLock` + `Shift` + `C` → `calc.exe`
+## Default Key Mappings
 
-### macOS Input Source Mappings
--   `CapsLock` + `[Key]` → **Switch macOS input source** (by exact input source ID)
--   User configurable via the UI on macOS.
--   First-run defaults:
-    -   `CapsLock` + `,` → `com.apple.keylayout.ABC`
-    -   `CapsLock` + `.` → `com.tencent.inputmethod.wetype.pinyin`
--   Mapping targets use exact source IDs (no fuzzy display-name matching).
+All mappings are customizable through the GUI. These are the defaults:
 
-## Screenshots
+### Navigation (vim-style)
+
+| Combo | Action |
+|-------|--------|
+| `Caps + H / J / K / L` | ← ↓ ↑ → Arrow keys |
+| `Caps + A` | Home (start of line) |
+| `Caps + E` | End (end of line) |
+| `Caps + Y` | Previous word |
+| `Caps + P` | Next word |
+| `Caps + U` | Up 10 lines |
+| `Caps + D` | Down 10 lines |
+
+### Editing
+
+| Combo | Action |
+|-------|--------|
+| `Caps + I` | Backspace |
+| `Caps + O` | New line below (End + Enter) |
+| `Caps + N` | Insert `""""""` with cursor centered |
+
+### Input Source Switching (macOS)
+
+| Combo | Action |
+|-------|--------|
+| `Caps + ,` | Switch to ABC (English) |
+| `Caps + .` | Switch to Chinese input |
+
+### Shell Commands
+
+`Caps + Shift + [Key]` can be bound to run arbitrary shell commands via the GUI.
+
+## Install (macOS)
+
+### Homebrew
+
+```bash
+brew install --cask XueshiQiao/tap/hypercapslock
+```
+
+Or download the `.dmg` from [GitHub Releases](https://github.com/XueshiQiao/HyperCapslock/releases).
+
+### Permissions
+
+The app needs **Accessibility** and **Input Monitoring** permissions:
+`System Settings → Privacy & Security → Accessibility / Input Monitoring`
+
+## Screenshot
 
 <div align="center">
-    <img src="./public/HyperCapslock.png" style="width: 720;" />
+  <img src="./public/HyperCapslock.png" width="400" />
 </div>
 
-## Architecture
+## Why Not Karabiner-Elements?
 
-This project is a hybrid application built with [Tauri](https://tauri.app/):
+[Karabiner-Elements](https://github.com/pqrs-org/Karabiner-Elements) is a powerful tool with 21k+ stars, and I used it for years. But for the specific use case of "Caps Lock as a navigation layer":
 
-1.  **Frontend (React + TypeScript):**
-    -   Displays the application status ("Running") and instructions.
-    -   Communicates with the backend via Tauri commands.
+- **Config complexity** — Karabiner requires hand-editing JSON for non-trivial remaps. HyperCapslock has a point-and-click GUI.
+- **Footprint** — Karabiner installs a kernel extension and multiple background processes. HyperCapslock is a single ~5 MB Tauri app.
+- **The modifier problem** — Karabiner typically maps Caps Lock to a real modifier combo (e.g., Ctrl+Shift+Cmd+Opt). This "hyper key" approach works but can conflict with existing shortcuts. HyperCapslock maps to F18, which conflicts with nothing and naturally stacks with real modifiers.
 
-2.  **Backend (Rust):**
-    -   Uses the `windows` crate to access the Win32 API.
-    -   Installs a **Low-Level Keyboard Hook** (`WH_KEYBOARD_LL`) via `SetWindowsHookEx`.
-    -   Intercepts keystrokes at the system level to perform remapping before they reach other applications.
-    -   Runs in a dedicated background thread to ensure responsiveness.
+If you need Karabiner's full power (per-app rules, mouse remapping, device-specific profiles), use Karabiner. If you mainly want vim navigation everywhere with minimal setup, this might be a simpler path.
 
-For a deep dive into the technical implementation, see [how_does_it_work.md](how_does_it_work.md).
+## How It Works
 
-## Prerequisites
+CapsLock is remapped to F18 via `hidutil` at the OS level. The app then installs a `CGEventTap` at the HID level — a system-wide event tap that intercepts key events before any application sees them.
 
--   **Windows 10/11**
--   **Node.js** (v16+)
--   **Rust** (latest stable)
+When F18 is held and another key is pressed, the app swallows the original event and injects the remapped key (e.g., arrow key) into the system input stream. Injected events carry a flag to prevent feedback loops.
 
-## Development Setup
+State tracking uses lock-free atomics (`AtomicBool`, `AtomicU64`) for zero-overhead thread safety. The hook callback does minimal work — integer comparisons and early returns — to avoid introducing input lag.
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/XueshiQiao/HyperCapslock.git
-    cd HyperCapslock
-    ```
+For the full technical deep-dive, see [how_does_it_work.md](how_does_it_work.md).
 
-2.  **Install dependencies:**
-    ```bash
-    npm install
-    ```
+## Tech Stack
 
-3.  **Run in development mode:**
-    ```bash
-    npm run tauri dev
-    # or
-    pnpm tauri dev
-    ```
-    This will start the React frontend and the Rust backend.
+- **Tauri 2** (Rust backend + React/TypeScript frontend)
+- CoreGraphics `CGEventTap` + `hidutil` for F18 remap
+- ~5 MB binary, single process
 
-## Building for Production
+## Development
 
-To create a standalone executable (`.exe`):
+### Prerequisites
+
+- macOS 12+
+- Node.js (v16+)
+- Rust (latest stable)
+
+### Setup
+
+```bash
+git clone https://github.com/XueshiQiao/HyperCapslock.git
+cd HyperCapslock
+npm install
+npm run tauri dev
+```
+
+### Build
 
 ```bash
 npm run tauri build
 ```
 
-The output file will be located at:
-`src-tauri/target/release/tauri-app.exe`
+## Troubleshooting
 
-## Usage Note
-
-**Privilege Levels:**
-On Windows, applications running with lower privileges cannot intercept keys from applications running with higher privileges (Administrator).
--   If you want this tool to work inside Task Manager, Admin Powershell, or other Admin-level apps, you must run `tauri-app.exe` as **Administrator**.
-
-## macOS Troubleshooting
-
-If hotkeys stop working intermittently on macOS:
-
-1. Check permissions:
-   - `System Settings > Privacy & Security > Accessibility`
-   - `System Settings > Privacy & Security > Input Monitoring` (if enabled in your setup)
-   - Remove and re-add the app if needed, then relaunch.
-2. Check runtime logs:
-   - File log: `/tmp/hypercapslock-macos.log`
-   - You can also run from terminal and watch stderr output.
-3. Look for these log patterns:
-   - `Event tap disabled by system` (tap timeout / dropped by macOS)
-   - `hidutil remap failed` (CapsLock->F18 remap not applied)
-   - `Failed to create CGEventTap` (permission or tap creation issue)
-   - `Caps(F18) down` and `Caps remap handled keydown` (normal hotkey path)
+- **Hotkeys stop working**: Logs are written to `/tmp/hypercapslock-macos.log`. Try removing and re-adding the app in Accessibility permissions, then relaunch.
+- **Gaming Mode**: Pause/resume via the menu bar icon to temporarily disable all remapping.
 
 ## License
 
-This project is licensed under the **GNU General Public License v3.0**. See the [LICENSE](LICENSE) file for details.
+GPL v3.0 — see [LICENSE](LICENSE).
