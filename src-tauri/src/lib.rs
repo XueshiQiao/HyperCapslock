@@ -22,8 +22,6 @@ static DID_REMAP: AtomicBool = AtomicBool::new(false);
 static IS_PAUSED: AtomicBool = AtomicBool::new(false);
 static TRAY_TOGGLE_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
 static TRAY_STATUS_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
-static SHELL_MAPPINGS: Mutex<Option<HashMap<u16, String>>> = Mutex::new(None);
-static INPUT_SOURCE_MAPPINGS: Mutex<Option<HashMap<u16, String>>> = Mutex::new(None);
 static ACTION_MAPPINGS: Mutex<Option<Vec<ActionMappingEntry>>> = Mutex::new(None);
 
 const DEFAULT_ABC_KEYCODE: u16 = 188;
@@ -142,32 +140,11 @@ fn get_permission_statuses() -> PermissionStatuses {
     }
 }
 
-fn get_shell_mappings_path(app: &AppHandle) -> Option<PathBuf> {
-    app.path()
-        .app_data_dir()
-        .ok()
-        .map(|p| p.join("shell_mappings.json"))
-}
-
-fn get_input_source_mappings_path(app: &AppHandle) -> Option<PathBuf> {
-    app.path()
-        .app_data_dir()
-        .ok()
-        .map(|p| p.join("input_source_mappings.json"))
-}
-
 fn get_action_mappings_path(app: &AppHandle) -> Option<PathBuf> {
     app.path()
         .app_data_dir()
         .ok()
         .map(|p| p.join("action_mappings.yml"))
-}
-
-fn get_action_mappings_legacy_json_path(app: &AppHandle) -> Option<PathBuf> {
-    app.path()
-        .app_data_dir()
-        .ok()
-        .map(|p| p.join("action_mappings.json"))
 }
 
 fn default_action_mappings() -> Vec<ActionMappingEntry> {
@@ -286,15 +263,6 @@ fn default_action_mappings() -> Vec<ActionMappingEntry> {
     }
 
     defaults
-}
-
-fn read_legacy_mappings(path: Option<PathBuf>) -> HashMap<u16, String> {
-    if let Some(path) = path {
-        if let Ok(content) = fs::read_to_string(path) {
-            return serde_json::from_str::<HashMap<u16, String>>(&content).unwrap_or_default();
-        }
-    }
-    HashMap::new()
 }
 
 fn js_keycode_name(key: u16) -> String {
@@ -440,26 +408,6 @@ fn normalize_action_mappings(mappings: &mut Vec<ActionMappingEntry>) {
     *mappings = deduped;
 }
 
-fn sync_legacy_mappings_cache_from_actions(mappings: &[ActionMappingEntry]) {
-    let mut shell = HashMap::new();
-    let mut input_sources = HashMap::new();
-
-    for entry in mappings {
-        match &entry.action {
-            ActionConfig::Command { command } if entry.with_shift => {
-                shell.insert(entry.key, command.clone());
-            }
-            ActionConfig::InputSource { input_source_id } if !entry.with_shift => {
-                input_sources.insert(entry.key, input_source_id.clone());
-            }
-            _ => {}
-        }
-    }
-
-    *SHELL_MAPPINGS.lock().unwrap() = Some(shell);
-    *INPUT_SOURCE_MAPPINGS.lock().unwrap() = Some(input_sources);
-}
-
 fn save_action_mappings_to_disk(app: &AppHandle) {
     if let Some(path) = get_action_mappings_path(app) {
         if let Some(mappings) = &*ACTION_MAPPINGS.lock().unwrap() {
@@ -473,66 +421,43 @@ fn save_action_mappings_to_disk(app: &AppHandle) {
 }
 
 fn load_action_mappings_from_disk(app: &AppHandle) {
-    let mut loaded_from_disk = false;
     let mut mappings = Vec::new();
     let mut changed = false;
 
     if let Some(path) = get_action_mappings_path(app) {
-        if let Ok(content) = fs::read_to_string(path) {
-            loaded_from_disk = true;
-            mappings =
-                serde_yaml::from_str::<Vec<ActionMappingEntry>>(&content).unwrap_or_default();
-        }
-    }
-
-    if !loaded_from_disk {
-        if let Some(path) = get_action_mappings_legacy_json_path(app) {
-            if let Ok(content) = fs::read_to_string(path) {
-                loaded_from_disk = true;
-                mappings =
-                    serde_json::from_str::<Vec<ActionMappingEntry>>(&content).unwrap_or_default();
-                changed = true;
+        eprintln!("[HYPERCAPS] Loading action mappings from: {:?}", path);
+        if let Ok(content) = fs::read_to_string(&path) {
+            match serde_yaml::from_str::<Vec<ActionMappingEntry>>(&content) {
+                Ok(m) => {
+                    eprintln!("[HYPERCAPS] Loaded {} mappings from YAML", m.len());
+                    mappings = m;
+                }
+                Err(e) => {
+                    eprintln!("[HYPERCAPS] YAML parse error: {}", e);
+                }
             }
+        } else {
+            eprintln!("[HYPERCAPS] File not found: {:?}", path);
         }
     }
 
-    if !loaded_from_disk || mappings.is_empty() {
+    if mappings.is_empty() {
+        eprintln!("[HYPERCAPS] Using default mappings");
         mappings = default_action_mappings();
         changed = true;
     }
 
-    let legacy_shell = read_legacy_mappings(get_shell_mappings_path(app));
-    for (key, command) in legacy_shell {
-        changed |= upsert_action_mapping_in_vec(
-            &mut mappings,
-            ActionMappingEntry {
-                key,
-                with_shift: true,
-                action: ActionConfig::Command { command },
-            },
-        );
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        let legacy_input = read_legacy_mappings(get_input_source_mappings_path(app));
-        for (key, input_source_id) in legacy_input {
-            changed |= upsert_action_mapping_in_vec(
-                &mut mappings,
-                ActionMappingEntry {
-                    key,
-                    with_shift: false,
-                    action: ActionConfig::InputSource { input_source_id },
-                },
-            );
-        }
-    }
-
     normalize_action_mappings(&mut mappings);
-    sync_legacy_mappings_cache_from_actions(&mappings);
+    eprintln!(
+        "[HYPERCAPS] Final mappings count: {}, changed: {}",
+        mappings.len(),
+        changed
+    );
+
     *ACTION_MAPPINGS.lock().unwrap() = Some(mappings);
 
     if changed {
+        eprintln!("[HYPERCAPS] Saving default mappings to disk");
         save_action_mappings_to_disk(app);
     }
 }
@@ -614,7 +539,6 @@ fn upsert_action_mapping(
         };
         upsert_action_mapping_in_vec(mappings, entry);
         normalize_action_mappings(mappings);
-        sync_legacy_mappings_cache_from_actions(mappings);
     }
     save_action_mappings_to_disk(&app);
     Ok(())
@@ -626,7 +550,6 @@ fn remove_action_mapping(app: AppHandle, key: u16, with_shift: bool) {
         let mut guard = ACTION_MAPPINGS.lock().unwrap();
         if let Some(mappings) = guard.as_mut() {
             remove_action_mapping_from_vec(mappings, key, with_shift);
-            sync_legacy_mappings_cache_from_actions(mappings);
         }
     }
     save_action_mappings_to_disk(&app);
