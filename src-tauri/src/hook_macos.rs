@@ -161,9 +161,51 @@ fn switch_input_source_by_id(input_source_id: &str) -> Result<(), String> {
                 status
             ));
         }
+
+        // Workaround for macOS TISSelectInputSource bug with CJKV input sources:
+        // The menu bar icon updates but actual input doesn't switch.
+        // Following macism's approach: after TISSelectInputSource, post a
+        // synthetic key event to force macOS to commit the input source change.
+        // See: https://github.com/laishulu/macism
+        let is_cjkv = !input_source_id.starts_with("com.apple.keylayout.");
+        if is_cjkv {
+            force_input_source_activation();
+        }
     }
 
     Ok(())
+}
+
+/// Workaround for macOS TISSelectInputSource CJKV bug.
+/// Simulates a Kana key (keycode 104) press/release via CGEvent to force
+/// macOS to actually commit the input source change.
+/// Approach borrowed from macism: https://github.com/laishulu/macism
+fn force_input_source_activation() {
+    const KANA_KEY: u16 = 104;
+    let src = CGEventSource::new(CGEventSourceStateID::HIDSystemState);
+    if src.is_err() {
+        log_macos(
+            "WARN",
+            "force_input_source_activation: failed to create CGEventSource",
+        );
+        return;
+    }
+    let src = src.unwrap();
+    let down = CGEvent::new_keyboard_event(src.clone(), KANA_KEY, true);
+    let up = CGEvent::new_keyboard_event(src, KANA_KEY, false);
+    if let (Ok(d), Ok(u)) = (down, up) {
+        // Stamp with our magic so the event tap ignores these
+        d.set_integer_value_field(EventField::EVENT_SOURCE_USER_DATA, INJECTED_EVENT_MAGIC);
+        u.set_integer_value_field(EventField::EVENT_SOURCE_USER_DATA, INJECTED_EVENT_MAGIC);
+        d.post(CGEventTapLocation::HID);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        u.post(CGEventTapLocation::HID);
+    } else {
+        log_macos(
+            "WARN",
+            "force_input_source_activation: failed to create CGEvent",
+        );
+    }
 }
 
 extern "C" fn switch_input_source_on_main_queue(context: *mut c_void) {
@@ -448,7 +490,10 @@ fn execute_action_mapping(action: &ActionConfig, key_down: bool, active_modifier
                                     EventField::EVENT_SOURCE_USER_DATA,
                                     INJECTED_EVENT_MAGIC,
                                 );
-                                event.post(CGEventTapLocation::HID);
+                                // Post at AnnotatedSession level to bypass IME,
+                                // preventing Chinese input methods from converting
+                                // ASCII quotes to Chinese smart quotes.
+                                event.post(CGEventTapLocation::AnnotatedSession);
                             }
                         }
                     }
