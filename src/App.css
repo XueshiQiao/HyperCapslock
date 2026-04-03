@@ -37,6 +37,21 @@ body {
   animation: slide-up 0.3s ease-out forwards;
 }
 
+@keyframes modal-in {
+  from {
+    transform: scale(0.95) translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-modal-in {
+  animation: modal-in 0.15s ease-out forwards;
+}
+
 *[data-tauri-drag-region] {
   app-region: drag;
 }

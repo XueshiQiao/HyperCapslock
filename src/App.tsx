@@ -153,6 +153,9 @@ function App() {
   const [newInputSourceId, setNewInputSourceId] = useState("");
   const [newCommand, setNewCommand] = useState("");
 
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [permissionsCollapsed, setPermissionsCollapsed] = useState<boolean | null>(null);
+
   const [isDark, setIsDark] = useState<boolean>(() => {
     const stored = localStorage.getItem("hc-theme");
     return stored ? stored === "dark" : true;
@@ -207,8 +210,14 @@ function App() {
 
   async function refreshPermissions(showFeedback = false) {
     try {
-      const p = await invoke("get_permission_statuses");
-      setPermissions(p as PermissionStatuses);
+      const p = await invoke("get_permission_statuses") as PermissionStatuses;
+      setPermissions(p);
+      // Auto-expand if any permission is not granted (only on first load)
+      setPermissionsCollapsed((prev) => {
+        if (prev !== null) return prev; // user already toggled manually
+        const allGranted = p.accessibility !== "not_granted" && p.input_monitoring !== "not_granted";
+        return allGranted;
+      });
       if (showFeedback) showToast("Permissions refreshed", "success");
     } catch (e) {
       console.error("Failed to fetch permission statuses", e);
@@ -422,174 +431,64 @@ function App() {
         </div>
       </div>
 
-      {/* Permissions Card */}
+      {/* Permissions Card (collapsible) */}
       <div className={`${CARD_WIDTH_CLASS} ${MODERN_CARD_CLASS} p-6 mb-8 transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-500 hover:shadow-2xl hover:shadow-emerald-100/30 dark:hover:shadow-emerald-900/20`}>
         <div className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full bg-emerald-500/12 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-blue-500/10 blur-2xl" />
         <div className="relative">
-          <div className="flex items-center justify-between mb-4">
-            <div>
+          <button
+            onClick={() => setPermissionsCollapsed((prev) => !(prev ?? true))}
+            className="w-full flex items-center justify-between cursor-pointer"
+          >
+            <div className="text-left">
               <h2 className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Permissions</h2>
               <p className="text-slate-800 dark:text-slate-200 font-medium">Authority Status</p>
             </div>
-            <button
-              onClick={() => refreshPermissions(true)}
-              className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors"
-            >
-              Refresh
-            </button>
-          </div>
-          <div className="space-y-2 text-sm">
-            <PermissionRow label="Accessibility" status={permissions?.accessibility ?? "not_required"} />
-            <PermissionRow label="Input Monitoring" status={permissions?.input_monitoring ?? "not_required"} />
-          </div>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3">
-            {permissions?.platform === "macos"
-              ? "Required on macOS for reliable global hotkeys."
-              : "These permissions are only required on macOS."}
-          </p>
+            <svg className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${permissionsCollapsed !== false ? "" : "rotate-180"}`} viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.174l3.71-3.944a.75.75 0 111.08 1.04l-4.25 4.52a.75.75 0 01-1.08 0l-4.25-4.52a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+            </svg>
+          </button>
+          {permissionsCollapsed === false && (
+            <div className="mt-4">
+              <div className="space-y-2 text-sm">
+                <PermissionRow label="Accessibility" status={permissions?.accessibility ?? "not_required"} />
+                <PermissionRow label="Input Monitoring" status={permissions?.input_monitoring ?? "not_required"} />
+              </div>
+              <div className="flex items-center justify-between mt-3">
+                <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                  {permissions?.platform === "macos"
+                    ? "Required on macOS for reliable global hotkeys."
+                    : "These permissions are only required on macOS."}
+                </p>
+                <button
+                  onClick={(e) => { e.stopPropagation(); refreshPermissions(true); }}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors shrink-0 ml-3"
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Action Mappings Card */}
       <div className={`${CARD_WIDTH_CLASS} ${MODERN_CARD_CLASS} p-6 mb-8`}>
         <div className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full bg-indigo-500/12 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-cyan-500/10 blur-2xl" />
         <div className="relative">
-          <h2 className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-semibold mb-4">
-            Action Mappings (Caps+Key)
-          </h2>
-
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mb-1">
-            <FormSelect
-              value={newWithShift ? "with_shift" : "plain"}
-              onChange={(value) => setNewWithShift(value === "with_shift")}
-              wrapperClassName="col-span-1"
-              options={[
-                { value: "plain", label: "Caps" },
-                { value: "with_shift", label: "Caps + Shift" },
-              ]}
-            />
-            <span className="text-slate-400 dark:text-slate-500 text-sm font-medium select-none">+</span>
-            <input
-              type="text"
-              placeholder="Press Key"
-              value={newKeyDisplay}
-              readOnly
-              onKeyDown={(e) => {
-                e.preventDefault();
-                if (["Shift", "Control", "Alt", "Meta", "CapsLock"].includes(e.key)) return;
-                setNewKey(e.keyCode);
-                setNewKeyDisplay(keyCodeToDisplay(e.keyCode));
-              }}
-              className="col-span-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-center text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer"
-            />
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-semibold">
+              Action Mappings (Caps+Key)
+            </h2>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors font-medium"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+              Add
+            </button>
           </div>
-
-          <div className="flex justify-center mb-1">
-            <span className="text-slate-400 dark:text-slate-500 text-base font-medium select-none">↓</span>
-          </div>
-
-          <div className="grid grid-cols-[minmax(130px,1fr)_minmax(0,3fr)] items-center gap-2 mb-2">
-            <FormSelect
-              value={newActionKind}
-              onChange={(value) => setNewActionKind(value as ActionConfig["kind"])}
-              wrapperClassName="col-span-1"
-              options={[
-                { value: "directional", label: "Directional" },
-                { value: "jump", label: "Jump" },
-                { value: "independent", label: "Independent" },
-                ...(permissions?.platform === "macos"
-                  ? [{ value: "input_source", label: "Input Source" }]
-                  : []),
-                { value: "command", label: "Command" },
-              ]}
-            />
-            <div className="min-w-0">
-              {newActionKind === "directional" && (
-                <FormSelect
-                  value={newDirectionalAction}
-                  onChange={(value) => setNewDirectionalAction(value as DirectionalAction)}
-                  options={[
-                    { value: "left", label: "Left" },
-                    { value: "right", label: "Right" },
-                    { value: "up", label: "Up" },
-                    { value: "down", label: "Down" },
-                    { value: "word_forward", label: "Word Forward" },
-                    { value: "word_back", label: "Word Back" },
-                    { value: "home", label: "Home" },
-                    { value: "end", label: "End" },
-                  ]}
-                />
-              )}
-
-              {newActionKind === "jump" && (
-                <div className="grid grid-cols-2 gap-2">
-                  <FormSelect
-                    value={newJumpDirection}
-                    onChange={(value) => setNewJumpDirection(value as JumpDirection)}
-                    options={[
-                      { value: "up", label: "Up" },
-                      { value: "down", label: "Down" },
-                    ]}
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    max={99}
-                    value={newJumpCount}
-                    onChange={(e) => setNewJumpCount(Number(e.target.value))}
-                    className="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors"
-                  />
-                </div>
-              )}
-
-              {newActionKind === "independent" && (
-                <FormSelect
-                  value={newIndependentAction}
-                  onChange={(value) => setNewIndependentAction(value as IndependentAction)}
-                  options={[
-                    { value: "backspace", label: "Backspace" },
-                    { value: "next_line", label: "Next Line" },
-                    { value: "insert_quotes", label: "Insert quotes" },
-                  ]}
-                />
-              )}
-
-              {newActionKind === "input_source" && (
-                <input
-                  type="text"
-                  placeholder="Input Source ID (e.g. com.apple.keylayout.ABC)"
-                  value={newInputSourceId}
-                  onChange={(e) => setNewInputSourceId(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors font-mono"
-                />
-              )}
-
-              {newActionKind === "command" && (
-                <input
-                  type="text"
-                  placeholder="Command (e.g. open -a Calculator)"
-                  value={newCommand}
-                  onChange={(e) => setNewCommand(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors"
-                />
-              )}
-            </div>
-          </div>
-
-          <button
-            onClick={upsertActionMapping}
-            disabled={!canSaveAction}
-            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 py-2 transition-colors text-sm font-medium mb-3"
-          >
-            Save Mapping
-          </button>
-
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-3">
-            Defaults include directional, jump, next-line, quote insertion, and on macOS:
-            <code className="text-slate-500 dark:text-slate-400 block">Caps+, → com.apple.keylayout.ABC</code>
-            <code className="text-slate-500 dark:text-slate-400 block">Caps+. → com.tencent.inputmethod.wetype.pinyin</code>
-          </p>
 
           <div className="space-y-4">
             {groupedMappings.map((group) => (
@@ -643,6 +542,150 @@ function App() {
           </div>
         </div>
       </div>
+
+      {/* Add Mapping Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
+          <div className="relative w-full max-w-[420px] mx-4 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl shadow-2xl p-6 animate-modal-in">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-slate-800 dark:text-slate-200 font-semibold text-base">Add Mapping</h2>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mb-1">
+              <FormSelect
+                value={newWithShift ? "with_shift" : "plain"}
+                onChange={(value) => setNewWithShift(value === "with_shift")}
+                wrapperClassName="col-span-1"
+                options={[
+                  { value: "plain", label: "Caps" },
+                  { value: "with_shift", label: "Caps + Shift" },
+                ]}
+              />
+              <span className="text-slate-400 dark:text-slate-500 text-sm font-medium select-none">+</span>
+              <input
+                type="text"
+                placeholder="Press Key"
+                value={newKeyDisplay}
+                readOnly
+                onKeyDown={(e) => {
+                  e.preventDefault();
+                  if (["Shift", "Control", "Alt", "Meta", "CapsLock"].includes(e.key)) return;
+                  setNewKey(e.keyCode);
+                  setNewKeyDisplay(keyCodeToDisplay(e.keyCode));
+                }}
+                className="col-span-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-center text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer"
+              />
+            </div>
+
+            <div className="flex justify-center mb-1">
+              <span className="text-slate-400 dark:text-slate-500 text-base font-medium select-none">↓</span>
+            </div>
+
+            <div className="grid grid-cols-[minmax(130px,1fr)_minmax(0,3fr)] items-center gap-2 mb-4">
+              <FormSelect
+                value={newActionKind}
+                onChange={(value) => setNewActionKind(value as ActionConfig["kind"])}
+                wrapperClassName="col-span-1"
+                options={[
+                  { value: "directional", label: "Directional" },
+                  { value: "jump", label: "Jump" },
+                  { value: "independent", label: "Independent" },
+                  ...(permissions?.platform === "macos"
+                    ? [{ value: "input_source", label: "Input Source" }]
+                    : []),
+                  { value: "command", label: "Command" },
+                ]}
+              />
+              <div className="min-w-0">
+                {newActionKind === "directional" && (
+                  <FormSelect
+                    value={newDirectionalAction}
+                    onChange={(value) => setNewDirectionalAction(value as DirectionalAction)}
+                    options={[
+                      { value: "left", label: "Left" },
+                      { value: "right", label: "Right" },
+                      { value: "up", label: "Up" },
+                      { value: "down", label: "Down" },
+                      { value: "word_forward", label: "Word Forward" },
+                      { value: "word_back", label: "Word Back" },
+                      { value: "home", label: "Home" },
+                      { value: "end", label: "End" },
+                    ]}
+                  />
+                )}
+
+                {newActionKind === "jump" && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <FormSelect
+                      value={newJumpDirection}
+                      onChange={(value) => setNewJumpDirection(value as JumpDirection)}
+                      options={[
+                        { value: "up", label: "Up" },
+                        { value: "down", label: "Down" },
+                      ]}
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      max={99}
+                      value={newJumpCount}
+                      onChange={(e) => setNewJumpCount(Number(e.target.value))}
+                      className="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors"
+                    />
+                  </div>
+                )}
+
+                {newActionKind === "independent" && (
+                  <FormSelect
+                    value={newIndependentAction}
+                    onChange={(value) => setNewIndependentAction(value as IndependentAction)}
+                    options={[
+                      { value: "backspace", label: "Backspace" },
+                      { value: "next_line", label: "Next Line" },
+                      { value: "insert_quotes", label: "Insert quotes" },
+                    ]}
+                  />
+                )}
+
+                {newActionKind === "input_source" && (
+                  <input
+                    type="text"
+                    placeholder="e.g. com.apple.keylayout.ABC"
+                    value={newInputSourceId}
+                    onChange={(e) => setNewInputSourceId(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors font-mono"
+                  />
+                )}
+
+                {newActionKind === "command" && (
+                  <input
+                    type="text"
+                    placeholder="e.g. open -a Calculator"
+                    value={newCommand}
+                    onChange={(e) => setNewCommand(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors"
+                  />
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={async () => { await upsertActionMapping(); setShowAddModal(false); }}
+              disabled={!canSaveAction}
+              className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 py-2.5 transition-colors text-sm font-medium"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
 
       <Footer version={appVersion} />
     </main>
