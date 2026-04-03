@@ -6,6 +6,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { check } from "@tauri-apps/plugin-updater";
 import { message, ask } from "@tauri-apps/plugin-dialog";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
+import { t, useLocale, setLocale, LOCALE_META, type Locale } from "./i18n";
 import "./App.css";
 
 type PermissionStatuses = {
@@ -81,61 +82,40 @@ type ActionPresentation = {
 
 function actionToPresentation(action: ActionConfig): ActionPresentation {
   switch (action.kind) {
-    case "directional":
-      switch (action.action) {
-        case "left":
-          return { category: "Directional", value: "Left", icon: "Left" };
-        case "right":
-          return { category: "Directional", value: "Right", icon: "Right" };
-        case "up":
-          return { category: "Directional", value: "Up", icon: "Up" };
-        case "down":
-          return { category: "Directional", value: "Down", icon: "Down" };
-        case "word_forward":
-          return { category: "Directional", value: "Word Forward", icon: "WordRight" };
-        case "word_back":
-          return { category: "Directional", value: "Word Back", icon: "WordLeft" };
-        case "home":
-          return { category: "Directional", value: "Home", icon: "Home" };
-        case "end":
-          return { category: "Directional", value: "End", icon: "End" };
-      }
+    case "directional": {
+      const iconMap: Record<DirectionalAction, string> = {
+        left: "Left", right: "Right", up: "Up", down: "Down",
+        word_forward: "WordRight", word_back: "WordLeft", home: "Home", end: "End",
+      };
+      return { category: t("group.directional"), value: t(`action.${action.action}`), icon: iconMap[action.action] };
+    }
     case "jump":
       return {
-        category: "Jump",
-        value: `${action.direction === "up" ? "Up" : "Down"} x${action.count}`,
+        category: t("group.jump"),
+        value: `${t(`action.${action.direction}`)} x${action.count}`,
         icon: action.direction === "up" ? "FastUp" : "FastDown",
       };
-    case "independent":
-      switch (action.action) {
-        case "backspace":
-          return { category: "Independent", value: "Backspace", icon: "Delete" };
-        case "next_line":
-          return { category: "Independent", value: "Next Line", icon: "Enter" };
-        case "insert_quotes":
-          return { category: "Independent", value: "Insert quotes", icon: "Code" };
-      }
+    case "independent": {
+      const iconMap: Record<IndependentAction, string> = {
+        backspace: "Delete", next_line: "Enter", insert_quotes: "Code",
+      };
+      return { category: t("group.independent"), value: t(`action.${action.action}`), icon: iconMap[action.action] };
+    }
     case "input_source":
-      return { category: "Input Source", value: action.input_source_id, icon: "Input" };
+      return { category: t("group.input_source"), value: action.input_source_id, icon: "Input" };
     case "command":
-      return { category: "Command", value: action.command, icon: "Command" };
+      return { category: t("group.command"), value: action.command, icon: "Command" };
     default:
-      return { category: "Unknown", value: "Unknown", icon: "Code" };
+      return { category: t("action.unknown"), value: t("action.unknown"), icon: "Code" };
   }
 }
 
 const CARD_WIDTH_CLASS = "w-full max-w-[580px]";
 const MODERN_CARD_CLASS = "relative overflow-hidden border border-slate-200/80 dark:border-slate-700/80 rounded-2xl shadow-xl bg-white dark:bg-slate-800";
-const ACTION_GROUP_ORDER: Array<{ key: ActionGroupKey; label: string }> = [
-  { key: "directional", label: "Directional" },
-  { key: "jump", label: "Jump" },
-  { key: "independent", label: "Independent" },
-  { key: "input_source", label: "Input Source" },
-  { key: "command", label: "Commit" },
-];
+const ACTION_GROUP_KEYS: ActionGroupKey[] = ["directional", "jump", "independent", "input_source", "command"];
 
 function App() {
-  const [status, setStatus] = useState("Initializing...");
+  const [status, setStatus] = useState("initializing");
   const [autostart, setAutostart] = useState(false);
   const [appVersion, setAppVersion] = useState("");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -155,6 +135,9 @@ function App() {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [permissionsCollapsed, setPermissionsCollapsed] = useState<boolean | null>(null);
+  const [showLangMenu, setShowLangMenu] = useState(false);
+  const langRef = useRef<HTMLDivElement | null>(null);
+  const locale = useLocale();
 
   const [isDark, setIsDark] = useState<boolean>(() => {
     const stored = localStorage.getItem("hc-theme");
@@ -167,14 +150,24 @@ function App() {
   }, [isDark]);
 
   useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (langRef.current && !langRef.current.contains(event.target as Node)) {
+        setShowLangMenu(false);
+      }
+    }
+    window.addEventListener("mousedown", handleClickOutside);
+    return () => window.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
     let unlisten: () => void;
 
     async function init() {
       try {
         const v = await getVersion();
         setAppVersion(v);
-        const msg = await invoke("get_status");
-        setStatus(msg as string);
+        const msg = (await invoke("get_status") as string).toLowerCase();
+        setStatus(msg);
         const auto = await isEnabled();
         setAutostart(auto);
 
@@ -187,10 +180,10 @@ function App() {
 
         unlisten = await listen<boolean>("status-update", (event) => {
           const paused = event.payload;
-          setStatus(paused ? "Paused" : "Running");
+          setStatus(paused ? "paused" : "running");
         });
       } catch (e: any) {
-        setStatus(`Error: ${e?.message || e || "Unknown backend error"}`);
+        setStatus("error");
         console.error(e);
       } finally {
         await getCurrentWindow().show();
@@ -218,10 +211,10 @@ function App() {
         const allGranted = p.accessibility !== "not_granted" && p.input_monitoring !== "not_granted";
         return allGranted;
       });
-      if (showFeedback) showToast("Permissions refreshed", "success");
+      if (showFeedback) showToast(t("toast.perm_refreshed"), "success");
     } catch (e) {
       console.error("Failed to fetch permission statuses", e);
-      if (showFeedback) showToast("Failed to refresh permissions", "error");
+      if (showFeedback) showToast(t("toast.perm_failed"), "error");
     }
   }
 
@@ -268,10 +261,10 @@ function App() {
       setNewKeyDisplay("");
       if (action.kind === "command") setNewCommand("");
       if (action.kind === "input_source") setNewInputSourceId("");
-      showToast("Action mapping saved", "success");
+      showToast(t("toast.mapping_saved"), "success");
     } catch (e: any) {
       console.error(e);
-      showToast((e?.toString?.() ?? "Failed to save mapping").replace("Error: ", ""), "error");
+      showToast((e?.toString?.() ?? t("toast.mapping_save_failed")).replace("Error: ", ""), "error");
     }
   }
 
@@ -279,22 +272,22 @@ function App() {
     try {
       await invoke("remove_action_mapping", { key, withShift });
       await reloadActionMappings();
-      showToast("Action mapping removed", "success");
+      showToast(t("toast.mapping_removed"), "success");
     } catch (e) {
       console.error(e);
-      showToast("Failed to remove mapping", "error");
+      showToast(t("toast.mapping_remove_failed"), "error");
     }
   }
 
   async function togglePause() {
     try {
-      const shouldPause = status === "Running";
-      const newStatus = await invoke("set_paused", { paused: shouldPause });
-      setStatus(newStatus as string);
-      showToast(shouldPause ? "Service Paused" : "Service Resumed", "success");
+      const shouldPause = status === "running";
+      const newStatus = (await invoke("set_paused", { paused: shouldPause }) as string).toLowerCase();
+      setStatus(newStatus);
+      showToast(shouldPause ? t("toast.service_paused") : t("toast.service_resumed"), "success");
     } catch (e) {
       console.error("Failed to toggle pause", e);
-      showToast("Failed to toggle service", "error");
+      showToast(t("toast.service_toggle_failed"), "error");
     }
   }
 
@@ -303,29 +296,30 @@ function App() {
       if (autostart) {
         await disable();
         setAutostart(false);
-        showToast("Autostart disabled", "success");
+        showToast(t("toast.autostart_disabled"), "success");
       } else {
         await enable();
         setAutostart(true);
-        showToast("Autostart enabled", "success");
+        showToast(t("toast.autostart_enabled"), "success");
       }
     } catch (e) {
       console.error("Failed to toggle autostart", e);
-      showToast("Failed to change settings", "error");
+      showToast(t("toast.autostart_failed"), "error");
     }
   }
 
-  const isRunning = status === "Running";
-  const isPaused = status === "Paused";
+  const isRunning = status === "running";
+  const isPaused = status === "paused";
 
   const statusColor = isRunning ? "text-green-500 dark:text-green-400" : isPaused ? "text-amber-500 dark:text-amber-400" : "text-red-500 dark:text-red-400";
   const dotColor = isRunning ? "bg-green-500" : isPaused ? "bg-amber-500" : "bg-red-500";
   const pingColor = isRunning ? "bg-green-400" : isPaused ? "bg-amber-400" : "bg-red-400";
   const draftAction = buildDraftAction();
   const canSaveAction = !!newKey && !!draftAction;
-  const groupedMappings = ACTION_GROUP_ORDER.map((group) => ({
-    ...group,
-    entries: actionMappings.filter((entry) => entry.action.kind === group.key),
+  const groupedMappings = ACTION_GROUP_KEYS.map((key) => ({
+    key,
+    label: t(`group.${key}`),
+    entries: actionMappings.filter((entry) => entry.action.kind === key),
   })).filter((group) => group.entries.length > 0);
 
   return (
@@ -344,14 +338,43 @@ function App() {
         className="fixed top-0 left-0 right-0 h-8 z-40"
       />
 
-      {/* Theme Toggle Button */}
-      <button
-        onClick={() => setIsDark((prev) => !prev)}
-        className="fixed top-1.5 right-3 z-50 p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-        title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-      >
-        {isDark ? <SunIcon /> : <MoonIcon />}
-      </button>
+      {/* Theme + Language Buttons */}
+      <div className="fixed top-1.5 right-3 z-50 flex items-center gap-1">
+        <div ref={langRef} className="relative">
+          <button
+            onClick={() => setShowLangMenu((prev) => !prev)}
+            className="p-1.5 rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+            title="Language"
+          >
+            {LOCALE_META[locale].flag}
+          </button>
+          {showLangMenu && (
+            <div className="absolute right-0 mt-1 w-36 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
+              {(Object.keys(LOCALE_META) as Locale[]).map((loc) => (
+                <button
+                  key={loc}
+                  onClick={() => { setLocale(loc); setShowLangMenu(false); }}
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 ${
+                    loc === locale
+                      ? "bg-blue-600/25 text-blue-600 dark:text-blue-300"
+                      : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <span>{LOCALE_META[loc].flag}</span>
+                  <span>{LOCALE_META[loc].label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={() => setIsDark((prev) => !prev)}
+          className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+          title={isDark ? t("theme.light") : t("theme.dark")}
+        >
+          {isDark ? <SunIcon /> : <MoonIcon />}
+        </button>
+      </div>
 
       {/* Toast Notification */}
       {toast && (
@@ -374,7 +397,7 @@ function App() {
         <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-500 mb-2">
           HyperCapslock
         </h1>
-        <p className="text-slate-500 dark:text-slate-400 text-sm">Make your Capslock Powerful again!</p>
+        <p className="text-slate-500 dark:text-slate-400 text-sm">{t("app.subtitle")}</p>
       </div>
 
       {/* Status + Settings Row */}
@@ -389,8 +412,8 @@ function App() {
                 <span className={`relative inline-flex rounded-full h-3 w-3 ${dotColor}`}></span>
               </div>
               <div>
-                <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">Status</p>
-                <p className={`text-lg font-semibold leading-tight ${statusColor}`}>{status}</p>
+                <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">{t("status.label")}</p>
+                <p className={`text-lg font-semibold leading-tight ${statusColor}`}>{t(`status.${status}`)}</p>
               </div>
             </div>
             <button
@@ -401,7 +424,7 @@ function App() {
                   : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20"
                 }`}
             >
-              {isRunning ? <><PauseIcon /><span>Pause</span></> : <><PlayIcon /><span>Resume</span></>}
+              {isRunning ? <><PauseIcon /><span>{t("status.pause")}</span></> : <><PlayIcon /><span>{t("status.resume")}</span></>}
             </button>
           </div>
         </div>
@@ -411,9 +434,9 @@ function App() {
           <div className="pointer-events-none absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-cyan-400/10 blur-2xl" />
           <div className="relative">
             <div>
-              <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">Settings</p>
-              <p className="text-sm text-slate-800 dark:text-slate-200 font-medium mt-1">Start at Login</p>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Launch automatically when you sign in.</p>
+              <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">{t("settings.label")}</p>
+              <p className="text-sm text-slate-800 dark:text-slate-200 font-medium mt-1">{t("settings.autostart")}</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">{t("settings.autostart_desc")}</p>
             </div>
             <div className="flex justify-end mt-4">
               <button
@@ -441,8 +464,8 @@ function App() {
             className="w-full flex items-center justify-between cursor-pointer"
           >
             <div className="text-left">
-              <h2 className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Permissions</h2>
-              <p className="text-slate-800 dark:text-slate-200 font-medium">Authority Status</p>
+              <h2 className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">{t("perm.label")}</h2>
+              <p className="text-slate-800 dark:text-slate-200 font-medium">{t("perm.title")}</p>
             </div>
             <svg className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${permissionsCollapsed !== false ? "" : "rotate-180"}`} viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.174l3.71-3.944a.75.75 0 111.08 1.04l-4.25 4.52a.75.75 0 01-1.08 0l-4.25-4.52a.75.75 0 01.02-1.06z" clipRule="evenodd" />
@@ -451,20 +474,20 @@ function App() {
           {permissionsCollapsed === false && (
             <div className="mt-4">
               <div className="space-y-2 text-sm">
-                <PermissionRow label="Accessibility" status={permissions?.accessibility ?? "not_required"} />
-                <PermissionRow label="Input Monitoring" status={permissions?.input_monitoring ?? "not_required"} />
+                <PermissionRow label={t("perm.accessibility")} status={permissions?.accessibility ?? "not_required"} />
+                <PermissionRow label={t("perm.input_monitoring")} status={permissions?.input_monitoring ?? "not_required"} />
               </div>
               <div className="flex items-center justify-between mt-3">
                 <p className="text-[11px] text-slate-400 dark:text-slate-500">
                   {permissions?.platform === "macos"
-                    ? "Required on macOS for reliable global hotkeys."
-                    : "These permissions are only required on macOS."}
+                    ? t("perm.macos_hint")
+                    : t("perm.other_hint")}
                 </p>
                 <button
                   onClick={(e) => { e.stopPropagation(); refreshPermissions(true); }}
                   className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors shrink-0 ml-3"
                 >
-                  Refresh
+                  {t("perm.refresh")}
                 </button>
               </div>
             </div>
@@ -479,14 +502,14 @@ function App() {
         <div className="relative">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-semibold">
-              Action Mappings (Caps+Key)
+              {t("mappings.title")}
             </h2>
             <button
               onClick={() => setShowAddModal(true)}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors font-medium"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
-              Add
+              {t("mappings.add")}
             </button>
           </div>
 
@@ -537,7 +560,7 @@ function App() {
               </div>
             ))}
             {actionMappings.length === 0 && (
-              <div className="text-center text-slate-400 dark:text-slate-500 text-xs py-2 italic">No action mappings yet</div>
+              <div className="text-center text-slate-400 dark:text-slate-500 text-xs py-2 italic">{t("mappings.empty")}</div>
             )}
           </div>
         </div>
@@ -549,7 +572,7 @@ function App() {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
           <div className="relative w-full max-w-[420px] mx-4 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl shadow-2xl p-6 animate-modal-in">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-slate-800 dark:text-slate-200 font-semibold text-base">Add Mapping</h2>
+              <h2 className="text-slate-800 dark:text-slate-200 font-semibold text-base">{t("mappings.add_title")}</h2>
               <button
                 onClick={() => setShowAddModal(false)}
                 className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1"
@@ -564,14 +587,14 @@ function App() {
                 onChange={(value) => setNewWithShift(value === "with_shift")}
                 wrapperClassName="col-span-1"
                 options={[
-                  { value: "plain", label: "Caps" },
-                  { value: "with_shift", label: "Caps + Shift" },
+                  { value: "plain", label: t("mappings.caps") },
+                  { value: "with_shift", label: t("mappings.caps_shift") },
                 ]}
               />
               <span className="text-slate-400 dark:text-slate-500 text-sm font-medium select-none">+</span>
               <input
                 type="text"
-                placeholder="Press Key"
+                placeholder={t("mappings.press_key")}
                 value={newKeyDisplay}
                 readOnly
                 onKeyDown={(e) => {
@@ -594,13 +617,13 @@ function App() {
                 onChange={(value) => setNewActionKind(value as ActionConfig["kind"])}
                 wrapperClassName="col-span-1"
                 options={[
-                  { value: "directional", label: "Directional" },
-                  { value: "jump", label: "Jump" },
-                  { value: "independent", label: "Independent" },
+                  { value: "directional", label: t("group.directional") },
+                  { value: "jump", label: t("group.jump") },
+                  { value: "independent", label: t("group.independent") },
                   ...(permissions?.platform === "macos"
-                    ? [{ value: "input_source", label: "Input Source" }]
+                    ? [{ value: "input_source", label: t("group.input_source") }]
                     : []),
-                  { value: "command", label: "Command" },
+                  { value: "command", label: t("group.command") },
                 ]}
               />
               <div className="min-w-0">
@@ -609,14 +632,14 @@ function App() {
                     value={newDirectionalAction}
                     onChange={(value) => setNewDirectionalAction(value as DirectionalAction)}
                     options={[
-                      { value: "left", label: "Left" },
-                      { value: "right", label: "Right" },
-                      { value: "up", label: "Up" },
-                      { value: "down", label: "Down" },
-                      { value: "word_forward", label: "Word Forward" },
-                      { value: "word_back", label: "Word Back" },
-                      { value: "home", label: "Home" },
-                      { value: "end", label: "End" },
+                      { value: "left", label: t("action.left") },
+                      { value: "right", label: t("action.right") },
+                      { value: "up", label: t("action.up") },
+                      { value: "down", label: t("action.down") },
+                      { value: "word_forward", label: t("action.word_forward") },
+                      { value: "word_back", label: t("action.word_back") },
+                      { value: "home", label: t("action.home") },
+                      { value: "end", label: t("action.end") },
                     ]}
                   />
                 )}
@@ -627,8 +650,8 @@ function App() {
                       value={newJumpDirection}
                       onChange={(value) => setNewJumpDirection(value as JumpDirection)}
                       options={[
-                        { value: "up", label: "Up" },
-                        { value: "down", label: "Down" },
+                        { value: "up", label: t("action.up") },
+                        { value: "down", label: t("action.down") },
                       ]}
                     />
                     <input
@@ -647,9 +670,9 @@ function App() {
                     value={newIndependentAction}
                     onChange={(value) => setNewIndependentAction(value as IndependentAction)}
                     options={[
-                      { value: "backspace", label: "Backspace" },
-                      { value: "next_line", label: "Next Line" },
-                      { value: "insert_quotes", label: "Insert quotes" },
+                      { value: "backspace", label: t("action.backspace") },
+                      { value: "next_line", label: t("action.next_line") },
+                      { value: "insert_quotes", label: t("action.insert_quotes") },
                     ]}
                   />
                 )}
@@ -681,7 +704,7 @@ function App() {
               disabled={!canSaveAction}
               className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 py-2.5 transition-colors text-sm font-medium"
             >
-              Save
+              {t("mappings.save")}
             </button>
           </div>
         </div>
@@ -698,19 +721,19 @@ function Footer({ version }: { version: string }) {
       const update = await check();
       if (update) {
         const yes = await ask(
-          `Version ${update.version} is available.\n\nRelease notes:\n${update.body}`,
-          { title: 'Update Available', kind: 'info', okLabel: 'Update', cancelLabel: 'Cancel' }
+          t("update.available", { version: update.version, body: update.body ?? "" }),
+          { title: t("update.title"), kind: 'info', okLabel: t("update.ok"), cancelLabel: t("update.cancel") }
         );
         if (yes) {
           await update.downloadAndInstall();
-          await message('Update installed. Please restart the application.', { title: 'Success', kind: 'info' });
+          await message(t("update.installed"), { title: t("update.success"), kind: 'info' });
         }
       } else {
-        await message('You are on the latest version.', { title: 'No Update', kind: 'info' });
+        await message(t("update.latest"), { title: t("update.no_update"), kind: 'info' });
       }
     } catch (error: any) {
       console.error(error);
-      await message(`Failed to check for updates: ${error?.message || error}`, { title: 'Error', kind: 'error' });
+      await message(t("update.failed", { error: error?.message || error }), { title: t("update.error"), kind: 'error' });
     }
   }
 
@@ -719,13 +742,13 @@ function Footer({ version }: { version: string }) {
       <div className="flex items-center gap-3 text-slate-400 dark:text-slate-500 text-xs font-medium">
         <span>v{version}</span>
         <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600"></span>
-        <span>By Xueshi Qiao</span>
+        <span>{t("footer.by")}</span>
       </div>
       <button
         onClick={handleCheckUpdate}
         className="text-xs text-blue-500/80 hover:text-blue-500 dark:hover:text-blue-400 hover:underline transition-colors rounded-md px-2 py-1 hover:bg-blue-500/10"
       >
-        Check for Updates
+        {t("update.check")}
       </button>
     </footer>
   );
@@ -739,7 +762,7 @@ function PermissionRow({
   status: "granted" | "not_granted" | "not_required";
 }) {
   const text =
-    status === "granted" ? "Granted" : status === "not_granted" ? "Not Granted" : "Not Required";
+    status === "granted" ? t("perm.granted") : status === "not_granted" ? t("perm.not_granted") : t("perm.not_required");
   const badgeClass =
     status === "granted"
       ? "text-xs px-2 py-1 rounded-md transition-colors bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
