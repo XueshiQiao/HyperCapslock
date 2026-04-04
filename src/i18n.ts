@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 export type Locale = "en" | "zh" | "ja" | "de";
 
@@ -341,7 +342,12 @@ export function getLocale(): Locale {
 export function setLocale(locale: Locale) {
   currentLocale = locale;
   localStorage.setItem("hc-locale", locale);
+  invoke("set_tray_locale", { locale }).catch(() => {});
   listeners.forEach((fn) => fn());
+}
+
+export function syncTrayLocale() {
+  invoke("set_tray_locale", { locale: currentLocale }).catch(() => {});
 }
 
 export function t(key: string, params?: Record<string, string>): string {

@@ -22,7 +22,11 @@ static DID_REMAP: AtomicBool = AtomicBool::new(false);
 static IS_PAUSED: AtomicBool = AtomicBool::new(false);
 static TRAY_TOGGLE_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
 static TRAY_STATUS_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
+static TRAY_CHECK_UPDATE_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
+static TRAY_SHOW_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
+static TRAY_QUIT_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
 static ACTION_MAPPINGS: Mutex<Option<Vec<ActionMappingEntry>>> = Mutex::new(None);
+static MENU_LOCALE: Mutex<&'static str> = Mutex::new("en");
 
 const DEFAULT_ABC_KEYCODE: u16 = 188;
 const DEFAULT_WECHAT_KEYCODE: u16 = 190;
@@ -519,7 +523,7 @@ static ICON_TRAY_TEMPLATE_RUNNING: &[u8] = include_bytes!("../icons/capslock.fil
 #[cfg(target_os = "macos")]
 static ICON_TRAY_TEMPLATE_PAUSED: &[u8] = include_bytes!("../icons/capslock.png");
 
-fn detect_menu_locale() -> &'static str {
+fn detect_system_locale() -> &'static str {
     if let Some(locale) = sys_locale::get_locale() {
         let code = locale.to_lowercase();
         if code.starts_with("zh") {
@@ -536,7 +540,7 @@ fn detect_menu_locale() -> &'static str {
 }
 
 fn menu_text(key: &'static str) -> &'static str {
-    let locale = detect_menu_locale();
+    let locale = *MENU_LOCALE.lock().unwrap();
     match (locale, key) {
         ("zh", "status_running") => "\u{72B6}\u{6001}: \u{8FD0}\u{884C}\u{4E2D}",
         ("zh", "status_paused") => "\u{72B6}\u{6001}: \u{5DF2}\u{6682}\u{505C}",
@@ -579,7 +583,7 @@ fn menu_text(key: &'static str) -> &'static str {
     }
 }
 
-fn update_tray_visuals(app: &AppHandle, paused: bool) {
+fn refresh_tray_texts(paused: bool) {
     if let Ok(guard) = TRAY_TOGGLE_ITEM.lock() {
         if let Some(item) = &*guard {
             let _ = item.set_text(if paused {
@@ -598,6 +602,25 @@ fn update_tray_visuals(app: &AppHandle, paused: bool) {
             });
         }
     }
+    if let Ok(guard) = TRAY_CHECK_UPDATE_ITEM.lock() {
+        if let Some(item) = &*guard {
+            let _ = item.set_text(menu_text("check_update"));
+        }
+    }
+    if let Ok(guard) = TRAY_SHOW_ITEM.lock() {
+        if let Some(item) = &*guard {
+            let _ = item.set_text(menu_text("open"));
+        }
+    }
+    if let Ok(guard) = TRAY_QUIT_ITEM.lock() {
+        if let Some(item) = &*guard {
+            let _ = item.set_text(menu_text("quit"));
+        }
+    }
+}
+
+fn update_tray_visuals(app: &AppHandle, paused: bool) {
+    refresh_tray_texts(paused);
 
     #[cfg(target_os = "macos")]
     // macOS menu bar uses template icons (alpha mask) for proper monochrome rendering.
@@ -739,6 +762,22 @@ fn get_input_source_mappings() -> HashMap<u16, String> {
     out
 }
 
+fn locale_str_to_static(s: &str) -> &'static str {
+    match s {
+        "zh" => "zh",
+        "ja" => "ja",
+        "de" => "de",
+        _ => "en",
+    }
+}
+
+#[tauri::command]
+fn set_tray_locale(locale: String) {
+    *MENU_LOCALE.lock().unwrap() = locale_str_to_static(&locale);
+    let paused = IS_PAUSED.load(Ordering::SeqCst);
+    refresh_tray_texts(paused);
+}
+
 #[tauri::command]
 fn get_status() -> String {
     if IS_PAUSED.load(Ordering::SeqCst) {
@@ -795,6 +834,7 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            *MENU_LOCALE.lock().unwrap() = detect_system_locale();
             load_action_mappings_from_disk(app.handle());
             let status_i =
                 MenuItem::with_id(app, "status", menu_text("status_running"), false, None::<&str>)?;
@@ -812,6 +852,15 @@ pub fn run() {
             }
             if let Ok(mut guard) = TRAY_STATUS_ITEM.lock() {
                 *guard = Some(status_i.clone());
+            }
+            if let Ok(mut guard) = TRAY_CHECK_UPDATE_ITEM.lock() {
+                *guard = Some(check_update_i.clone());
+            }
+            if let Ok(mut guard) = TRAY_SHOW_ITEM.lock() {
+                *guard = Some(show_i.clone());
+            }
+            if let Ok(mut guard) = TRAY_QUIT_ITEM.lock() {
+                *guard = Some(quit_i.clone());
             }
 
             let menu = Menu::with_items(
@@ -953,7 +1002,8 @@ pub fn run() {
             get_mappings,
             add_input_source_mapping,
             remove_input_source_mapping,
-            get_input_source_mappings
+            get_input_source_mappings,
+            set_tray_locale
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

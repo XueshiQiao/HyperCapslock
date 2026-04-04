@@ -6,7 +6,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { check } from "@tauri-apps/plugin-updater";
 import { message, ask } from "@tauri-apps/plugin-dialog";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { t, useLocale, setLocale, LOCALE_META, type Locale } from "./i18n";
+import { t, useLocale, setLocale, syncTrayLocale, LOCALE_META, type Locale } from "./i18n";
 import "./App.css";
 
 type PermissionStatuses = {
@@ -193,6 +193,7 @@ function App() {
         );
         setActionMappings(sorted);
         await refreshPermissions();
+        syncTrayLocale();
 
         unlisten = await listen<boolean>("status-update", (event) => {
           const paused = event.payload;
