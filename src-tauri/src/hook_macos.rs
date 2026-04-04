@@ -306,6 +306,68 @@ fn mac_keycode_to_js_keycode(mac_keycode: u16) -> Option<u16> {
     }
 }
 
+fn js_keycode_to_mac_keycode(js_keycode: u16) -> Option<u16> {
+    match js_keycode {
+        65 => Some(0x00),  // A
+        66 => Some(0x0B),  // B
+        67 => Some(0x08),  // C
+        68 => Some(0x02),  // D
+        69 => Some(0x0E),  // E
+        70 => Some(0x03),  // F
+        71 => Some(0x05),  // G
+        72 => Some(0x04),  // H
+        73 => Some(0x22),  // I
+        74 => Some(0x26),  // J
+        75 => Some(0x28),  // K
+        76 => Some(0x25),  // L
+        77 => Some(0x2E),  // M
+        78 => Some(0x2D),  // N
+        79 => Some(0x1F),  // O
+        80 => Some(0x23),  // P
+        81 => Some(0x0C),  // Q
+        82 => Some(0x0F),  // R
+        83 => Some(0x01),  // S
+        84 => Some(0x11),  // T
+        85 => Some(0x20),  // U
+        86 => Some(0x09),  // V
+        87 => Some(0x0D),  // W
+        88 => Some(0x07),  // X
+        89 => Some(0x10),  // Y
+        90 => Some(0x06),  // Z
+        48 => Some(0x1D),  // 0
+        49 => Some(0x12),  // 1
+        50 => Some(0x13),  // 2
+        51 => Some(0x14),  // 3
+        52 => Some(0x15),  // 4
+        53 => Some(0x16),  // 5
+        54 => Some(0x17),  // 6
+        55 => Some(0x18),  // 7
+        56 => Some(0x19),  // 8
+        57 => Some(0x1A),  // 9
+        188 => Some(0x2B), // ,
+        190 => Some(0x2F), // .
+        186 => Some(0x29), // ;
+        187 => Some(0x18), // = (shares with 7 on some layouts, use 0x18 cautiously)
+        189 => Some(0x1B), // -
+        191 => Some(0x2C), // /
+        220 => Some(0x2A), // backslash
+        222 => Some(0x27), // '
+        219 => Some(0x21), // [
+        221 => Some(0x1E), // ]
+        192 => Some(0x32), // `
+        8 => Some(0x33),   // Backspace/Delete
+        13 => Some(0x24),  // Enter
+        9 => Some(0x30),   // Tab
+        27 => Some(0x35),  // Escape
+        32 => Some(0x31),  // Space
+        37 => Some(0x7B),  // Left
+        38 => Some(0x7E),  // Up
+        39 => Some(0x7C),  // Right
+        40 => Some(0x7D),  // Down
+        _ => None,
+    }
+}
+
 /// Helper to compare CGEventType values (the enum doesn't implement PartialEq)
 fn event_type_matches(a: CGEventType, b: CGEventType) -> bool {
     (a as u32) == (b as u32)
@@ -404,7 +466,9 @@ fn active_modifier_flags(flags: CGEventFlags) -> CGEventFlags {
 fn allow_shift_fallback(action: &ActionConfig) -> bool {
     !matches!(
         action,
-        ActionConfig::InputSource { .. } | ActionConfig::Command { .. }
+        ActionConfig::InputSource { .. }
+            | ActionConfig::Command { .. }
+            | ActionConfig::KeyCombo { .. }
     )
 }
 
@@ -531,6 +595,38 @@ fn execute_action_mapping(action: &ActionConfig, key_down: bool, active_modifier
                         log_macos("ERROR", &format!("Failed to spawn shell mapping: {}", e));
                     }
                 });
+            }
+        }
+        ActionConfig::KeyCombo {
+            target_key,
+            with_ctrl,
+            with_alt,
+            with_cmd,
+            with_target_shift,
+        } => {
+            if let Some(mac_keycode) = js_keycode_to_mac_keycode(*target_key) {
+                let mut flags = CGEventFlags::empty();
+                if *with_ctrl {
+                    flags |= CGEventFlags::CGEventFlagControl;
+                }
+                if *with_alt {
+                    flags |= CGEventFlags::CGEventFlagAlternate;
+                }
+                if *with_cmd {
+                    flags |= CGEventFlags::CGEventFlagCommand;
+                }
+                if *with_target_shift {
+                    flags |= CGEventFlags::CGEventFlagShift;
+                }
+                post_key(mac_keycode, key_down, flags);
+            } else {
+                log_macos(
+                    "WARN",
+                    &format!(
+                        "KeyCombo: unknown JS keycode {}, cannot map to macOS",
+                        target_key
+                    ),
+                );
             }
         }
     }

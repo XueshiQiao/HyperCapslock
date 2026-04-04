@@ -74,11 +74,33 @@ pub(crate) enum IndependentActionKind {
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub(crate) enum ActionConfig {
-    Directional { action: DirectionalActionKind },
-    Jump { direction: JumpDirection, count: u8 },
-    Independent { action: IndependentActionKind },
-    InputSource { input_source_id: String },
-    Command { command: String },
+    Directional {
+        action: DirectionalActionKind,
+    },
+    Jump {
+        direction: JumpDirection,
+        count: u8,
+    },
+    Independent {
+        action: IndependentActionKind,
+    },
+    InputSource {
+        input_source_id: String,
+    },
+    Command {
+        command: String,
+    },
+    KeyCombo {
+        target_key: u16,
+        #[serde(default)]
+        with_ctrl: bool,
+        #[serde(default)]
+        with_alt: bool,
+        #[serde(default)]
+        with_cmd: bool,
+        #[serde(default)]
+        with_target_shift: bool,
+    },
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -359,6 +381,32 @@ fn render_action_mappings_yaml_with_comments(mappings: &[ActionMappingEntry]) ->
                 lines.push("    kind: command".to_string());
                 lines.push(format!("    command: {}", yaml_quote(command)));
             }
+            ActionConfig::KeyCombo {
+                target_key,
+                with_ctrl,
+                with_alt,
+                with_cmd,
+                with_target_shift,
+            } => {
+                lines.push("    kind: key_combo".to_string());
+                lines.push(format!(
+                    "    target_key: {} # {}",
+                    target_key,
+                    js_keycode_name(*target_key)
+                ));
+                if *with_ctrl {
+                    lines.push("    with_ctrl: true".to_string());
+                }
+                if *with_alt {
+                    lines.push("    with_alt: true".to_string());
+                }
+                if *with_cmd {
+                    lines.push("    with_cmd: true".to_string());
+                }
+                if *with_target_shift {
+                    lines.push("    with_target_shift: true".to_string());
+                }
+            }
         }
     }
 
@@ -471,22 +519,82 @@ static ICON_TRAY_TEMPLATE_RUNNING: &[u8] = include_bytes!("../icons/capslock.fil
 #[cfg(target_os = "macos")]
 static ICON_TRAY_TEMPLATE_PAUSED: &[u8] = include_bytes!("../icons/capslock.png");
 
+fn detect_menu_locale() -> &'static str {
+    if let Some(locale) = sys_locale::get_locale() {
+        let code = locale.to_lowercase();
+        if code.starts_with("zh") {
+            return "zh";
+        }
+        if code.starts_with("ja") {
+            return "ja";
+        }
+        if code.starts_with("de") {
+            return "de";
+        }
+    }
+    "en"
+}
+
+fn menu_text(key: &'static str) -> &'static str {
+    let locale = detect_menu_locale();
+    match (locale, key) {
+        ("zh", "status_running") => "\u{72B6}\u{6001}: \u{8FD0}\u{884C}\u{4E2D}",
+        ("zh", "status_paused") => "\u{72B6}\u{6001}: \u{5DF2}\u{6682}\u{505C}",
+        ("zh", "start") => "\u{542F}\u{52A8}\u{670D}\u{52A1}",
+        ("zh", "stop") => "\u{505C}\u{6B62}\u{670D}\u{52A1}",
+        ("zh", "check_update") => "\u{68C0}\u{67E5}\u{66F4}\u{65B0}",
+        ("zh", "open") => "\u{6253}\u{5F00}\u{7A97}\u{53E3}",
+        ("zh", "quit") => "\u{9000}\u{51FA} HyperCapslock",
+
+        ("ja", "status_running") => {
+            "\u{30B9}\u{30C6}\u{30FC}\u{30BF}\u{30B9}: \u{5B9F}\u{884C}\u{4E2D}"
+        }
+        ("ja", "status_paused") => {
+            "\u{30B9}\u{30C6}\u{30FC}\u{30BF}\u{30B9}: \u{4E00}\u{6642}\u{505C}\u{6B62}"
+        }
+        ("ja", "start") => "\u{30B5}\u{30FC}\u{30D3}\u{30B9}\u{3092}\u{958B}\u{59CB}",
+        ("ja", "stop") => "\u{30B5}\u{30FC}\u{30D3}\u{30B9}\u{3092}\u{505C}\u{6B62}",
+        ("ja", "check_update") => {
+            "\u{30A2}\u{30C3}\u{30D7}\u{30C7}\u{30FC}\u{30C8}\u{3092}\u{78BA}\u{8A8D}"
+        }
+        ("ja", "open") => "\u{30A6}\u{30A3}\u{30F3}\u{30C9}\u{30A6}\u{3092}\u{958B}\u{304F}",
+        ("ja", "quit") => "HyperCapslock \u{3092}\u{7D42}\u{4E86}",
+
+        ("de", "status_running") => "Status: L\u{00E4}uft",
+        ("de", "status_paused") => "Status: Pausiert",
+        ("de", "start") => "Dienst starten",
+        ("de", "stop") => "Dienst stoppen",
+        ("de", "check_update") => "Nach Updates suchen",
+        ("de", "open") => "Fenster \u{00F6}ffnen",
+        ("de", "quit") => "HyperCapslock beenden",
+
+        (_, "status_running") => "Status: Running",
+        (_, "status_paused") => "Status: Paused",
+        (_, "start") => "Start Service",
+        (_, "stop") => "Stop Service",
+        (_, "check_update") => "Check for Updates",
+        (_, "open") => "Open Window",
+        (_, "quit") => "Quit HyperCapslock",
+        _ => key,
+    }
+}
+
 fn update_tray_visuals(app: &AppHandle, paused: bool) {
     if let Ok(guard) = TRAY_TOGGLE_ITEM.lock() {
         if let Some(item) = &*guard {
             let _ = item.set_text(if paused {
-                "Start Service"
+                menu_text("start")
             } else {
-                "Stop Service"
+                menu_text("stop")
             });
         }
     }
     if let Ok(guard) = TRAY_STATUS_ITEM.lock() {
         if let Some(item) = &*guard {
             let _ = item.set_text(if paused {
-                "Status: Paused"
+                menu_text("status_paused")
             } else {
-                "Status: Running"
+                menu_text("status_running")
             });
         }
     }
@@ -689,15 +797,15 @@ pub fn run() {
         .setup(|app| {
             load_action_mappings_from_disk(app.handle());
             let status_i =
-                MenuItem::with_id(app, "status", "Status: Running", false, None::<&str>)?;
+                MenuItem::with_id(app, "status", menu_text("status_running"), false, None::<&str>)?;
             let toggle_i =
-                MenuItem::with_id(app, "toggle", "Stop Service", true, None::<&str>)?;
+                MenuItem::with_id(app, "toggle", menu_text("stop"), true, None::<&str>)?;
             let check_update_i =
-                MenuItem::with_id(app, "check_update", "Check for Updates", true, None::<&str>)?;
+                MenuItem::with_id(app, "check_update", menu_text("check_update"), true, None::<&str>)?;
             let sep = PredefinedMenuItem::separator(app)?;
-            let show_i = MenuItem::with_id(app, "show", "Open window", true, None::<&str>)?;
+            let show_i = MenuItem::with_id(app, "show", menu_text("open"), true, None::<&str>)?;
             let quit_i =
-                MenuItem::with_id(app, "quit", "Quit HyperCapslock", true, None::<&str>)?;
+                MenuItem::with_id(app, "quit", menu_text("quit"), true, None::<&str>)?;
 
             if let Ok(mut guard) = TRAY_TOGGLE_ITEM.lock() {
                 *guard = Some(toggle_i.clone());

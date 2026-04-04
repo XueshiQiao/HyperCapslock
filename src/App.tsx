@@ -34,7 +34,8 @@ type ActionConfig =
   | { kind: "jump"; direction: JumpDirection; count: number }
   | { kind: "independent"; action: IndependentAction }
   | { kind: "input_source"; input_source_id: string }
-  | { kind: "command"; command: string };
+  | { kind: "command"; command: string }
+  | { kind: "key_combo"; target_key: number; with_ctrl: boolean; with_alt: boolean; with_cmd: boolean; with_target_shift: boolean };
 
 type ActionMappingEntry = {
   key: number;
@@ -105,6 +106,15 @@ function actionToPresentation(action: ActionConfig): ActionPresentation {
       return { category: t("group.input_source"), value: action.input_source_id, icon: "Input" };
     case "command":
       return { category: t("group.command"), value: action.command, icon: "Command" };
+    case "key_combo": {
+      const parts: string[] = [];
+      if (action.with_ctrl) parts.push("Ctrl");
+      if (action.with_alt) parts.push("Alt");
+      if (action.with_cmd) parts.push("Cmd");
+      if (action.with_target_shift) parts.push("Shift");
+      parts.push(keyCodeToDisplay(action.target_key));
+      return { category: t("group.key_combo"), value: parts.join("+"), icon: "KeyCombo" };
+    }
     default:
       return { category: t("action.unknown"), value: t("action.unknown"), icon: "Code" };
   }
@@ -112,7 +122,7 @@ function actionToPresentation(action: ActionConfig): ActionPresentation {
 
 const CARD_WIDTH_CLASS = "w-full max-w-[580px]";
 const MODERN_CARD_CLASS = "relative overflow-hidden border border-slate-200/80 dark:border-slate-700/80 rounded-2xl shadow-xl bg-white dark:bg-slate-800";
-const ACTION_GROUP_KEYS: ActionGroupKey[] = ["directional", "jump", "independent", "input_source", "command"];
+const ACTION_GROUP_KEYS: ActionGroupKey[] = ["directional", "jump", "independent", "input_source", "command", "key_combo"];
 
 function App() {
   const [status, setStatus] = useState("initializing");
@@ -132,6 +142,12 @@ function App() {
   const [newIndependentAction, setNewIndependentAction] = useState<IndependentAction>("backspace");
   const [newInputSourceId, setNewInputSourceId] = useState("");
   const [newCommand, setNewCommand] = useState("");
+  const [newTargetKey, setNewTargetKey] = useState<number | null>(null);
+  const [newTargetKeyDisplay, setNewTargetKeyDisplay] = useState("");
+  const [newTargetCtrl, setNewTargetCtrl] = useState(false);
+  const [newTargetAlt, setNewTargetAlt] = useState(false);
+  const [newTargetCmd, setNewTargetCmd] = useState(false);
+  const [newTargetShift, setNewTargetShift] = useState(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [permissionsCollapsed, setPermissionsCollapsed] = useState<boolean | null>(null);
@@ -240,6 +256,10 @@ function App() {
           : null;
       case "command":
         return newCommand.trim() ? { kind: "command", command: newCommand.trim() } : null;
+      case "key_combo":
+        return newTargetKey
+          ? { kind: "key_combo", target_key: newTargetKey, with_ctrl: newTargetCtrl, with_alt: newTargetAlt, with_cmd: newTargetCmd, with_target_shift: newTargetShift }
+          : null;
       default:
         return null;
     }
@@ -624,6 +644,7 @@ function App() {
                     ? [{ value: "input_source", label: t("group.input_source") }]
                     : []),
                   { value: "command", label: t("group.command") },
+                  { value: "key_combo", label: t("group.key_combo") },
                 ]}
               />
               <div className="min-w-0">
@@ -695,6 +716,44 @@ function App() {
                     onChange={(e) => setNewCommand(e.target.value)}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors"
                   />
+                )}
+
+                {newActionKind === "key_combo" && (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder={t("mappings.press_key")}
+                      value={newTargetKeyDisplay}
+                      readOnly
+                      onKeyDown={(e) => {
+                        e.preventDefault();
+                        if (["Shift", "Control", "Alt", "Meta", "CapsLock"].includes(e.key)) return;
+                        setNewTargetKey(e.keyCode);
+                        setNewTargetKeyDisplay(keyCodeToDisplay(e.keyCode));
+                      }}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-center text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer"
+                    />
+                    <div className="flex gap-2 flex-wrap">
+                      {(["Ctrl", "Alt", "Cmd", "Shift"] as const).map((mod) => {
+                        const stateMap = { Ctrl: [newTargetCtrl, setNewTargetCtrl], Alt: [newTargetAlt, setNewTargetAlt], Cmd: [newTargetCmd, setNewTargetCmd], Shift: [newTargetShift, setNewTargetShift] } as const;
+                        const [active, setActive] = stateMap[mod] as [boolean, (v: boolean) => void];
+                        return (
+                          <button
+                            key={mod}
+                            type="button"
+                            onClick={() => setActive(!active)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                              active
+                                ? "bg-blue-600/20 border-blue-500/50 text-blue-600 dark:text-blue-300"
+                                : "bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-slate-400"
+                            }`}
+                          >
+                            {mod}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -881,6 +940,7 @@ function ActionIcon({ icon, className }: { icon: string; className?: string }) {
     case "Code": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>;
     case "Input": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 0c2.2 2.3 3.5 5.4 3.5 10S14.2 19.7 12 22m0-20C9.8 4.3 8.5 7.4 8.5 12S9.8 19.7 12 22m-9-10h18" /></svg>;
     case "Command": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 8h8v8H8zM8 2a4 4 0 110 8M2 8a4 4 0 108 0m4 8a4 4 0 108 0m-8 6a4 4 0 110-8" /></svg>;
+    case "KeyCombo": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" /></svg>;
     default: return null;
   }
 }
