@@ -108,10 +108,64 @@ pub(crate) enum ActionConfig {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub(crate) enum Trigger {
+    HyperPlusKey {
+        key: u16,
+        #[serde(default)]
+        with_shift: bool,
+    },
+    DoubleTapHyper,
+}
+
+#[derive(serde::Serialize, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ActionMappingEntry {
-    pub(crate) key: u16,
-    pub(crate) with_shift: bool,
+    pub(crate) trigger: Trigger,
     pub(crate) action: ActionConfig,
+}
+
+// Custom deserializer to support legacy YAML (top-level `key` / `with_shift`).
+// Old entries: `{ key: 72, with_shift: false, action: ... }`
+// New entries: `{ trigger: { kind: hyper_plus_key, key: 72, with_shift: false }, action: ... }`
+impl<'de> serde::Deserialize<'de> for ActionMappingEntry {
+    fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        struct Raw {
+            #[serde(default)]
+            trigger: Option<Trigger>,
+            #[serde(default)]
+            key: Option<u16>,
+            #[serde(default)]
+            with_shift: Option<bool>,
+            action: ActionConfig,
+        }
+        let raw = Raw::deserialize(de)?;
+        let trigger = if let Some(t) = raw.trigger {
+            t
+        } else if let Some(key) = raw.key {
+            Trigger::HyperPlusKey {
+                key,
+                with_shift: raw.with_shift.unwrap_or(false),
+            }
+        } else {
+            return Err(serde::de::Error::custom(
+                "action mapping entry missing both 'trigger' and legacy 'key' fields",
+            ));
+        };
+        Ok(ActionMappingEntry {
+            trigger,
+            action: raw.action,
+        })
+    }
+}
+
+impl Trigger {
+    pub(crate) fn hyper_plus_key(&self) -> Option<(u16, bool)> {
+        match self {
+            Trigger::HyperPlusKey { key, with_shift } => Some((*key, *with_shift)),
+            _ => None,
+        }
+    }
 }
 
 #[derive(serde::Serialize)]
@@ -176,94 +230,120 @@ fn get_action_mappings_path(app: &AppHandle) -> Option<PathBuf> {
 fn default_action_mappings() -> Vec<ActionMappingEntry> {
     let mut defaults = vec![
         ActionMappingEntry {
-            key: JS_H_KEYCODE,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: JS_H_KEYCODE,
+                with_shift: false,
+            },
             action: ActionConfig::Directional {
                 action: DirectionalActionKind::Left,
             },
         },
         ActionMappingEntry {
-            key: JS_J_KEYCODE,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: JS_J_KEYCODE,
+                with_shift: false,
+            },
             action: ActionConfig::Directional {
                 action: DirectionalActionKind::Down,
             },
         },
         ActionMappingEntry {
-            key: JS_K_KEYCODE,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: JS_K_KEYCODE,
+                with_shift: false,
+            },
             action: ActionConfig::Directional {
                 action: DirectionalActionKind::Up,
             },
         },
         ActionMappingEntry {
-            key: JS_L_KEYCODE,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: JS_L_KEYCODE,
+                with_shift: false,
+            },
             action: ActionConfig::Directional {
                 action: DirectionalActionKind::Right,
             },
         },
         ActionMappingEntry {
-            key: JS_P_KEYCODE,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: JS_P_KEYCODE,
+                with_shift: false,
+            },
             action: ActionConfig::Directional {
                 action: DirectionalActionKind::WordForward,
             },
         },
         ActionMappingEntry {
-            key: JS_Y_KEYCODE,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: JS_Y_KEYCODE,
+                with_shift: false,
+            },
             action: ActionConfig::Directional {
                 action: DirectionalActionKind::WordBack,
             },
         },
         ActionMappingEntry {
-            key: JS_A_KEYCODE,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: JS_A_KEYCODE,
+                with_shift: false,
+            },
             action: ActionConfig::Directional {
                 action: DirectionalActionKind::Home,
             },
         },
         ActionMappingEntry {
-            key: JS_E_KEYCODE,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: JS_E_KEYCODE,
+                with_shift: false,
+            },
             action: ActionConfig::Directional {
                 action: DirectionalActionKind::End,
             },
         },
         ActionMappingEntry {
-            key: JS_U_KEYCODE,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: JS_U_KEYCODE,
+                with_shift: false,
+            },
             action: ActionConfig::Jump {
                 direction: JumpDirection::Up,
                 count: 10,
             },
         },
         ActionMappingEntry {
-            key: JS_D_KEYCODE,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: JS_D_KEYCODE,
+                with_shift: false,
+            },
             action: ActionConfig::Jump {
                 direction: JumpDirection::Down,
                 count: 10,
             },
         },
         ActionMappingEntry {
-            key: JS_I_KEYCODE,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: JS_I_KEYCODE,
+                with_shift: false,
+            },
             action: ActionConfig::Independent {
                 action: IndependentActionKind::Backspace,
             },
         },
         ActionMappingEntry {
-            key: JS_N_KEYCODE,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: JS_N_KEYCODE,
+                with_shift: false,
+            },
             action: ActionConfig::Independent {
                 action: IndependentActionKind::InsertQuotes,
             },
         },
         ActionMappingEntry {
-            key: JS_O_KEYCODE,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: JS_O_KEYCODE,
+                with_shift: false,
+            },
             action: ActionConfig::Independent {
                 action: IndependentActionKind::NextLine,
             },
@@ -273,15 +353,19 @@ fn default_action_mappings() -> Vec<ActionMappingEntry> {
     #[cfg(target_os = "macos")]
     {
         defaults.push(ActionMappingEntry {
-            key: DEFAULT_ABC_KEYCODE,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: DEFAULT_ABC_KEYCODE,
+                with_shift: false,
+            },
             action: ActionConfig::InputSource {
                 input_source_id: DEFAULT_ABC_INPUT_SOURCE_ID.to_string(),
             },
         });
         defaults.push(ActionMappingEntry {
-            key: DEFAULT_WECHAT_KEYCODE,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: DEFAULT_WECHAT_KEYCODE,
+                with_shift: false,
+            },
             action: ActionConfig::InputSource {
                 input_source_id: DEFAULT_WECHAT_INPUT_SOURCE_ID.to_string(),
             },
@@ -348,17 +432,24 @@ fn independent_action_name(action: &IndependentActionKind) -> &'static str {
 fn render_action_mappings_yaml_with_comments(mappings: &[ActionMappingEntry]) -> String {
     let mut lines = vec![
         "# HyperCapslock action mappings".to_string(),
+        "# trigger.kind: hyper_plus_key (Caps+Key) or double_tap_hyper (Caps tapped twice)"
+            .to_string(),
         "# key uses JavaScript keyCode".to_string(),
-        "# with_shift=false -> Caps+Key, with_shift=true -> Caps+Shift+Key".to_string(),
     ];
 
     for entry in mappings {
-        lines.push(format!(
-            "- key: {} # {}",
-            entry.key,
-            js_keycode_name(entry.key)
-        ));
-        lines.push(format!("  with_shift: {}", entry.with_shift));
+        match &entry.trigger {
+            Trigger::HyperPlusKey { key, with_shift } => {
+                lines.push("- trigger:".to_string());
+                lines.push("    kind: hyper_plus_key".to_string());
+                lines.push(format!("    key: {} # {}", key, js_keycode_name(*key)));
+                lines.push(format!("    with_shift: {}", with_shift));
+            }
+            Trigger::DoubleTapHyper => {
+                lines.push("- trigger:".to_string());
+                lines.push("    kind: double_tap_hyper".to_string());
+            }
+        }
         lines.push("  action:".to_string());
         match &entry.action {
             ActionConfig::Directional { action } => {
@@ -421,10 +512,7 @@ fn upsert_action_mapping_in_vec(
     mappings: &mut Vec<ActionMappingEntry>,
     entry: ActionMappingEntry,
 ) -> bool {
-    if let Some(existing) = mappings
-        .iter_mut()
-        .find(|m| m.key == entry.key && m.with_shift == entry.with_shift)
-    {
+    if let Some(existing) = mappings.iter_mut().find(|m| m.trigger == entry.trigger) {
         if *existing != entry {
             *existing = entry;
             return true;
@@ -437,21 +525,17 @@ fn upsert_action_mapping_in_vec(
 
 fn remove_action_mapping_from_vec(
     mappings: &mut Vec<ActionMappingEntry>,
-    key: u16,
-    with_shift: bool,
+    trigger: &Trigger,
 ) -> bool {
     let before = mappings.len();
-    mappings.retain(|m| !(m.key == key && m.with_shift == with_shift));
+    mappings.retain(|m| m.trigger != *trigger);
     before != mappings.len()
 }
 
 fn normalize_action_mappings(mappings: &mut Vec<ActionMappingEntry>) {
     let mut deduped: Vec<ActionMappingEntry> = Vec::new();
     for entry in mappings.drain(..) {
-        if let Some(existing) = deduped
-            .iter_mut()
-            .find(|m| m.key == entry.key && m.with_shift == entry.with_shift)
-        {
+        if let Some(existing) = deduped.iter_mut().find(|m| m.trigger == entry.trigger) {
             *existing = entry;
         } else {
             deduped.push(entry);
@@ -643,8 +727,7 @@ fn update_tray_visuals(app: &AppHandle, paused: bool) {
 #[tauri::command]
 fn upsert_action_mapping(
     app: AppHandle,
-    key: u16,
-    with_shift: bool,
+    trigger: Trigger,
     action: ActionConfig,
 ) -> Result<(), String> {
     match &action {
@@ -663,11 +746,7 @@ fn upsert_action_mapping(
     {
         let mut guard = ACTION_MAPPINGS.lock().unwrap();
         let mappings = guard.get_or_insert_with(Vec::new);
-        let entry = ActionMappingEntry {
-            key,
-            with_shift,
-            action,
-        };
+        let entry = ActionMappingEntry { trigger, action };
         upsert_action_mapping_in_vec(mappings, entry);
         normalize_action_mappings(mappings);
     }
@@ -676,11 +755,11 @@ fn upsert_action_mapping(
 }
 
 #[tauri::command]
-fn remove_action_mapping(app: AppHandle, key: u16, with_shift: bool) {
+fn remove_action_mapping(app: AppHandle, trigger: Trigger) {
     {
         let mut guard = ACTION_MAPPINGS.lock().unwrap();
         if let Some(mappings) = guard.as_mut() {
-            remove_action_mapping_from_vec(mappings, key, with_shift);
+            remove_action_mapping_from_vec(mappings, &trigger);
         }
     }
     save_action_mappings_to_disk(&app);
@@ -694,21 +773,34 @@ fn get_action_mappings() -> Vec<ActionMappingEntry> {
 // Legacy API wrappers kept for compatibility.
 #[tauri::command]
 fn add_mapping(app: AppHandle, key: u16, command: String) -> Result<(), String> {
-    upsert_action_mapping(app, key, true, ActionConfig::Command { command })
+    upsert_action_mapping(
+        app,
+        Trigger::HyperPlusKey {
+            key,
+            with_shift: true,
+        },
+        ActionConfig::Command { command },
+    )
 }
 
 #[tauri::command]
 fn remove_mapping(app: AppHandle, key: u16) {
-    remove_action_mapping(app, key, true);
+    remove_action_mapping(
+        app,
+        Trigger::HyperPlusKey {
+            key,
+            with_shift: true,
+        },
+    );
 }
 
 #[tauri::command]
 fn get_mappings() -> HashMap<u16, String> {
     let mut out = HashMap::new();
     for entry in get_action_mappings() {
-        if let ActionConfig::Command { command } = entry.action {
-            if entry.with_shift {
-                out.insert(entry.key, command);
+        if let Some((key, true)) = entry.trigger.hyper_plus_key() {
+            if let ActionConfig::Command { command } = entry.action {
+                out.insert(key, command);
             }
         }
     }
@@ -723,8 +815,10 @@ fn add_input_source_mapping(
 ) -> Result<(), String> {
     upsert_action_mapping(
         app,
-        key,
-        false,
+        Trigger::HyperPlusKey {
+            key,
+            with_shift: false,
+        },
         ActionConfig::InputSource { input_source_id },
     )
 }
@@ -737,15 +831,25 @@ fn remove_input_source_mapping(app: AppHandle, key: u16) {
         .as_ref()
         .map(|mappings| {
             mappings.iter().any(|m| {
-                m.key == key
-                    && !m.with_shift
-                    && matches!(m.action, ActionConfig::InputSource { .. })
+                matches!(
+                    m.trigger,
+                    Trigger::HyperPlusKey {
+                        key: k,
+                        with_shift: false,
+                    } if k == key
+                ) && matches!(m.action, ActionConfig::InputSource { .. })
             })
         })
         .unwrap_or(false);
 
     if should_remove {
-        remove_action_mapping(app, key, false);
+        remove_action_mapping(
+            app,
+            Trigger::HyperPlusKey {
+                key,
+                with_shift: false,
+            },
+        );
     }
 }
 
@@ -753,9 +857,9 @@ fn remove_input_source_mapping(app: AppHandle, key: u16) {
 fn get_input_source_mappings() -> HashMap<u16, String> {
     let mut out = HashMap::new();
     for entry in get_action_mappings() {
-        if let ActionConfig::InputSource { input_source_id } = entry.action {
-            if !entry.with_shift {
-                out.insert(entry.key, input_source_id);
+        if let Some((key, false)) = entry.trigger.hyper_plus_key() {
+            if let ActionConfig::InputSource { input_source_id } = entry.action {
+                out.insert(key, input_source_id);
             }
         }
     }
@@ -1017,14 +1121,16 @@ mod tests {
     use crate::{
         default_action_mappings, render_action_mappings_yaml_with_comments,
         upsert_action_mapping_in_vec, ActionConfig, ActionMappingEntry, DirectionalActionKind,
-        IndependentActionKind, JumpDirection, JS_H_KEYCODE, JS_N_KEYCODE, JS_U_KEYCODE,
+        IndependentActionKind, JumpDirection, Trigger, JS_H_KEYCODE, JS_N_KEYCODE, JS_U_KEYCODE,
     };
 
     #[test]
     fn test_action_mapping_serialization() {
         let entry = ActionMappingEntry {
-            key: 77,
-            with_shift: true,
+            trigger: Trigger::HyperPlusKey {
+                key: 77,
+                with_shift: true,
+            },
             action: ActionConfig::Command {
                 command: "open -a Calculator".to_string(),
             },
@@ -1036,10 +1142,45 @@ mod tests {
     }
 
     #[test]
+    fn test_double_tap_trigger_serialization() {
+        let entry = ActionMappingEntry {
+            trigger: Trigger::DoubleTapHyper,
+            action: ActionConfig::KeyCombo {
+                target_key: 32,
+                with_ctrl: true,
+                with_alt: true,
+                with_cmd: false,
+                with_target_shift: false,
+            },
+        };
+
+        let yaml = serde_yaml::to_string(&entry).unwrap();
+        let decoded: ActionMappingEntry = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(decoded, entry);
+    }
+
+    #[test]
+    fn test_legacy_yaml_loads_as_hyper_plus_key() {
+        let legacy =
+            "- key: 72\n  with_shift: false\n  action:\n    kind: directional\n    action: left\n";
+        let decoded: Vec<ActionMappingEntry> = serde_yaml::from_str(legacy).unwrap();
+        assert_eq!(decoded.len(), 1);
+        assert_eq!(
+            decoded[0].trigger,
+            Trigger::HyperPlusKey {
+                key: 72,
+                with_shift: false,
+            }
+        );
+    }
+
+    #[test]
     fn test_yaml_render_contains_key_name_comment() {
         let entries = vec![ActionMappingEntry {
-            key: 87,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: 87,
+                with_shift: false,
+            },
             action: ActionConfig::Directional {
                 action: DirectionalActionKind::WordForward,
             },
@@ -1056,41 +1197,57 @@ mod tests {
     fn test_default_action_mappings_include_core_behaviors() {
         let defaults = default_action_mappings();
         assert!(defaults.iter().any(|m| {
-            m.key == JS_H_KEYCODE
-                && !m.with_shift
-                && matches!(
-                    m.action,
-                    ActionConfig::Directional {
-                        action: DirectionalActionKind::Left
-                    }
-                )
+            matches!(
+                m.trigger,
+                Trigger::HyperPlusKey {
+                    key: JS_H_KEYCODE,
+                    with_shift: false,
+                }
+            ) && matches!(
+                m.action,
+                ActionConfig::Directional {
+                    action: DirectionalActionKind::Left
+                }
+            )
         }));
         assert!(defaults.iter().any(|m| {
-            m.key == JS_U_KEYCODE
-                && matches!(
-                    m.action,
-                    ActionConfig::Jump {
-                        direction: JumpDirection::Up,
-                        count: 10
-                    }
-                )
+            matches!(
+                m.trigger,
+                Trigger::HyperPlusKey {
+                    key: JS_U_KEYCODE,
+                    ..
+                }
+            ) && matches!(
+                m.action,
+                ActionConfig::Jump {
+                    direction: JumpDirection::Up,
+                    count: 10
+                }
+            )
         }));
         assert!(defaults.iter().any(|m| {
-            m.key == JS_N_KEYCODE
-                && matches!(
-                    m.action,
-                    ActionConfig::Independent {
-                        action: IndependentActionKind::InsertQuotes
-                    }
-                )
+            matches!(
+                m.trigger,
+                Trigger::HyperPlusKey {
+                    key: JS_N_KEYCODE,
+                    ..
+                }
+            ) && matches!(
+                m.action,
+                ActionConfig::Independent {
+                    action: IndependentActionKind::InsertQuotes
+                }
+            )
         }));
     }
 
     #[test]
     fn test_upsert_replaces_existing_binding() {
         let mut mappings = vec![ActionMappingEntry {
-            key: 65,
-            with_shift: false,
+            trigger: Trigger::HyperPlusKey {
+                key: 65,
+                with_shift: false,
+            },
             action: ActionConfig::Directional {
                 action: DirectionalActionKind::Left,
             },
@@ -1099,8 +1256,10 @@ mod tests {
         let changed = upsert_action_mapping_in_vec(
             &mut mappings,
             ActionMappingEntry {
-                key: 65,
-                with_shift: false,
+                trigger: Trigger::HyperPlusKey {
+                    key: 65,
+                    with_shift: false,
+                },
                 action: ActionConfig::Directional {
                     action: DirectionalActionKind::Right,
                 },
@@ -1115,5 +1274,30 @@ mod tests {
                 action: DirectionalActionKind::Right
             }
         ));
+    }
+
+    #[test]
+    fn test_double_tap_dedups_by_trigger() {
+        let mut mappings = vec![ActionMappingEntry {
+            trigger: Trigger::DoubleTapHyper,
+            action: ActionConfig::Command {
+                command: "first".into(),
+            },
+        }];
+        upsert_action_mapping_in_vec(
+            &mut mappings,
+            ActionMappingEntry {
+                trigger: Trigger::DoubleTapHyper,
+                action: ActionConfig::Command {
+                    command: "second".into(),
+                },
+            },
+        );
+        assert_eq!(mappings.len(), 1);
+        if let ActionConfig::Command { command } = &mappings[0].action {
+            assert_eq!(command, "second");
+        } else {
+            panic!("expected command action");
+        }
     }
 }

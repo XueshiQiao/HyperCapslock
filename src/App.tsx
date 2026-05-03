@@ -37,11 +37,24 @@ type ActionConfig =
   | { kind: "command"; command: string }
   | { kind: "key_combo"; target_key: number; with_ctrl: boolean; with_alt: boolean; with_cmd: boolean; with_target_shift: boolean };
 
+type Trigger =
+  | { kind: "hyper_plus_key"; key: number; with_shift: boolean }
+  | { kind: "double_tap_hyper" };
+
 type ActionMappingEntry = {
-  key: number;
-  with_shift: boolean;
+  trigger: Trigger;
   action: ActionConfig;
 };
+
+function triggerSortKey(t: Trigger): string {
+  if (t.kind === "double_tap_hyper") return "0:double";
+  return `1:${String(t.key).padStart(4, "0")}:${t.with_shift ? "1" : "0"}`;
+}
+
+function triggerUniqueId(t: Trigger): string {
+  if (t.kind === "double_tap_hyper") return "double_tap_hyper";
+  return `hyper:${t.key}:${t.with_shift ? "s" : "n"}`;
+}
 
 type SelectOption = {
   value: string;
@@ -52,7 +65,10 @@ type ActionGroupKey = ActionConfig["kind"];
 
 const SPECIAL_KEY_DISPLAY: Record<number, string> = {
   8: "Del",
+  9: "Tab",
   13: "Enter",
+  27: "Esc",
+  32: "Space",
   37: "←",
   38: "↑",
   39: "→",
@@ -63,8 +79,11 @@ const SPECIAL_KEY_DISPLAY: Record<number, string> = {
   189: "-",
   190: ".",
   191: "/",
+  219: "[",
   220: "\\",
-  222: "'"
+  221: "]",
+  222: "'",
+  192: "`"
 };
 
 function keyCodeToDisplay(keyCode: number): string {
@@ -132,9 +151,10 @@ function App() {
   const [permissions, setPermissions] = useState<PermissionStatuses | null>(null);
 
   const [actionMappings, setActionMappings] = useState<ActionMappingEntry[]>([]);
+  // Combined trigger picker: "plain" = Caps+Key, "with_shift" = Caps+Shift+Key, "double_tap" = Caps×2
+  const [newTriggerSel, setNewTriggerSel] = useState<"plain" | "with_shift" | "double_tap">("plain");
   const [newKey, setNewKey] = useState<number | null>(null);
   const [newKeyDisplay, setNewKeyDisplay] = useState("");
-  const [newWithShift, setNewWithShift] = useState(false);
   const [newActionKind, setNewActionKind] = useState<ActionConfig["kind"]>("directional");
   const [newDirectionalAction, setNewDirectionalAction] = useState<DirectionalAction>("left");
   const [newJumpDirection, setNewJumpDirection] = useState<JumpDirection>("up");
@@ -189,7 +209,7 @@ function App() {
 
         const maps = await invoke("get_action_mappings");
         const sorted = (maps as ActionMappingEntry[]).sort((a, b) =>
-          a.key === b.key ? Number(a.with_shift) - Number(b.with_shift) : a.key - b.key
+          triggerSortKey(a.trigger).localeCompare(triggerSortKey(b.trigger))
         );
         setActionMappings(sorted);
         await refreshPermissions();
@@ -238,9 +258,17 @@ function App() {
   async function reloadActionMappings() {
     const maps = await invoke("get_action_mappings");
     const sorted = (maps as ActionMappingEntry[]).sort((a, b) =>
-      a.key === b.key ? Number(a.with_shift) - Number(b.with_shift) : a.key - b.key
+      triggerSortKey(a.trigger).localeCompare(triggerSortKey(b.trigger))
     );
     setActionMappings(sorted);
+  }
+
+  function buildDraftTrigger(): Trigger | null {
+    if (newTriggerSel === "double_tap") {
+      return { kind: "double_tap_hyper" };
+    }
+    if (!newKey) return null;
+    return { kind: "hyper_plus_key", key: newKey, with_shift: newTriggerSel === "with_shift" };
   }
 
   function buildDraftAction(): ActionConfig | null {
@@ -267,16 +295,13 @@ function App() {
   }
 
   async function upsertActionMapping() {
-    if (!newKey) return;
+    const trigger = buildDraftTrigger();
+    if (!trigger) return;
     const action = buildDraftAction();
     if (!action) return;
 
     try {
-      await invoke("upsert_action_mapping", {
-        key: newKey,
-        withShift: newWithShift,
-        action,
-      });
+      await invoke("upsert_action_mapping", { trigger, action });
       await reloadActionMappings();
       setNewKey(null);
       setNewKeyDisplay("");
@@ -289,9 +314,9 @@ function App() {
     }
   }
 
-  async function removeActionMapping(key: number, withShift: boolean) {
+  async function removeActionMappingByTrigger(trigger: Trigger) {
     try {
-      await invoke("remove_action_mapping", { key, withShift });
+      await invoke("remove_action_mapping", { trigger });
       await reloadActionMappings();
       showToast(t("toast.mapping_removed"), "success");
     } catch (e) {
@@ -336,7 +361,8 @@ function App() {
   const dotColor = isRunning ? "bg-green-500" : isPaused ? "bg-amber-500" : "bg-red-500";
   const pingColor = isRunning ? "bg-green-400" : isPaused ? "bg-amber-400" : "bg-red-400";
   const draftAction = buildDraftAction();
-  const canSaveAction = !!newKey && !!draftAction;
+  const draftTrigger = buildDraftTrigger();
+  const canSaveAction = !!draftTrigger && !!draftAction;
   const groupedMappings = ACTION_GROUP_KEYS.map((key) => ({
     key,
     label: t(`group.${key}`),
@@ -544,19 +570,29 @@ function App() {
                   const presentation = actionToPresentation(entry.action);
                   return (
                     <div
-                      key={`${entry.key}-${entry.with_shift ? "s" : "n"}`}
+                      key={triggerUniqueId(entry.trigger)}
                       className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2 px-3 border border-slate-200/50 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-500 transition-colors group"
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <Kbd>Caps</Kbd>
-                        <span className="text-slate-400 dark:text-slate-500 font-light text-xs">+</span>
-                        {entry.with_shift && (
+                        {entry.trigger.kind === "double_tap_hyper" ? (
                           <>
-                            <Kbd>Shift</Kbd>
+                            <Kbd>Caps</Kbd>
+                            <span className="text-slate-400 dark:text-slate-500 font-light text-xs">×</span>
+                            <Kbd>2</Kbd>
+                          </>
+                        ) : (
+                          <>
+                            <Kbd>Caps</Kbd>
                             <span className="text-slate-400 dark:text-slate-500 font-light text-xs">+</span>
+                            {entry.trigger.with_shift && (
+                              <>
+                                <Kbd>Shift</Kbd>
+                                <span className="text-slate-400 dark:text-slate-500 font-light text-xs">+</span>
+                              </>
+                            )}
+                            <Kbd>{keyCodeToDisplay(entry.trigger.key)}</Kbd>
                           </>
                         )}
-                        <Kbd>{keyCodeToDisplay(entry.key)}</Kbd>
                       </div>
                       <div className="flex items-center gap-3 overflow-hidden flex-1 justify-end">
                         <div
@@ -571,7 +607,7 @@ function App() {
                           </span>
                           <ActionIcon icon={presentation.icon} className={presentation.iconClassName} />
                         </div>
-                        <button onClick={() => removeActionMapping(entry.key, entry.with_shift)} className="text-slate-400 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 transition-colors">
+                        <button onClick={() => removeActionMappingByTrigger(entry.trigger)} className="text-slate-400 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 transition-colors">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                         </button>
                       </div>
@@ -604,27 +640,29 @@ function App() {
 
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mb-1">
               <FormSelect
-                value={newWithShift ? "with_shift" : "plain"}
-                onChange={(value) => setNewWithShift(value === "with_shift")}
+                value={newTriggerSel}
+                onChange={(value) => setNewTriggerSel(value as typeof newTriggerSel)}
                 wrapperClassName="col-span-1"
                 options={[
                   { value: "plain", label: t("mappings.caps") },
                   { value: "with_shift", label: t("mappings.caps_shift") },
+                  { value: "double_tap", label: t("trigger.double_tap_hyper") },
                 ]}
               />
-              <span className="text-slate-400 dark:text-slate-500 text-sm font-medium select-none">+</span>
+              <span className={`text-sm font-medium select-none ${newTriggerSel === "double_tap" ? "text-slate-300 dark:text-slate-600" : "text-slate-400 dark:text-slate-500"}`}>+</span>
               <input
                 type="text"
-                placeholder={t("mappings.press_key")}
-                value={newKeyDisplay}
+                placeholder={newTriggerSel === "double_tap" ? "—" : t("mappings.press_key")}
+                value={newTriggerSel === "double_tap" ? "" : newKeyDisplay}
                 readOnly
+                disabled={newTriggerSel === "double_tap"}
                 onKeyDown={(e) => {
                   e.preventDefault();
                   if (["Shift", "Control", "Alt", "Meta", "CapsLock"].includes(e.key)) return;
                   setNewKey(e.keyCode);
                   setNewKeyDisplay(keyCodeToDisplay(e.keyCode));
                 }}
-                className="col-span-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-center text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer"
+                className="col-span-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-center text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-50 dark:disabled:hover:bg-slate-800 disabled:hover:border-slate-300 dark:disabled:hover:border-slate-600"
               />
             </div>
 

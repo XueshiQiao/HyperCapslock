@@ -15,7 +15,7 @@ use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
 use crate::{
     ActionConfig, ActionMappingEntry, DirectionalActionKind, IndependentActionKind, JumpDirection,
-    ACTION_MAPPINGS, CAPS_DOWN, CAPS_PRESSED_AT_MS, DID_REMAP, IS_PAUSED,
+    Trigger, ACTION_MAPPINGS, CAPS_DOWN, CAPS_PRESSED_AT_MS, DID_REMAP, IS_PAUSED,
 };
 
 // Magic value stamped on injected events to prevent feedback loops
@@ -33,8 +33,13 @@ const KC_UP: u16 = 0x7E;
 
 const MACOS_LOG_PATH: &str = "/tmp/hypercapslock-macos.log";
 const CAPS_TAP_MAX_MS: u64 = 200;
+const DOUBLE_TAP_WINDOW_MS: u64 = 300;
 static LOG_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 static EVENT_TAP_PORT: AtomicUsize = AtomicUsize::new(0);
+// Timestamp (ms) of the last unmatched short tap pending a possible 2nd tap.
+// 0 means no tap is pending. Used as the cancellation token for the delayed
+// CapsLock toggle scheduled when a DoubleTapHyper mapping exists.
+static LAST_TAP_AT_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 #[repr(C)]
 struct DispatchObject {
@@ -435,6 +440,91 @@ fn toggle_caps_lock() {
     }
 }
 
+/// State machine for a confirmed short Caps tap (held ≤ CAPS_TAP_MAX_MS, no remap).
+///
+/// If a `DoubleTapHyper` mapping exists, we cannot toggle CapsLock immediately —
+/// we must wait DOUBLE_TAP_WINDOW_MS to see whether a 2nd tap arrives. The 2nd
+/// tap (when within the window) fires the configured action and suppresses the
+/// CapsLock toggle. Without a DoubleTapHyper mapping, behavior is unchanged
+/// (instant toggle), so users who don't configure double-tap pay zero cost.
+fn handle_short_tap() {
+    let now = now_millis();
+    let prev_tap = LAST_TAP_AT_MS.swap(0, Ordering::SeqCst);
+    let dt_action = find_double_tap_action();
+
+    // 2nd tap within the double-tap window?
+    if prev_tap > 0 && now.saturating_sub(prev_tap) <= DOUBLE_TAP_WINDOW_MS && dt_action.is_some() {
+        let action = dt_action.unwrap();
+        log_macos(
+            "INFO",
+            &format!(
+                "Caps(F18) DOUBLE-TAP detected ({}ms gap). Firing action.",
+                now.saturating_sub(prev_tap)
+            ),
+        );
+        // Simulate a full key press: down then up. Use empty modifiers; the
+        // action's own KeyCombo flags carry whatever modifiers it needs.
+        execute_action_mapping(&action, true, CGEventFlags::empty());
+        execute_action_mapping(&action, false, CGEventFlags::empty());
+        // Note: we do NOT toggle CapsLock here. The pending toggle from prev_tap
+        // is canceled because LAST_TAP_AT_MS was just swapped to 0; the spawned
+        // delay thread's compare_exchange will fail and skip its toggle.
+        return;
+    }
+
+    // Fresh single tap. If there was an orphaned previous tap whose window
+    // expired *just before* this one, fire its toggle synchronously so we
+    // don't lose it (the spawned thread might race against our store below).
+    if prev_tap > 0 {
+        log_macos(
+            "INFO",
+            "Caps(F18) prior pending tap expired without 2nd tap; firing CapsLock toggle synchronously.",
+        );
+        toggle_caps_lock();
+    }
+
+    if dt_action.is_some() {
+        log_macos(
+            "INFO",
+            &format!(
+                "Caps(F18) short tap; deferring CapsLock toggle by {}ms (double-tap mapping configured).",
+                DOUBLE_TAP_WINDOW_MS
+            ),
+        );
+        LAST_TAP_AT_MS.store(now, Ordering::SeqCst);
+        let scheduled_for = now;
+        thread::spawn(move || {
+            thread::sleep(std::time::Duration::from_millis(DOUBLE_TAP_WINDOW_MS + 10));
+            // Only toggle if no 2nd tap consumed our pending state.
+            if LAST_TAP_AT_MS
+                .compare_exchange(scheduled_for, 0, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+            {
+                // If the user paused the service during the window, don't fire
+                // a surprise toggle after they explicitly stopped the app.
+                if IS_PAUSED.load(Ordering::SeqCst) {
+                    log_macos(
+                        "INFO",
+                        "Caps(F18) double-tap window elapsed but service paused; skipping CapsLock toggle.",
+                    );
+                    return;
+                }
+                log_macos(
+                    "INFO",
+                    "Caps(F18) double-tap window elapsed; toggling CapsLock.",
+                );
+                toggle_caps_lock();
+            }
+        });
+    } else {
+        log_macos(
+            "INFO",
+            "Caps(F18) short tap; toggling CapsLock immediately.",
+        );
+        toggle_caps_lock();
+    }
+}
+
 fn post_key(keycode: u16, key_down: bool, flags: CGEventFlags) {
     if let Ok(source) = CGEventSource::new(CGEventSourceStateID::Private) {
         if let Ok(event) = CGEvent::new_keyboard_event(source, keycode, key_down) {
@@ -476,23 +566,37 @@ fn resolve_action_mapping(js_keycode: u16, shift_held: bool) -> Option<ActionMap
     let guard = ACTION_MAPPINGS.lock().unwrap();
     let mappings = guard.as_ref()?;
 
-    if let Some(entry) = mappings
-        .iter()
-        .find(|m| m.key == js_keycode && m.with_shift == shift_held)
-    {
+    if let Some(entry) = mappings.iter().find(|m| {
+        matches!(
+            m.trigger,
+            Trigger::HyperPlusKey { key, with_shift } if key == js_keycode && with_shift == shift_held
+        )
+    }) {
         return Some(entry.clone());
     }
 
     if shift_held {
-        if let Some(entry) = mappings
-            .iter()
-            .find(|m| m.key == js_keycode && !m.with_shift && allow_shift_fallback(&m.action))
-        {
+        if let Some(entry) = mappings.iter().find(|m| {
+            matches!(
+                m.trigger,
+                Trigger::HyperPlusKey { key, with_shift: false } if key == js_keycode
+            ) && allow_shift_fallback(&m.action)
+        }) {
             return Some(entry.clone());
         }
     }
 
     None
+}
+
+/// Look up the configured DoubleTapHyper action, if any.
+fn find_double_tap_action() -> Option<ActionConfig> {
+    let guard = ACTION_MAPPINGS.lock().unwrap();
+    let mappings = guard.as_ref()?;
+    mappings
+        .iter()
+        .find(|m| matches!(m.trigger, Trigger::DoubleTapHyper))
+        .map(|m| m.action.clone())
 }
 
 fn execute_action_mapping(action: &ActionConfig, key_down: bool, active_modifiers: CGEventFlags) {
@@ -856,15 +960,7 @@ pub fn start_keyboard_hook() {
 
                         if was_down && !DID_REMAP.load(Ordering::SeqCst) {
                             if held_ms <= CAPS_TAP_MAX_MS {
-                                // Toggle native CapsLock only for short taps.
-                                log_macos(
-                                    "INFO",
-                                    &format!(
-                                        "Caps(F18) short tap detected ({}ms). Toggling CapsLock.",
-                                        held_ms
-                                    ),
-                                );
-                                toggle_caps_lock();
+                                handle_short_tap();
                             } else {
                                 log_macos(
                                     "INFO",
