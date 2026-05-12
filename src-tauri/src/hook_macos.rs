@@ -988,6 +988,74 @@ pub fn start_keyboard_hook() {
                     return None;
                 }
 
+                // ─── Pre-empt the deferred CapsLock toggle on next keypress ───
+                //
+                // Background: When a DoubleTapHyper mapping is configured,
+                // `handle_short_tap` cannot toggle CapsLock immediately on a
+                // single tap because a 2nd tap might arrive within 300ms and
+                // convert this into a double-tap (which fires the configured
+                // action and suppresses the toggle). To disambiguate, it stores
+                // `LAST_TAP_AT_MS = now` and spawns a thread that performs the
+                // toggle after `DOUBLE_TAP_WINDOW_MS + 10` ms.
+                //
+                // The unwanted side effect: every single-tap experiences ~310ms
+                // of input lag before CapsLock visibly changes — type "b" right
+                // after tapping Caps and it comes out in the old case because
+                // the toggle hasn't fired yet.
+                //
+                // Observation: if the user types ANY non-F18 key during the
+                // deferred window, they are by definition not in the middle of
+                // a double-tap (humans cannot physically tap Caps twice with a
+                // letter in between in <300ms). So that keypress is itself an
+                // unambiguous signal that the pending tap was a single tap, and
+                // we can fire the toggle synchronously right here, before the
+                // typed key propagates to the focused app.
+                //
+                // Guard `!CAPS_DOWN`: skip when Caps is currently held, because
+                // that means a Caps+key chord is in progress and the chord key
+                // shouldn't drag an earlier tap's pending toggle along with it.
+                // (Otherwise: tap → hold-Caps+H within 300ms would both perform
+                // the chord *and* toggle CapsLock as a side effect of pressing H.)
+                //
+                // Atomic protocol: `LAST_TAP_AT_MS.swap(0)` here vs the spawned
+                // timer's `compare_exchange(scheduled_for, 0)` — whichever clears
+                // the token first wins; the other becomes a no-op. Two non-F18
+                // KeyDowns in quick succession are also safe: the first swap
+                // consumes the timestamp, the second sees 0 and skips.
+                //
+                // In-flight flag patch: even though IOKit's toggle is synchronous,
+                // the WindowServer stamped this KeyDown's modifier flags BEFORE
+                // our tap callback received it. The new CapsLock state will
+                // apply to future events, but the case of *this* first key was
+                // already cooked. We XOR `CGEventFlagAlphaShift` on the in-flight
+                // event so downstream character translation (Cocoa/Carbon text
+                // input) re-resolves the case using the patched flag. This is
+                // the difference between "aBC" (without patch) and "ABC" (with
+                // patch) when typing "abc" right after a tap that should have
+                // turned CapsLock ON. Verified empirically on macOS 14+.
+                if event_type_matches(event_type, CGEventType::KeyDown)
+                    && !CAPS_DOWN.load(Ordering::SeqCst)
+                {
+                    let pending = LAST_TAP_AT_MS.swap(0, Ordering::SeqCst);
+                    if pending > 0 && !IS_PAUSED.load(Ordering::SeqCst) {
+                        let age_ms = now_millis().saturating_sub(pending);
+                        let old_flags = event.get_flags();
+                        let patched = old_flags ^ CGEventFlags::CGEventFlagAlphaShift;
+                        log_macos(
+                            "INFO",
+                            &format!(
+                                "Caps(F18) pending toggle pre-empted by next keypress: keycode={} age={}ms; toggling CapsLock synchronously and flipping in-flight AlphaShift flag (0x{:x} -> 0x{:x}).",
+                                keycode,
+                                age_ms,
+                                old_flags.bits(),
+                                patched.bits()
+                            ),
+                        );
+                        toggle_caps_lock();
+                        event.set_flags(patched);
+                    }
+                }
+
                 // Handle remapping when CapsLock is held
                 if CAPS_DOWN.load(Ordering::SeqCst) {
                     let key_down = event_type_matches(event_type, CGEventType::KeyDown);
