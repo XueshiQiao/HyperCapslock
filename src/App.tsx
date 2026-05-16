@@ -793,10 +793,16 @@ function App() {
             </div>
 
             <div className="flex justify-center mb-1">
-              <span className="text-slate-400 dark:text-slate-500 text-base font-medium select-none">↓</span>
+              <span
+                className="text-slate-500 dark:text-slate-400 text-base leading-none select-none"
+                aria-label="maps to"
+                title="maps to"
+              >
+                ▼
+              </span>
             </div>
 
-            <div className="grid grid-cols-[minmax(130px,1fr)_minmax(0,3fr)] items-center gap-2 mb-4">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-2 mb-4">
               <FormSelect
                 value={newActionKind}
                 onChange={(value) => setNewActionKind(value as ActionConfig["kind"])}
@@ -812,6 +818,12 @@ function App() {
                   { value: "key_combo", label: t("group.key_combo") },
                 ]}
               />
+              <span
+                className="text-sm font-medium select-none invisible"
+                aria-hidden="true"
+              >
+                +
+              </span>
               <div className="min-w-0">
                 {newActionKind === "directional" && (
                   <FormSelect
@@ -898,25 +910,28 @@ function App() {
                       }}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 text-center text-sm focus:outline-none focus:border-blue-500 hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors cursor-pointer"
                     />
-                    <div className="flex gap-2 flex-wrap">
-                      {(["Ctrl", "Alt", "Cmd", "Shift"] as const).map((mod) => {
-                        const stateMap = { Ctrl: [newTargetCtrl, setNewTargetCtrl], Alt: [newTargetAlt, setNewTargetAlt], Cmd: [newTargetCmd, setNewTargetCmd], Shift: [newTargetShift, setNewTargetShift] } as const;
-                        const [active, setActive] = stateMap[mod] as [boolean, (v: boolean) => void];
-                        return (
-                          <button
-                            key={mod}
-                            type="button"
-                            onClick={() => setActive(!active)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                              active
-                                ? "bg-blue-600/20 border-blue-500/50 text-blue-600 dark:text-blue-300"
-                                : "bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-slate-400"
-                            }`}
-                          >
-                            {mod}
-                          </button>
-                        );
-                      })}
+                    <div className="grid grid-cols-4 gap-2">
+                      {([
+                        { symbol: "⌘", name: "Cmd", active: newTargetCmd, setActive: setNewTargetCmd },
+                        { symbol: "⌃", name: "Ctrl", active: newTargetCtrl, setActive: setNewTargetCtrl },
+                        { symbol: "⌥", name: "Alt", active: newTargetAlt, setActive: setNewTargetAlt },
+                        { symbol: "⇧", name: "Shift", active: newTargetShift, setActive: setNewTargetShift },
+                      ] as const).map(({ symbol, name, active, setActive }) => (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => setActive(!active)}
+                          title={name}
+                          aria-label={name}
+                          className={`px-2 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                            active
+                              ? "bg-blue-600/20 border-blue-500/50 text-blue-600 dark:text-blue-300"
+                              : "bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-slate-400"
+                          }`}
+                        >
+                          {symbol}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
