@@ -339,7 +339,38 @@ function App() {
         filters: [{ name: "YAML", extensions: ["yml", "yaml"] }],
       });
       if (!path) return;
-      await invoke("export_action_mappings_to_path", { path });
+      const trimmed = path.replace(/\.+$/, "");
+      const appended = !/\.(ya?ml)$/i.test(trimmed);
+      const finalPath = appended ? `${trimmed}.yml` : trimmed;
+      try {
+        // If we appended the extension, the OS save dialog's overwrite check
+        // ran on the user-typed name, not finalPath — so guard against silent
+        // clobber. If the user typed an extension themselves, the dialog
+        // already confirmed and we can overwrite directly.
+        await invoke("export_action_mappings_to_path", {
+          path: finalPath,
+          overwrite: !appended,
+        });
+      } catch (err) {
+        if (String(err).includes("FILE_EXISTS")) {
+          const confirmed = await ask(
+            t("config.overwrite_prompt", { path: finalPath }),
+            {
+              title: t("config.overwrite_title"),
+              kind: "warning",
+              okLabel: t("config.overwrite_confirm"),
+              cancelLabel: t("update.cancel"),
+            }
+          );
+          if (!confirmed) return;
+          await invoke("export_action_mappings_to_path", {
+            path: finalPath,
+            overwrite: true,
+          });
+        } else {
+          throw err;
+        }
+      }
       showToast(t("toast.config_exported"), "success");
     } catch (e: any) {
       console.error(e);

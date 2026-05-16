@@ -863,8 +863,16 @@ struct ImportResult {
     imported: usize,
 }
 
+// Sentinel returned when the caller did not opt in to overwriting and the
+// target already exists. The frontend matches on this string and prompts the
+// user before retrying with `overwrite: true`.
+pub(crate) const EXPORT_FILE_EXISTS_ERR: &str = "FILE_EXISTS";
+
 #[tauri::command]
-fn export_action_mappings_to_path(path: String) -> Result<(), String> {
+fn export_action_mappings_to_path(path: String, overwrite: bool) -> Result<(), String> {
+    if !overwrite && std::path::Path::new(&path).exists() {
+        return Err(EXPORT_FILE_EXISTS_ERR.to_string());
+    }
     let mappings = ACTION_MAPPINGS.lock().unwrap().clone().unwrap_or_default();
     let content = render_action_mappings_yaml_with_comments(&mappings);
     if let Some(parent) = std::path::Path::new(&path).parent() {
