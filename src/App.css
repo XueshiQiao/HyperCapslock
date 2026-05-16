@@ -55,3 +55,15 @@ body {
 *[data-tauri-drag-region] {
   app-region: drag;
 }
+
+html,
+body,
+main {
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+main::-webkit-scrollbar {
+  display: none;
+}
