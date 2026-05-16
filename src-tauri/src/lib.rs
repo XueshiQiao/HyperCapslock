@@ -27,6 +27,9 @@ static TRAY_SHOW_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
 static TRAY_QUIT_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
 static ACTION_MAPPINGS: Mutex<Option<Vec<ActionMappingEntry>>> = Mutex::new(None);
 static MENU_LOCALE: Mutex<&'static str> = Mutex::new("en");
+static APP_CONFIG: Mutex<AppConfig> = Mutex::new(AppConfig {
+    hide_dock_icon: false,
+});
 
 const DEFAULT_ABC_KEYCODE: u16 = 188;
 const DEFAULT_WECHAT_KEYCODE: u16 = 190;
@@ -166,6 +169,12 @@ impl Trigger {
             _ => None,
         }
     }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct AppConfig {
+    #[serde(default)]
+    pub(crate) hide_dock_icon: bool,
 }
 
 #[derive(serde::Serialize)]
@@ -544,6 +553,55 @@ fn normalize_action_mappings(mappings: &mut Vec<ActionMappingEntry>) {
     *mappings = deduped;
 }
 
+fn get_app_config_path(app: &AppHandle) -> Option<PathBuf> {
+    app.path()
+        .app_data_dir()
+        .ok()
+        .map(|p| p.join("app_config.yml"))
+}
+
+fn load_app_config_from_disk(app: &AppHandle) {
+    if let Some(path) = get_app_config_path(app) {
+        if let Ok(content) = fs::read_to_string(&path) {
+            match serde_yaml::from_str::<AppConfig>(&content) {
+                Ok(cfg) => {
+                    *APP_CONFIG.lock().unwrap() = cfg;
+                }
+                Err(e) => {
+                    eprintln!("[HYPERCAPS] app_config.yml parse error: {}", e);
+                }
+            }
+        }
+    }
+}
+
+fn persist_app_config(app: &AppHandle, cfg: AppConfig) -> Result<(), String> {
+    let path = get_app_config_path(app)
+        .ok_or_else(|| "Could not determine application data directory".to_string())?;
+    let content = serde_yaml::to_string(&cfg)
+        .map_err(|e| format!("Failed to serialize app config: {}", e))?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create config directory: {}", e))?;
+    }
+    fs::write(path, content).map_err(|e| format!("Failed to write app config: {}", e))
+}
+
+#[cfg(target_os = "macos")]
+fn apply_activation_policy(app: &AppHandle, hide: bool) {
+    let policy = if hide {
+        tauri::ActivationPolicy::Accessory
+    } else {
+        tauri::ActivationPolicy::Regular
+    };
+    if let Err(e) = app.set_activation_policy(policy) {
+        eprintln!("[HYPERCAPS] set_activation_policy failed: {}", e);
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn apply_activation_policy(_: &AppHandle, _: bool) {}
+
 fn save_action_mappings_to_disk(app: &AppHandle) {
     if let Some(path) = get_action_mappings_path(app) {
         if let Some(mappings) = &*ACTION_MAPPINGS.lock().unwrap() {
@@ -770,6 +828,103 @@ fn get_action_mappings() -> Vec<ActionMappingEntry> {
     ACTION_MAPPINGS.lock().unwrap().clone().unwrap_or_default()
 }
 
+#[tauri::command]
+fn get_app_config() -> AppConfig {
+    *APP_CONFIG.lock().unwrap()
+}
+
+#[tauri::command]
+fn set_hide_dock_icon(app: AppHandle, hide: bool) -> Result<(), String> {
+    // Hold the lock for the whole sequence so concurrent toggles can't leave
+    // in-memory state, the persisted file, and the live activation policy
+    // disagreeing. If persistence fails we revert the in-memory flip so the
+    // next read matches disk.
+    let mut cfg = APP_CONFIG.lock().unwrap();
+    let previous = cfg.hide_dock_icon;
+    cfg.hide_dock_icon = hide;
+    if let Err(e) = persist_app_config(&app, *cfg) {
+        cfg.hide_dock_icon = previous;
+        return Err(e);
+    }
+    apply_activation_policy(&app, hide);
+    drop(cfg);
+
+    // Switching activation policy can drop window focus; reassert visibility
+    // so the user does not lose the settings window after toggling.
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    Ok(())
+}
+
+#[derive(serde::Serialize)]
+struct ImportResult {
+    imported: usize,
+}
+
+#[tauri::command]
+fn export_action_mappings_to_path(path: String) -> Result<(), String> {
+    let mappings = ACTION_MAPPINGS.lock().unwrap().clone().unwrap_or_default();
+    let content = render_action_mappings_yaml_with_comments(&mappings);
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
+        }
+    }
+    fs::write(&path, content).map_err(|e| format!("Failed to write file: {}", e))
+}
+
+#[tauri::command]
+fn import_action_mappings_from_path(app: AppHandle, path: String) -> Result<ImportResult, String> {
+    let content = fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let mut imported: Vec<ActionMappingEntry> =
+        serde_yaml::from_str(&content).map_err(|e| format!("Invalid YAML: {}", e))?;
+
+    if imported.is_empty() {
+        return Err("Imported file contains no mappings".into());
+    }
+
+    for entry in &imported {
+        match &entry.action {
+            ActionConfig::Command { command } if command.trim().is_empty() => {
+                return Err("Imported entry has empty command".into());
+            }
+            ActionConfig::InputSource { input_source_id } if input_source_id.trim().is_empty() => {
+                return Err("Imported entry has empty input_source_id".into());
+            }
+            ActionConfig::Jump { count, .. } if *count == 0 => {
+                return Err("Imported entry has jump count of 0".into());
+            }
+            _ => {}
+        }
+    }
+
+    normalize_action_mappings(&mut imported);
+    let imported_count = imported.len();
+
+    // Update in-memory state and snapshot YAML under a single lock so the
+    // file we write matches what the hooks now see.
+    let yaml_content = {
+        let mut guard = ACTION_MAPPINGS.lock().unwrap();
+        *guard = Some(imported);
+        render_action_mappings_yaml_with_comments(guard.as_ref().unwrap())
+    };
+
+    let dest = get_action_mappings_path(&app)
+        .ok_or_else(|| "Could not determine application data directory".to_string())?;
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create config directory: {}", e))?;
+    }
+    fs::write(&dest, yaml_content)
+        .map_err(|e| format!("Failed to persist imported mappings: {}", e))?;
+
+    Ok(ImportResult {
+        imported: imported_count,
+    })
+}
+
 // Legacy API wrappers kept for compatibility.
 #[tauri::command]
 fn add_mapping(app: AppHandle, key: u16, command: String) -> Result<(), String> {
@@ -940,6 +1095,10 @@ pub fn run() {
         .setup(|app| {
             *MENU_LOCALE.lock().unwrap() = detect_system_locale();
             load_action_mappings_from_disk(app.handle());
+            load_app_config_from_disk(app.handle());
+            if APP_CONFIG.lock().unwrap().hide_dock_icon {
+                apply_activation_policy(app.handle(), true);
+            }
             let status_i =
                 MenuItem::with_id(app, "status", menu_text("status_running"), false, None::<&str>)?;
             let toggle_i =
@@ -1101,6 +1260,10 @@ pub fn run() {
             upsert_action_mapping,
             remove_action_mapping,
             get_action_mappings,
+            get_app_config,
+            set_hide_dock_icon,
+            export_action_mappings_to_path,
+            import_action_mappings_from_path,
             add_mapping,
             remove_mapping,
             get_mappings,

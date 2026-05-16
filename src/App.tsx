@@ -4,7 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { check } from "@tauri-apps/plugin-updater";
-import { message, ask } from "@tauri-apps/plugin-dialog";
+import { message, ask, save, open } from "@tauri-apps/plugin-dialog";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { t, useLocale, setLocale, syncTrayLocale, LOCALE_META, type Locale } from "./i18n";
 import "./App.css";
@@ -146,6 +146,7 @@ const ACTION_GROUP_KEYS: ActionGroupKey[] = ["directional", "jump", "independent
 function App() {
   const [status, setStatus] = useState("initializing");
   const [autostart, setAutostart] = useState(false);
+  const [hideDockIcon, setHideDockIcon] = useState(false);
   const [appVersion, setAppVersion] = useState("");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [permissions, setPermissions] = useState<PermissionStatuses | null>(null);
@@ -206,6 +207,12 @@ function App() {
         setStatus(msg);
         const auto = await isEnabled();
         setAutostart(auto);
+        try {
+          const cfg = await invoke<{ hide_dock_icon: boolean }>("get_app_config");
+          setHideDockIcon(!!cfg.hide_dock_icon);
+        } catch (e) {
+          console.error("Failed to load app config", e);
+        }
 
         const maps = await invoke("get_action_mappings");
         const sorted = (maps as ActionMappingEntry[]).sort((a, b) =>
@@ -325,6 +332,48 @@ function App() {
     }
   }
 
+  async function exportConfig() {
+    try {
+      const path = await save({
+        defaultPath: "hyper-capslock-config.yml",
+        filters: [{ name: "YAML", extensions: ["yml", "yaml"] }],
+      });
+      if (!path) return;
+      await invoke("export_action_mappings_to_path", { path });
+      showToast(t("toast.config_exported"), "success");
+    } catch (e: any) {
+      console.error(e);
+      showToast(t("toast.config_export_failed"), "error");
+    }
+  }
+
+  async function importConfig() {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: "YAML", extensions: ["yml", "yaml"] }],
+      });
+      if (!selected || typeof selected !== "string") return;
+      const confirmed = await ask(t("config.import_prompt"), {
+        title: t("config.import_title"),
+        kind: "warning",
+        okLabel: t("config.import_confirm"),
+        cancelLabel: t("update.cancel"),
+      });
+      if (!confirmed) return;
+      const result = await invoke<{ imported: number }>(
+        "import_action_mappings_from_path",
+        { path: selected }
+      );
+      await reloadActionMappings();
+      showToast(t("toast.config_imported", { count: String(result.imported) }), "success");
+    } catch (e: any) {
+      console.error(e);
+      const msg = (e?.toString?.() ?? "").replace("Error: ", "");
+      showToast(t("toast.config_import_failed", { error: msg }), "error");
+    }
+  }
+
   async function togglePause() {
     try {
       const shouldPause = status === "running";
@@ -334,6 +383,22 @@ function App() {
     } catch (e) {
       console.error("Failed to toggle pause", e);
       showToast(t("toast.service_toggle_failed"), "error");
+    }
+  }
+
+  async function toggleHideDockIcon() {
+    const next = !hideDockIcon;
+    setHideDockIcon(next);
+    try {
+      await invoke("set_hide_dock_icon", { hide: next });
+      showToast(
+        next ? t("toast.hide_dock_enabled") : t("toast.hide_dock_disabled"),
+        "success"
+      );
+    } catch (e) {
+      console.error("Failed to toggle hide dock icon", e);
+      setHideDockIcon(!next);
+      showToast(t("toast.hide_dock_failed"), "error");
     }
   }
 
@@ -476,19 +541,16 @@ function App() {
           </div>
         </div>
 
-        <div className={`${MODERN_CARD_CLASS} p-5 flex flex-col justify-between transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-500 hover:shadow-2xl hover:shadow-violet-100/30 dark:hover:shadow-violet-900/20`}>
+        <div className={`${MODERN_CARD_CLASS} p-5 flex flex-col transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-500 hover:shadow-2xl hover:shadow-violet-100/30 dark:hover:shadow-violet-900/20`}>
           <div className="pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full bg-violet-500/12 blur-2xl" />
           <div className="pointer-events-none absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-cyan-400/10 blur-2xl" />
           <div className="relative">
-            <div>
-              <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">{t("settings.label")}</p>
-              <p className="text-sm text-slate-800 dark:text-slate-200 font-medium mt-1">{t("settings.autostart")}</p>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">{t("settings.autostart_desc")}</p>
-            </div>
-            <div className="flex justify-end mt-4">
+            <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">{t("settings.label")}</p>
+            <div className="flex items-center justify-between mt-3">
+              <p className="text-sm text-slate-800 dark:text-slate-200 font-medium">{t("settings.autostart")}</p>
               <button
                 onClick={toggleAutostart}
-                className={`w-12 h-6 rounded-full p-1 border transition-all duration-200 ease-in-out cursor-pointer ${
+                className={`w-12 h-6 rounded-full p-1 border transition-all duration-200 ease-in-out cursor-pointer shrink-0 ${
                   autostart
                     ? "bg-primary border-blue-400/70 hover:bg-blue-500 hover:border-blue-300"
                     : "bg-slate-200 dark:bg-slate-600 border-slate-300 dark:border-slate-500 hover:bg-slate-300 dark:hover:bg-slate-500 hover:border-slate-400 dark:hover:border-slate-400"
@@ -497,6 +559,21 @@ function App() {
                 <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${autostart ? 'translate-x-6' : 'translate-x-0'}`} />
               </button>
             </div>
+            {permissions?.platform === "macos" && (
+              <div className="flex items-center justify-between mt-3">
+                <p className="text-sm text-slate-800 dark:text-slate-200 font-medium">{t("settings.hide_dock")}</p>
+                <button
+                  onClick={toggleHideDockIcon}
+                  className={`w-12 h-6 rounded-full p-1 border transition-all duration-200 ease-in-out cursor-pointer shrink-0 ${
+                    hideDockIcon
+                      ? "bg-primary border-blue-400/70 hover:bg-blue-500 hover:border-blue-300"
+                      : "bg-slate-200 dark:bg-slate-600 border-slate-300 dark:border-slate-500 hover:bg-slate-300 dark:hover:bg-slate-500 hover:border-slate-400 dark:hover:border-slate-400"
+                  }`}
+                >
+                  <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${hideDockIcon ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -551,13 +628,31 @@ function App() {
             <h2 className="text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-semibold">
               {t("mappings.title")}
             </h2>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors font-medium"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
-              {t("mappings.add")}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={importConfig}
+                title={t("config.import")}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors font-medium"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4" /></svg>
+                {t("config.import")}
+              </button>
+              <button
+                onClick={exportConfig}
+                title={t("config.export")}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors font-medium"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 16V4m0 0L8 8m4-4l4 4" /></svg>
+                {t("config.export")}
+              </button>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors font-medium"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                {t("mappings.add")}
+              </button>
+            </div>
           </div>
 
           <div className="space-y-4">
