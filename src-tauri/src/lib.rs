@@ -8,6 +8,7 @@ use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, Wry};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_updater::UpdaterExt;
 
 #[cfg(target_os = "macos")]
@@ -25,6 +26,7 @@ static TRAY_STATUS_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
 static TRAY_CHECK_UPDATE_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
 static TRAY_SHOW_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
 static TRAY_QUIT_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
+static TRAY_MORE_APPS_ITEM: Mutex<Option<MenuItem<Wry>>> = Mutex::new(None);
 static ACTION_MAPPINGS: Mutex<Option<Vec<ActionMappingEntry>>> = Mutex::new(None);
 static MENU_LOCALE: Mutex<&'static str> = Mutex::new("en");
 static APP_CONFIG: Mutex<AppConfig> = Mutex::new(AppConfig {
@@ -691,6 +693,7 @@ fn menu_text(key: &'static str) -> &'static str {
         ("zh", "check_update") => "\u{68C0}\u{67E5}\u{66F4}\u{65B0}",
         ("zh", "open") => "\u{6253}\u{5F00}\u{7A97}\u{53E3}",
         ("zh", "quit") => "\u{9000}\u{51FA} HyperCapslock",
+        ("zh", "more_apps") => "\u{4F5C}\u{8005}\u{7684}\u{66F4}\u{591A}\u{5E94}\u{7528}\u{2026}",
 
         ("ja", "status_running") => {
             "\u{30B9}\u{30C6}\u{30FC}\u{30BF}\u{30B9}: \u{5B9F}\u{884C}\u{4E2D}"
@@ -705,6 +708,9 @@ fn menu_text(key: &'static str) -> &'static str {
         }
         ("ja", "open") => "\u{30A6}\u{30A3}\u{30F3}\u{30C9}\u{30A6}\u{3092}\u{958B}\u{304F}",
         ("ja", "quit") => "HyperCapslock \u{3092}\u{7D42}\u{4E86}",
+        ("ja", "more_apps") => {
+            "\u{4F5C}\u{8005}\u{306E}\u{4ED6}\u{306E}\u{30A2}\u{30D7}\u{30EA}\u{2026}"
+        }
 
         ("de", "status_running") => "Status: L\u{00E4}uft",
         ("de", "status_paused") => "Status: Pausiert",
@@ -713,6 +719,7 @@ fn menu_text(key: &'static str) -> &'static str {
         ("de", "check_update") => "Nach Updates suchen",
         ("de", "open") => "Fenster \u{00F6}ffnen",
         ("de", "quit") => "HyperCapslock beenden",
+        ("de", "more_apps") => "Weitere Apps des Autors\u{2026}",
 
         (_, "status_running") => "Status: Running",
         (_, "status_paused") => "Status: Paused",
@@ -721,6 +728,7 @@ fn menu_text(key: &'static str) -> &'static str {
         (_, "check_update") => "Check for Updates",
         (_, "open") => "Open Window",
         (_, "quit") => "Quit HyperCapslock",
+        (_, "more_apps") => "More Apps by Author\u{2026}",
         _ => key,
     }
 }
@@ -757,6 +765,11 @@ fn refresh_tray_texts(paused: bool) {
     if let Ok(guard) = TRAY_QUIT_ITEM.lock() {
         if let Some(item) = &*guard {
             let _ = item.set_text(menu_text("quit"));
+        }
+    }
+    if let Ok(guard) = TRAY_MORE_APPS_ITEM.lock() {
+        if let Some(item) = &*guard {
+            let _ = item.set_text(menu_text("more_apps"));
         }
     }
 }
@@ -1113,6 +1126,8 @@ pub fn run() {
                 MenuItem::with_id(app, "toggle", menu_text("stop"), true, None::<&str>)?;
             let check_update_i =
                 MenuItem::with_id(app, "check_update", menu_text("check_update"), true, None::<&str>)?;
+            let more_apps_i =
+                MenuItem::with_id(app, "more_apps", menu_text("more_apps"), true, None::<&str>)?;
             let sep = PredefinedMenuItem::separator(app)?;
             let show_i = MenuItem::with_id(app, "show", menu_text("open"), true, None::<&str>)?;
             let quit_i =
@@ -1133,6 +1148,9 @@ pub fn run() {
             if let Ok(mut guard) = TRAY_QUIT_ITEM.lock() {
                 *guard = Some(quit_i.clone());
             }
+            if let Ok(mut guard) = TRAY_MORE_APPS_ITEM.lock() {
+                *guard = Some(more_apps_i.clone());
+            }
 
             let menu = Menu::with_items(
                 app,
@@ -1140,6 +1158,7 @@ pub fn run() {
                     &status_i,
                     &toggle_i,
                     &check_update_i,
+                    &more_apps_i,
                     &sep,
                     &show_i,
                     &quit_i,
@@ -1228,6 +1247,13 @@ pub fn run() {
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
+                        }
+                    }
+                    "more_apps" => {
+                        if let Err(e) =
+                            app.opener().open_url("https://xueshi.dev", None::<&str>)
+                        {
+                            eprintln!("[HYPERCAPS] failed to open xueshi.dev: {}", e);
                         }
                     }
                     "quit" => {

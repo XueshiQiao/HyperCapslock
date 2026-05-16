@@ -102,7 +102,9 @@ const translations: Record<Locale, Record<string, string>> = {
     "update.failed": "Failed to check for updates: {error}",
     "update.error": "Error",
     "update.check": "Check for Updates",
-    "footer.by": "By Xueshi Qiao",
+    "footer.by": "By",
+    "footer.github": "GitHub Repository",
+    "footer.more_apps_desc": "Check out all apps I created at:",
   },
   zh: {
     "app.subtitle": "\u5524\u9192\u6C89\u7761\u7684 Capslock",
@@ -195,7 +197,9 @@ const translations: Record<Locale, Record<string, string>> = {
     "update.failed": "\u68C0\u67E5\u66F4\u65B0\u5931\u8D25\uFF1A{error}",
     "update.error": "\u9519\u8BEF",
     "update.check": "\u68C0\u67E5\u66F4\u65B0",
-    "footer.by": "By Xueshi Qiao",
+    "footer.by": "By",
+    "footer.github": "GitHub \u4ED3\u5E93",
+    "footer.more_apps_desc": "\u67E5\u770B\u6211\u521B\u4F5C\u7684\u6240\u6709\u5E94\u7528:",
   },
   ja: {
     "app.subtitle": "Capslock\u3092\u3082\u3063\u3068\u30D1\u30EF\u30D5\u30EB\u306B\uFF01",
@@ -288,7 +292,9 @@ const translations: Record<Locale, Record<string, string>> = {
     "update.failed": "\u30A2\u30C3\u30D7\u30C7\u30FC\u30C8\u306E\u78BA\u8A8D\u306B\u5931\u6557: {error}",
     "update.error": "\u30A8\u30E9\u30FC",
     "update.check": "\u30A2\u30C3\u30D7\u30C7\u30FC\u30C8\u3092\u78BA\u8A8D",
-    "footer.by": "By Xueshi Qiao",
+    "footer.by": "By",
+    "footer.github": "GitHub \u30EA\u30DD\u30B8\u30C8\u30EA",
+    "footer.more_apps_desc": "\u4ED6\u306E\u30A2\u30D7\u30EA\u3082\u30C1\u30A7\u30C3\u30AF:",
   },
   de: {
     "app.subtitle": "Mach deine Capslock-Taste wieder m\u00E4chtig!",
@@ -381,7 +387,9 @@ const translations: Record<Locale, Record<string, string>> = {
     "update.failed": "Update-Pr\u00FCfung fehlgeschlagen: {error}",
     "update.error": "Fehler",
     "update.check": "Nach Updates suchen",
-    "footer.by": "Von Xueshi Qiao",
+    "footer.by": "Von",
+    "footer.github": "GitHub-Repository",
+    "footer.more_apps_desc": "Alle meine Apps:",
   },
 };
 
