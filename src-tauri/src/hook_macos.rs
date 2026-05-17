@@ -14,9 +14,10 @@ use core_graphics::event::{
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
 use crate::{
-    directional_action_name, independent_action_name, js_keycode_name, jump_direction_name,
-    ActionConfig, ActionMappingEntry, DirectionalActionKind, IndependentActionKind, JumpDirection,
-    ModifierKey, Trigger, ACTION_MAPPINGS, CAPS_DOWN, CAPS_PRESSED_AT_MS, DID_REMAP, IS_PAUSED,
+    directional_action_name, emit_hud, independent_action_name, js_keycode_name,
+    jump_direction_name, ActionConfig, ActionMappingEntry, DirectionalActionKind,
+    IndependentActionKind, JumpDirection, ModifierKey, Trigger, ACTION_MAPPINGS, CAPS_DOWN,
+    CAPS_PRESSED_AT_MS, DID_REMAP, IS_PAUSED,
 };
 
 // Magic value stamped on injected events to prevent feedback loops
@@ -317,6 +318,80 @@ fn describe_action(action: &ActionConfig) -> String {
             format!("input source {}", input_source_id)
         }
         ActionConfig::Command { command } => format!("command: {}", command),
+    }
+}
+
+/// HUD payload parts: (combo string rendered as keycaps, caption).
+/// KeyCombo is keys-only (self-explanatory); others get a glyph + a
+/// human-readable caption.
+fn hud_parts(action: &ActionConfig) -> (String, String) {
+    match action {
+        ActionConfig::KeyCombo {
+            target_key,
+            with_ctrl,
+            with_alt,
+            with_cmd,
+            with_target_shift,
+        } => (
+            key_combo_string(
+                *target_key,
+                *with_ctrl,
+                *with_alt,
+                *with_cmd,
+                *with_target_shift,
+            ),
+            String::new(),
+        ),
+        ActionConfig::Directional { action } => {
+            let (sym, name) = match action {
+                DirectionalActionKind::Left => ("←", "Move Left"),
+                DirectionalActionKind::Right => ("→", "Move Right"),
+                DirectionalActionKind::Up => ("↑", "Move Up"),
+                DirectionalActionKind::Down => ("↓", "Move Down"),
+                DirectionalActionKind::WordForward => ("⌥→", "Word Forward"),
+                DirectionalActionKind::WordBack => ("⌥←", "Word Back"),
+                DirectionalActionKind::Home => ("↖", "Line Start"),
+                DirectionalActionKind::End => ("↘", "Line End"),
+            };
+            (sym.to_string(), name.to_string())
+        }
+        ActionConfig::Jump { direction, count } => {
+            let sym = match direction {
+                JumpDirection::Up => "↑",
+                JumpDirection::Down => "↓",
+            };
+            (
+                format!("{}×{}", sym, count),
+                format!("Jump {}", jump_direction_name(direction)),
+            )
+        }
+        ActionConfig::Independent { action } => {
+            let (sym, name) = match action {
+                IndependentActionKind::Backspace => ("⌫", "Backspace"),
+                IndependentActionKind::NextLine => ("↵", "New Line"),
+                IndependentActionKind::InsertQuotes => ("\u{201C}\u{201D}", "Insert Quotes"),
+            };
+            (sym.to_string(), name.to_string())
+        }
+        ActionConfig::InputSource { input_source_id } => {
+            ("\u{2328}".to_string(), input_source_id.clone())
+        }
+        ActionConfig::Command { command } => ("Shell".to_string(), command.clone()),
+    }
+}
+
+/// Compact label for a double-tapped modifier, e.g. "⌘L".
+fn modifier_hud_label(modifier: ModifierKey) -> &'static str {
+    match modifier {
+        ModifierKey::LeftShift => "\u{21E7}L",
+        ModifierKey::RightShift => "\u{21E7}R",
+        ModifierKey::LeftControl => "\u{2303}L",
+        ModifierKey::RightControl => "\u{2303}R",
+        ModifierKey::LeftOption => "\u{2325}L",
+        ModifierKey::RightOption => "\u{2325}R",
+        ModifierKey::LeftCommand => "\u{2318}L",
+        ModifierKey::RightCommand => "\u{2318}R",
+        ModifierKey::Fn => "fn",
     }
 }
 
@@ -892,6 +967,8 @@ fn handle_short_tap() {
                 now.saturating_sub(prev_tap)
             ),
         );
+        let (combo, caption) = hud_parts(&action);
+        emit_hud("Caps ×2".to_string(), combo, caption);
         // Simulate a full key press: down then up. Use empty modifiers; the
         // action's own KeyCombo flags carry whatever modifiers it needs.
         execute_action_mapping(&action, true, CGEventFlags::empty());
@@ -1190,6 +1267,8 @@ fn handle_caps_remap(keycode: u16, key_down: bool, active_modifiers: CGEventFlag
                 describe_action(&mapping.action)
             ),
         );
+        let (combo, caption) = hud_parts(&mapping.action);
+        emit_hud(trigger, combo, caption);
     }
 
     execute_action_mapping(&mapping.action, key_down, active_modifiers);
@@ -1453,6 +1532,12 @@ pub fn start_keyboard_hook() {
                                         "Modifier DOUBLE-TAP detected (keycode={}). Firing action.",
                                         keycode
                                     ),
+                                );
+                                let (combo, caption) = hud_parts(&action);
+                                emit_hud(
+                                    format!("{} ×2", modifier_hud_label(modifier)),
+                                    combo,
+                                    caption,
                                 );
                                 fire_double_tap_modifier_action(action);
                             }

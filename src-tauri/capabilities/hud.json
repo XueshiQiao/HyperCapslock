@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "hud",
+  "description": "Capability for the transparent on-screen mapping HUD window",
+  "windows": ["hud"],
+  "permissions": [
+    "core:default",
+    "core:event:allow-listen",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-position",
+    "core:window:allow-outer-size",
+    "core:window:allow-current-monitor"
+  ]
+}

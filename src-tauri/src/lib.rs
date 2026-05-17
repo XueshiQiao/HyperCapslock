@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Emitter, Manager, Wry};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Wry};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_updater::UpdaterExt;
@@ -31,7 +31,15 @@ static ACTION_MAPPINGS: Mutex<Option<Vec<ActionMappingEntry>>> = Mutex::new(None
 static MENU_LOCALE: Mutex<&'static str> = Mutex::new("en");
 static APP_CONFIG: Mutex<AppConfig> = Mutex::new(AppConfig {
     hide_dock_icon: false,
+    show_hud: false,
+    hud_duration_ms: 1350,
 });
+// Set once in setup(); lets the keyboard hook emit HUD events to the frontend.
+static APP_HANDLE: Mutex<Option<AppHandle>> = Mutex::new(None);
+// Throttle token for HUD emits (held nav keys autorepeat fast).
+static LAST_HUD_EMIT_MS: AtomicU64 = AtomicU64::new(0);
+static LAST_HUD_KEY: Mutex<String> = Mutex::new(String::new());
+const HUD_THROTTLE_MS: u64 = 120;
 
 const DEFAULT_ABC_KEYCODE: u16 = 188;
 const DEFAULT_WECHAT_KEYCODE: u16 = 190;
@@ -190,10 +198,18 @@ impl Trigger {
     }
 }
 
+fn default_hud_duration_ms() -> u32 {
+    1350
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct AppConfig {
     #[serde(default)]
     pub(crate) hide_dock_icon: bool,
+    #[serde(default)]
+    pub(crate) show_hud: bool,
+    #[serde(default = "default_hud_duration_ms")]
+    pub(crate) hud_duration_ms: u32,
 }
 
 #[derive(serde::Serialize)]
@@ -906,6 +922,58 @@ fn get_action_mappings() -> Vec<ActionMappingEntry> {
     ACTION_MAPPINGS.lock().unwrap().clone().unwrap_or_default()
 }
 
+#[derive(Clone, serde::Serialize)]
+struct HudPayload {
+    trigger: String,
+    combo: String,
+    caption: String,
+    duration: u32,
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Emit a HUD event to the frontend overlay window. No-op unless the user
+/// enabled the HUD. Throttled per identical (trigger,combo) so a held nav key
+/// autorepeating doesn't flood IPC; a *different* mapping emits immediately.
+/// Called from the keyboard-hook thread.
+pub(crate) fn emit_hud(trigger: String, combo: String, caption: String) {
+    let (enabled, duration) = {
+        let c = APP_CONFIG.lock().unwrap();
+        (c.show_hud, c.hud_duration_ms)
+    };
+    if !enabled {
+        return;
+    }
+    let key = format!("{trigger}\u{1}{combo}\u{1}{caption}");
+    let now = now_ms();
+    {
+        let mut last_key = LAST_HUD_KEY.lock().unwrap();
+        let same = *last_key == key;
+        let last = LAST_HUD_EMIT_MS.load(Ordering::SeqCst);
+        if same && now.saturating_sub(last) < HUD_THROTTLE_MS {
+            return;
+        }
+        *last_key = key;
+        LAST_HUD_EMIT_MS.store(now, Ordering::SeqCst);
+    }
+    if let Some(app) = APP_HANDLE.lock().unwrap().as_ref() {
+        let _ = app.emit(
+            "hud-show",
+            HudPayload {
+                trigger,
+                combo,
+                caption,
+                duration,
+            },
+        );
+    }
+}
+
 #[tauri::command]
 fn get_app_config() -> AppConfig {
     *APP_CONFIG.lock().unwrap()
@@ -932,6 +1000,31 @@ fn set_hide_dock_icon(app: AppHandle, hide: bool) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.set_focus();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn set_show_hud(app: AppHandle, show: bool) -> Result<(), String> {
+    let mut cfg = APP_CONFIG.lock().unwrap();
+    let previous = cfg.show_hud;
+    cfg.show_hud = show;
+    if let Err(e) = persist_app_config(&app, *cfg) {
+        cfg.show_hud = previous;
+        return Err(e);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn set_hud_duration(app: AppHandle, duration_ms: u32) -> Result<(), String> {
+    let clamped = duration_ms.clamp(300, 6000);
+    let mut cfg = APP_CONFIG.lock().unwrap();
+    let previous = cfg.hud_duration_ms;
+    cfg.hud_duration_ms = clamped;
+    if let Err(e) = persist_app_config(&app, *cfg) {
+        cfg.hud_duration_ms = previous;
+        return Err(e);
     }
     Ok(())
 }
@@ -1185,6 +1278,29 @@ pub fn run() {
             if APP_CONFIG.lock().unwrap().hide_dock_icon {
                 apply_activation_policy(app.handle(), true);
             }
+
+            *APP_HANDLE.lock().unwrap() = Some(app.handle().clone());
+
+            // Transparent, click-through, non-focusing overlay for the mapping
+            // HUD. Created hidden; the frontend repositions (bottom-center of
+            // the active monitor) and shows/hides it on `hud-show` events.
+            let hud = WebviewWindowBuilder::new(
+                app,
+                "hud",
+                WebviewUrl::App("index.html#hud".into()),
+            )
+            .title("HyperCapslock HUD")
+            .inner_size(760.0, 240.0)
+            .decorations(false)
+            .transparent(true)
+            .always_on_top(true)
+            .shadow(false)
+            .skip_taskbar(true)
+            .focused(false)
+            .visible(false)
+            .resizable(false)
+            .build()?;
+            let _ = hud.set_ignore_cursor_events(true);
             let status_i =
                 MenuItem::with_id(app, "status", menu_text("status_running"), false, None::<&str>)?;
             let toggle_i =
@@ -1361,6 +1477,8 @@ pub fn run() {
             get_action_mappings,
             get_app_config,
             set_hide_dock_icon,
+            set_show_hud,
+            set_hud_duration,
             open_privacy_settings,
             export_action_mappings_to_path,
             import_action_mappings_from_path,

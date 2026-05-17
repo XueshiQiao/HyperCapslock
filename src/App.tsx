@@ -197,6 +197,9 @@ function App() {
   const [status, setStatus] = useState("initializing");
   const [autostart, setAutostart] = useState(false);
   const [hideDockIcon, setHideDockIcon] = useState(false);
+  const [showHud, setShowHud] = useState(false);
+  const [hudDuration, setHudDuration] = useState(1350);
+  const hudDurationTimer = useRef<number | null>(null);
   const [appVersion, setAppVersion] = useState("");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [permissions, setPermissions] = useState<PermissionStatuses | null>(null);
@@ -239,6 +242,12 @@ function App() {
   }, [isDark]);
 
   useEffect(() => {
+    return () => {
+      if (hudDurationTimer.current) window.clearTimeout(hudDurationTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (langRef.current && !langRef.current.contains(event.target as Node)) {
         setShowLangMenu(false);
@@ -260,8 +269,10 @@ function App() {
         const auto = await isEnabled();
         setAutostart(auto);
         try {
-          const cfg = await invoke<{ hide_dock_icon: boolean }>("get_app_config");
+          const cfg = await invoke<{ hide_dock_icon: boolean; show_hud: boolean; hud_duration_ms: number }>("get_app_config");
           setHideDockIcon(!!cfg.hide_dock_icon);
+          setShowHud(!!cfg.show_hud);
+          if (cfg.hud_duration_ms) setHudDuration(cfg.hud_duration_ms);
         } catch (e) {
           console.error("Failed to load app config", e);
         }
@@ -491,6 +502,32 @@ function App() {
     }
   }
 
+  async function toggleShowHud() {
+    const next = !showHud;
+    setShowHud(next);
+    try {
+      await invoke("set_show_hud", { show: next });
+      showToast(
+        next ? t("toast.show_hud_enabled") : t("toast.show_hud_disabled"),
+        "success"
+      );
+    } catch (e) {
+      console.error("Failed to toggle HUD", e);
+      setShowHud(!next);
+      showToast(t("toast.show_hud_failed"), "error");
+    }
+  }
+
+  function onHudDurationChange(ms: number) {
+    setHudDuration(ms);
+    if (hudDurationTimer.current) window.clearTimeout(hudDurationTimer.current);
+    hudDurationTimer.current = window.setTimeout(() => {
+      invoke("set_hud_duration", { durationMs: ms }).catch((e) =>
+        console.error("Failed to set HUD duration", e)
+      );
+    }, 250);
+  }
+
   async function toggleAutostart() {
     try {
       if (autostart) {
@@ -663,6 +700,38 @@ function App() {
                 >
                   <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${hideDockIcon ? 'translate-x-6' : 'translate-x-0'}`} />
                 </button>
+              </div>
+            )}
+            <div className="flex items-center justify-between mt-3">
+              <p className="text-sm text-slate-800 dark:text-slate-200 font-medium">{t("settings.show_hud")}</p>
+              <button
+                onClick={toggleShowHud}
+                className={`w-12 h-6 rounded-full p-1 border transition-all duration-200 ease-in-out cursor-pointer shrink-0 ${
+                  showHud
+                    ? "bg-primary border-blue-400/70 hover:bg-blue-500 hover:border-blue-300"
+                    : "bg-slate-200 dark:bg-slate-600 border-slate-300 dark:border-slate-500 hover:bg-slate-300 dark:hover:bg-slate-500 hover:border-slate-400 dark:hover:border-slate-400"
+                }`}
+              >
+                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${showHud ? 'translate-x-6' : 'translate-x-0'}`} />
+              </button>
+            </div>
+            {showHud && (
+              <div className="flex items-center justify-between mt-3 gap-4">
+                <p className="text-sm text-slate-800 dark:text-slate-200 font-medium shrink-0">{t("settings.hud_duration")}</p>
+                <div className="flex items-center gap-3 flex-1 max-w-[220px]">
+                  <input
+                    type="range"
+                    min={300}
+                    max={6000}
+                    step={100}
+                    value={hudDuration}
+                    onChange={(e) => onHudDurationChange(Number(e.target.value))}
+                    className="flex-1 accent-blue-500 cursor-pointer"
+                  />
+                  <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums w-10 text-right shrink-0">
+                    {(hudDuration / 1000).toFixed(1)}s
+                  </span>
+                </div>
               </div>
             )}
           </div>
