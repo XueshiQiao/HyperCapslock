@@ -38,9 +38,39 @@ type ActionConfig =
   | { kind: "command"; command: string }
   | { kind: "key_combo"; target_key: number; with_ctrl: boolean; with_alt: boolean; with_cmd: boolean; with_target_shift: boolean };
 
+type ModifierKey =
+  | "left_shift" | "right_shift"
+  | "left_control" | "right_control"
+  | "left_option" | "right_option"
+  | "left_command" | "right_command"
+  | "fn";
+
+const MODIFIER_KEYS: ModifierKey[] = [
+  "left_command", "right_command",
+  "left_control", "right_control",
+  "left_option", "right_option",
+  "left_shift", "right_shift",
+  "fn",
+];
+
+// Symbol + side glyph shown on the trigger chip, e.g. "⌘L".
+const MODIFIER_GLYPH: Record<ModifierKey, string> = {
+  left_command: "⌘L", right_command: "⌘R",
+  left_control: "⌃L", right_control: "⌃R",
+  left_option: "⌥L", right_option: "⌥R",
+  left_shift: "⇧L", right_shift: "⇧R",
+  fn: "fn",
+};
+
+function modifierTriggerLabel(m: ModifierKey): string {
+  const base = `${t("trigger.double_tap_prefix")} ${MODIFIER_GLYPH[m]}`;
+  return m === "fn" ? `${base} (${t("trigger.experimental")})` : base;
+}
+
 type Trigger =
   | { kind: "hyper_plus_key"; key: number; with_shift: boolean }
-  | { kind: "double_tap_hyper" };
+  | { kind: "double_tap_hyper" }
+  | { kind: "double_tap_modifier"; modifier: ModifierKey };
 
 type ActionMappingEntry = {
   trigger: Trigger;
@@ -49,11 +79,13 @@ type ActionMappingEntry = {
 
 function triggerSortKey(t: Trigger): string {
   if (t.kind === "double_tap_hyper") return "0:double";
+  if (t.kind === "double_tap_modifier") return `0:modifier:${t.modifier}`;
   return `1:${String(t.key).padStart(4, "0")}:${t.with_shift ? "1" : "0"}`;
 }
 
 function triggerUniqueId(t: Trigger): string {
   if (t.kind === "double_tap_hyper") return "double_tap_hyper";
+  if (t.kind === "double_tap_modifier") return `dtm:${t.modifier}`;
   return `hyper:${t.key}:${t.with_shift ? "s" : "n"}`;
 }
 
@@ -153,8 +185,10 @@ function App() {
   const [permissions, setPermissions] = useState<PermissionStatuses | null>(null);
 
   const [actionMappings, setActionMappings] = useState<ActionMappingEntry[]>([]);
-  // Combined trigger picker: "plain" = Caps+Key, "with_shift" = Caps+Shift+Key, "double_tap" = Caps×2
-  const [newTriggerSel, setNewTriggerSel] = useState<"plain" | "with_shift" | "double_tap">("plain");
+  // Combined trigger picker: "plain" = Caps+Key, "with_shift" = Caps+Shift+Key,
+  // "double_tap" = Caps×2, "dtm:<modifier>" = double-tap that modifier.
+  type TriggerSel = "plain" | "with_shift" | "double_tap" | `dtm:${ModifierKey}`;
+  const [newTriggerSel, setNewTriggerSel] = useState<TriggerSel>("plain");
   const [newKey, setNewKey] = useState<number | null>(null);
   const [newKeyDisplay, setNewKeyDisplay] = useState("");
   const [newActionKind, setNewActionKind] = useState<ActionConfig["kind"]>("directional");
@@ -274,6 +308,12 @@ function App() {
   function buildDraftTrigger(): Trigger | null {
     if (newTriggerSel === "double_tap") {
       return { kind: "double_tap_hyper" };
+    }
+    if (newTriggerSel.startsWith("dtm:")) {
+      return {
+        kind: "double_tap_modifier",
+        modifier: newTriggerSel.slice(4) as ModifierKey,
+      };
     }
     if (!newKey) return null;
     return { kind: "hyper_plus_key", key: newKey, with_shift: newTriggerSel === "with_shift" };
@@ -460,6 +500,8 @@ function App() {
   const draftAction = buildDraftAction();
   const draftTrigger = buildDraftTrigger();
   const canSaveAction = !!draftTrigger && !!draftAction;
+  // Only Caps+Key / Caps+Shift+Key need a key captured; double-tap triggers don't.
+  const triggerNeedsKey = newTriggerSel === "plain" || newTriggerSel === "with_shift";
   const groupedMappings = ACTION_GROUP_KEYS.map((key) => ({
     key,
     label: t(`group.${key}`),
@@ -707,6 +749,12 @@ function App() {
                             <span className="text-slate-400 dark:text-slate-500 font-light text-xs">×</span>
                             <Kbd>2</Kbd>
                           </>
+                        ) : entry.trigger.kind === "double_tap_modifier" ? (
+                          <>
+                            <Kbd>{MODIFIER_GLYPH[entry.trigger.modifier]}</Kbd>
+                            <span className="text-slate-400 dark:text-slate-500 font-light text-xs">×</span>
+                            <Kbd>2</Kbd>
+                          </>
                         ) : (
                           <>
                             <Kbd>Caps</Kbd>
@@ -774,15 +822,19 @@ function App() {
                   { value: "plain", label: t("mappings.caps") },
                   { value: "with_shift", label: t("mappings.caps_shift") },
                   { value: "double_tap", label: t("trigger.double_tap_hyper") },
+                  ...MODIFIER_KEYS.map((m) => ({
+                    value: `dtm:${m}`,
+                    label: modifierTriggerLabel(m),
+                  })),
                 ]}
               />
-              <span className={`text-sm font-medium select-none ${newTriggerSel === "double_tap" ? "text-slate-300 dark:text-slate-600" : "text-slate-400 dark:text-slate-500"}`}>+</span>
+              <span className={`text-sm font-medium select-none ${!triggerNeedsKey ? "text-slate-300 dark:text-slate-600" : "text-slate-400 dark:text-slate-500"}`}>+</span>
               <input
                 type="text"
-                placeholder={newTriggerSel === "double_tap" ? "—" : t("mappings.press_key")}
-                value={newTriggerSel === "double_tap" ? "" : newKeyDisplay}
+                placeholder={!triggerNeedsKey ? "—" : t("mappings.press_key")}
+                value={!triggerNeedsKey ? "" : newKeyDisplay}
                 readOnly
-                disabled={newTriggerSel === "double_tap"}
+                disabled={!triggerNeedsKey}
                 onKeyDown={(e) => {
                   e.preventDefault();
                   if (["Shift", "Control", "Alt", "Meta", "CapsLock"].includes(e.key)) return;

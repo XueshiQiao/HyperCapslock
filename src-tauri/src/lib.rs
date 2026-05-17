@@ -112,6 +112,20 @@ pub(crate) enum ActionConfig {
     },
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ModifierKey {
+    LeftShift,
+    RightShift,
+    LeftControl,
+    RightControl,
+    LeftOption,
+    RightOption,
+    LeftCommand,
+    RightCommand,
+    Fn,
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub(crate) enum Trigger {
@@ -121,6 +135,9 @@ pub(crate) enum Trigger {
         with_shift: bool,
     },
     DoubleTapHyper,
+    DoubleTapModifier {
+        modifier: ModifierKey,
+    },
 }
 
 #[derive(serde::Serialize, Clone, Debug, PartialEq, Eq)]
@@ -440,11 +457,26 @@ fn independent_action_name(action: &IndependentActionKind) -> &'static str {
     }
 }
 
+fn modifier_key_name(modifier: ModifierKey) -> &'static str {
+    match modifier {
+        ModifierKey::LeftShift => "left_shift",
+        ModifierKey::RightShift => "right_shift",
+        ModifierKey::LeftControl => "left_control",
+        ModifierKey::RightControl => "right_control",
+        ModifierKey::LeftOption => "left_option",
+        ModifierKey::RightOption => "right_option",
+        ModifierKey::LeftCommand => "left_command",
+        ModifierKey::RightCommand => "right_command",
+        ModifierKey::Fn => "fn",
+    }
+}
+
 fn render_action_mappings_yaml_with_comments(mappings: &[ActionMappingEntry]) -> String {
     let mut lines = vec![
         "# HyperCapslock action mappings".to_string(),
-        "# trigger.kind: hyper_plus_key (Caps+Key) or double_tap_hyper (Caps tapped twice)"
+        "# trigger.kind: hyper_plus_key (Caps+Key), double_tap_hyper (Caps tapped twice),"
             .to_string(),
+        "#   or double_tap_modifier (a modifier key tapped twice)".to_string(),
         "# key uses JavaScript keyCode".to_string(),
     ];
 
@@ -459,6 +491,11 @@ fn render_action_mappings_yaml_with_comments(mappings: &[ActionMappingEntry]) ->
             Trigger::DoubleTapHyper => {
                 lines.push("- trigger:".to_string());
                 lines.push("    kind: double_tap_hyper".to_string());
+            }
+            Trigger::DoubleTapModifier { modifier } => {
+                lines.push("- trigger:".to_string());
+                lines.push("    kind: double_tap_modifier".to_string());
+                lines.push(format!("    modifier: {}", modifier_key_name(*modifier)));
             }
         }
         lines.push("  action:".to_string());
@@ -1316,9 +1353,10 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use crate::{
-        default_action_mappings, render_action_mappings_yaml_with_comments,
-        upsert_action_mapping_in_vec, ActionConfig, ActionMappingEntry, DirectionalActionKind,
-        IndependentActionKind, JumpDirection, Trigger, JS_H_KEYCODE, JS_N_KEYCODE, JS_U_KEYCODE,
+        default_action_mappings, normalize_action_mappings,
+        render_action_mappings_yaml_with_comments, upsert_action_mapping_in_vec, ActionConfig,
+        ActionMappingEntry, DirectionalActionKind, IndependentActionKind, JumpDirection,
+        ModifierKey, Trigger, JS_H_KEYCODE, JS_N_KEYCODE, JS_U_KEYCODE,
     };
 
     #[test]
@@ -1336,6 +1374,85 @@ mod tests {
         let yaml = serde_yaml::to_string(&entry).unwrap();
         let decoded: ActionMappingEntry = serde_yaml::from_str(&yaml).unwrap();
         assert_eq!(decoded, entry);
+    }
+
+    #[test]
+    fn test_double_tap_modifier_roundtrip_all_variants() {
+        let modifiers = [
+            ModifierKey::LeftShift,
+            ModifierKey::RightShift,
+            ModifierKey::LeftControl,
+            ModifierKey::RightControl,
+            ModifierKey::LeftOption,
+            ModifierKey::RightOption,
+            ModifierKey::LeftCommand,
+            ModifierKey::RightCommand,
+            ModifierKey::Fn,
+        ];
+        for modifier in modifiers {
+            let entry = ActionMappingEntry {
+                trigger: Trigger::DoubleTapModifier { modifier },
+                action: ActionConfig::Independent {
+                    action: IndependentActionKind::Backspace,
+                },
+            };
+            let yaml = serde_yaml::to_string(&entry).unwrap();
+            let decoded: ActionMappingEntry = serde_yaml::from_str(&yaml).unwrap();
+            assert_eq!(decoded, entry, "serde round-trip failed for {:?}", modifier);
+        }
+    }
+
+    #[test]
+    fn test_double_tap_modifier_yaml_render_and_reparse() {
+        let entries = vec![ActionMappingEntry {
+            trigger: Trigger::DoubleTapModifier {
+                modifier: ModifierKey::LeftCommand,
+            },
+            action: ActionConfig::Directional {
+                action: DirectionalActionKind::Left,
+            },
+        }];
+        let yaml = render_action_mappings_yaml_with_comments(&entries);
+        assert!(yaml.contains("kind: double_tap_modifier"));
+        assert!(yaml.contains("modifier: left_command"));
+        let decoded: Vec<ActionMappingEntry> = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(decoded, entries);
+    }
+
+    #[test]
+    fn test_double_tap_modifier_sides_are_distinct() {
+        let mut mappings = vec![ActionMappingEntry {
+            trigger: Trigger::DoubleTapModifier {
+                modifier: ModifierKey::LeftShift,
+            },
+            action: ActionConfig::Independent {
+                action: IndependentActionKind::Backspace,
+            },
+        }];
+        // Right shift, double-tap hyper, and a hyper+key binding must all
+        // coexist as distinct entries (no dedup collision).
+        upsert_action_mapping_in_vec(
+            &mut mappings,
+            ActionMappingEntry {
+                trigger: Trigger::DoubleTapModifier {
+                    modifier: ModifierKey::RightShift,
+                },
+                action: ActionConfig::Independent {
+                    action: IndependentActionKind::NextLine,
+                },
+            },
+        );
+        upsert_action_mapping_in_vec(
+            &mut mappings,
+            ActionMappingEntry {
+                trigger: Trigger::DoubleTapHyper,
+                action: ActionConfig::Independent {
+                    action: IndependentActionKind::InsertQuotes,
+                },
+            },
+        );
+        normalize_action_mappings(&mut mappings);
+        assert_eq!(mappings.len(), 3);
     }
 
     #[test]

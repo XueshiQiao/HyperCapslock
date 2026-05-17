@@ -15,7 +15,7 @@ use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
 use crate::{
     ActionConfig, ActionMappingEntry, DirectionalActionKind, IndependentActionKind, JumpDirection,
-    Trigger, ACTION_MAPPINGS, CAPS_DOWN, CAPS_PRESSED_AT_MS, DID_REMAP, IS_PAUSED,
+    ModifierKey, Trigger, ACTION_MAPPINGS, CAPS_DOWN, CAPS_PRESSED_AT_MS, DID_REMAP, IS_PAUSED,
 };
 
 // Magic value stamped on injected events to prevent feedback loops
@@ -31,6 +31,17 @@ const KC_RIGHT: u16 = 0x7C;
 const KC_DOWN: u16 = 0x7D;
 const KC_UP: u16 = 0x7E;
 
+// Modifier keycodes (side-specific) for double-tap-modifier triggers.
+const KC_LSHIFT: u16 = 56;
+const KC_RSHIFT: u16 = 60;
+const KC_LCTRL: u16 = 59;
+const KC_RCTRL: u16 = 62;
+const KC_LOPTION: u16 = 58;
+const KC_ROPTION: u16 = 61;
+const KC_LCOMMAND: u16 = 55;
+const KC_RCOMMAND: u16 = 54;
+const KC_FN: u16 = 63;
+
 const MACOS_LOG_PATH: &str = "/tmp/hypercapslock-macos.log";
 const CAPS_TAP_MAX_MS: u64 = 200;
 const DOUBLE_TAP_WINDOW_MS: u64 = 300;
@@ -40,6 +51,216 @@ static EVENT_TAP_PORT: AtomicUsize = AtomicUsize::new(0);
 // 0 means no tap is pending. Used as the cancellation token for the delayed
 // CapsLock toggle scheduled when a DoubleTapHyper mapping exists.
 static LAST_TAP_AT_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+// ─── Modifier double-tap detection (independent of the Caps/F18 path) ───
+//
+// One slot per ModifierKey (9). The whole block is gated by
+// `any_double_tap_modifier_configured()` — an entirely unconfigured keyboard
+// does zero work. Once the feature is active, physical down-state is tracked
+// for ALL nine modifier slots (even unmapped ones): a configured modifier's
+// tap can only be judged "clean" if no *other* modifier is physically held,
+// and the only way to know an unmapped sibling is held is to track it. Tap
+// bookkeeping (armed/dirty/last_clean) still runs only for the configured
+// modifier.
+#[derive(Clone, Copy)]
+struct ModTapState {
+    last_clean_tap_ms: u64, // 0 = no pending first tap
+    press_start_ms: u64,    // 0 = not currently held
+    armed: bool,            // candidate tap in progress (configured modifier down)
+    dirty: bool,            // disqualified: combined with another key/modifier
+    phys_down: bool,        // physical key-down state (all slots, while feature active)
+}
+
+const MOD_TAP_INIT: ModTapState = ModTapState {
+    last_clean_tap_ms: 0,
+    press_start_ms: 0,
+    armed: false,
+    dirty: false,
+    phys_down: false,
+};
+
+static MOD_TAP: Mutex<[ModTapState; 9]> = Mutex::new([MOD_TAP_INIT; 9]);
+
+fn modifier_for_keycode(keycode: u16) -> Option<ModifierKey> {
+    match keycode {
+        KC_LSHIFT => Some(ModifierKey::LeftShift),
+        KC_RSHIFT => Some(ModifierKey::RightShift),
+        KC_LCTRL => Some(ModifierKey::LeftControl),
+        KC_RCTRL => Some(ModifierKey::RightControl),
+        KC_LOPTION => Some(ModifierKey::LeftOption),
+        KC_ROPTION => Some(ModifierKey::RightOption),
+        KC_LCOMMAND => Some(ModifierKey::LeftCommand),
+        KC_RCOMMAND => Some(ModifierKey::RightCommand),
+        KC_FN => Some(ModifierKey::Fn),
+        _ => None,
+    }
+}
+
+fn modifier_slot(modifier: ModifierKey) -> usize {
+    match modifier {
+        ModifierKey::LeftShift => 0,
+        ModifierKey::RightShift => 1,
+        ModifierKey::LeftControl => 2,
+        ModifierKey::RightControl => 3,
+        ModifierKey::LeftOption => 4,
+        ModifierKey::RightOption => 5,
+        ModifierKey::LeftCommand => 6,
+        ModifierKey::RightCommand => 7,
+        ModifierKey::Fn => 8,
+    }
+}
+
+/// Mask bit for the modifier *family* (side-agnostic). Used to decide whether
+/// a FlagsChanged event for this modifier is a press (bit set) or a release
+/// (bit cleared). The side comes from the keycode, not the flag.
+fn modifier_family_mask(modifier: ModifierKey) -> CGEventFlags {
+    match modifier {
+        ModifierKey::LeftShift | ModifierKey::RightShift => CGEventFlags::CGEventFlagShift,
+        ModifierKey::LeftControl | ModifierKey::RightControl => CGEventFlags::CGEventFlagControl,
+        ModifierKey::LeftOption | ModifierKey::RightOption => CGEventFlags::CGEventFlagAlternate,
+        ModifierKey::LeftCommand | ModifierKey::RightCommand => CGEventFlags::CGEventFlagCommand,
+        ModifierKey::Fn => CGEventFlags::CGEventFlagSecondaryFn,
+    }
+}
+
+/// Action configured for a specific `DoubleTapModifier`, if any. Sibling of
+/// `find_double_tap_action` — kept separate so the Caps path is untouched.
+fn find_double_tap_modifier_action(modifier: ModifierKey) -> Option<ActionConfig> {
+    let guard = ACTION_MAPPINGS.lock().unwrap();
+    let mappings = guard.as_ref()?;
+    mappings
+        .iter()
+        .find(|m| matches!(m.trigger, Trigger::DoubleTapModifier { modifier: cfg } if cfg == modifier))
+        .map(|m| m.action.clone())
+}
+
+/// True if at least one `DoubleTapModifier` mapping exists (cheap gate so an
+/// unconfigured keyboard pays nothing).
+fn any_double_tap_modifier_configured() -> bool {
+    let guard = ACTION_MAPPINGS.lock().unwrap();
+    guard
+        .as_ref()
+        .map(|m| {
+            m.iter()
+                .any(|e| matches!(e.trigger, Trigger::DoubleTapModifier { .. }))
+        })
+        .unwrap_or(false)
+}
+
+/// Mark every armed slot dirty and drop all pending first-taps. Called when a
+/// non-modifier key is pressed or a second modifier joins — a chord, not a
+/// lone double-tap.
+fn modtap_invalidate_all(table: &mut [ModTapState; 9]) {
+    for s in table.iter_mut() {
+        if s.armed {
+            s.dirty = true;
+        }
+        s.last_clean_tap_ms = 0;
+    }
+}
+
+/// Slot indices that share `modifier`'s family (the left/right pair, or just
+/// Fn). Used for the hard resync when the family's aggregate bit clears.
+fn family_sibling_slots(modifier: ModifierKey) -> &'static [usize] {
+    match modifier {
+        ModifierKey::LeftShift | ModifierKey::RightShift => &[0, 1],
+        ModifierKey::LeftControl | ModifierKey::RightControl => &[2, 3],
+        ModifierKey::LeftOption | ModifierKey::RightOption => &[4, 5],
+        ModifierKey::LeftCommand | ModifierKey::RightCommand => &[6, 7],
+        ModifierKey::Fn => &[8],
+    }
+}
+
+/// Handle a FlagsChanged event for any modifier keycode (called whenever the
+/// modifier double-tap feature is active). Maintains physical down-state for
+/// all slots; runs tap detection only for the configured modifier. Returns the
+/// action to fire on a clean double-tap.
+///
+/// Press vs release for this physical key is tracked by toggling `phys_down`.
+/// Because the aggregate family flag cannot distinguish the two sides of one
+/// family, we additionally hard-resync: whenever the family's aggregate bit is
+/// *clear*, every key of that family is definitively up — so any desynced slot
+/// self-heals on the next full release of that family (which happens
+/// constantly in normal use).
+fn modtap_on_modifier_flags(modifier: ModifierKey, flags: CGEventFlags) -> Option<ActionConfig> {
+    let now = now_millis();
+    let slot = modifier_slot(modifier);
+    let family_active = !(flags & modifier_family_mask(modifier)).is_empty();
+    let configured = find_double_tap_modifier_action(modifier);
+
+    let mut table = MOD_TAP.lock().unwrap();
+
+    // Determine this key's transition.
+    let is_press;
+    if !family_active {
+        // No key of this family is down → hard resync both siblings to up.
+        is_press = false;
+        for &i in family_sibling_slots(modifier) {
+            table[i].phys_down = false;
+            if i != slot && table[i].armed {
+                table[i].armed = false; // interrupted, never completes a tap
+            }
+        }
+    } else if table[slot].phys_down {
+        is_press = false;
+        table[slot].phys_down = false;
+    } else {
+        is_press = true;
+        table[slot].phys_down = true;
+    }
+
+    // Another modifier physically held (any other slot down), or a non-family
+    // modifier bit set in the aggregate flags (defense if an event was missed).
+    let other_phys = table
+        .iter()
+        .enumerate()
+        .any(|(i, s)| i != slot && s.phys_down);
+    let cross_family = active_modifier_flags(flags) & !modifier_family_mask(modifier);
+    let other_mod = other_phys || !cross_family.is_empty();
+
+    if is_press {
+        // A modifier press anywhere invalidates every other in-progress tap.
+        for (i, s) in table.iter_mut().enumerate() {
+            if i != slot && s.armed {
+                s.dirty = true;
+            }
+        }
+        if configured.is_some() {
+            let s = &mut table[slot];
+            s.armed = true;
+            s.press_start_ms = now;
+            s.dirty = other_mod;
+        }
+        None
+    } else {
+        // Release.
+        if configured.is_none() {
+            return None;
+        }
+        let s = &mut table[slot];
+        let was_armed = s.armed;
+        let dirty = s.dirty;
+        let held = now.saturating_sub(s.press_start_ms);
+        s.armed = false;
+        s.press_start_ms = 0;
+        s.dirty = false;
+
+        // Re-check other_mod at release too: catches a modifier that joined
+        // mid-hold after this tap's clean press.
+        if !was_armed || dirty || other_mod || held > CAPS_TAP_MAX_MS {
+            return None;
+        }
+        if s.last_clean_tap_ms != 0
+            && now.saturating_sub(s.last_clean_tap_ms) <= DOUBLE_TAP_WINDOW_MS
+        {
+            s.last_clean_tap_ms = 0;
+            drop(table);
+            return configured;
+        }
+        s.last_clean_tap_ms = now;
+        None
+    }
+}
 
 #[repr(C)]
 struct DispatchObject {
@@ -986,6 +1207,37 @@ pub fn start_keyboard_hook() {
                     // Swallow — we handle CapsLock via F18 now
                     event.set_type(CGEventType::Null);
                     return None;
+                }
+
+                // ─── Modifier double-tap detection ───
+                //
+                // Independent of the Caps/F18 path above. Only does work when a
+                // DoubleTapModifier mapping exists (unconfigured keyboards pay
+                // nothing). Modifier events are NEVER swallowed/mutated — they
+                // pass through normally; we just additionally fire the mapped
+                // action on a clean 2nd tap.
+                if any_double_tap_modifier_configured() {
+                    if event_type_matches(event_type, CGEventType::FlagsChanged) {
+                        // Call for ANY modifier keycode (configured or not) so
+                        // physical down-state of unmapped siblings is tracked.
+                        if let Some(modifier) = modifier_for_keycode(keycode) {
+                            if let Some(action) = modtap_on_modifier_flags(modifier, flags) {
+                                log_macos(
+                                    "INFO",
+                                    &format!(
+                                        "Modifier DOUBLE-TAP detected (keycode={}). Firing action.",
+                                        keycode
+                                    ),
+                                );
+                                execute_action_mapping(&action, true, CGEventFlags::empty());
+                                execute_action_mapping(&action, false, CGEventFlags::empty());
+                            }
+                        }
+                    } else if event_type_matches(event_type, CGEventType::KeyDown) {
+                        // A regular key was pressed — any in-progress modifier
+                        // tap is part of a chord, not a lone double-tap.
+                        modtap_invalidate_all(&mut MOD_TAP.lock().unwrap());
+                    }
                 }
 
                 // ─── Pre-empt the deferred CapsLock toggle on next keypress ───
