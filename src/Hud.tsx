@@ -149,9 +149,9 @@ const CSS = `
 .hud-panel{
   display:flex;flex-direction:column;align-items:center;gap:12px;
   padding:18px 26px;border-radius:22px;
-  background:rgba(20,26,42,.62);
-  -webkit-backdrop-filter:blur(28px) saturate(160%);
-  backdrop-filter:blur(28px) saturate(160%);
+  background:rgba(17,22,38,.96);
+  -webkit-backdrop-filter:blur(12px) saturate(140%);
+  backdrop-filter:blur(12px) saturate(140%);
   border:1px solid rgba(255,255,255,.10);
   box-shadow:0 18px 50px rgba(0,0,0,.55),0 1px 0 rgba(255,255,255,.08) inset;
   animation:hud-rise .24s cubic-bezier(.22,1,.36,1);

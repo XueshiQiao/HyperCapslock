@@ -676,62 +676,35 @@ function App() {
             <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">{t("settings.label")}</p>
             <div className="flex items-center justify-between mt-3">
               <p className="text-sm text-slate-800 dark:text-slate-200 font-medium">{t("settings.autostart")}</p>
-              <button
-                onClick={toggleAutostart}
-                className={`w-12 h-6 rounded-full p-1 border transition-all duration-200 ease-in-out cursor-pointer shrink-0 ${
-                  autostart
-                    ? "bg-primary border-blue-400/70 hover:bg-blue-500 hover:border-blue-300"
-                    : "bg-slate-200 dark:bg-slate-600 border-slate-300 dark:border-slate-500 hover:bg-slate-300 dark:hover:bg-slate-500 hover:border-slate-400 dark:hover:border-slate-400"
-                }`}
-              >
-                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${autostart ? 'translate-x-6' : 'translate-x-0'}`} />
-              </button>
+              <Toggle checked={autostart} onClick={toggleAutostart} />
             </div>
             {permissions?.platform === "macos" && (
               <div className="flex items-center justify-between mt-3">
                 <p className="text-sm text-slate-800 dark:text-slate-200 font-medium">{t("settings.hide_dock")}</p>
-                <button
-                  onClick={toggleHideDockIcon}
-                  className={`w-12 h-6 rounded-full p-1 border transition-all duration-200 ease-in-out cursor-pointer shrink-0 ${
-                    hideDockIcon
-                      ? "bg-primary border-blue-400/70 hover:bg-blue-500 hover:border-blue-300"
-                      : "bg-slate-200 dark:bg-slate-600 border-slate-300 dark:border-slate-500 hover:bg-slate-300 dark:hover:bg-slate-500 hover:border-slate-400 dark:hover:border-slate-400"
-                  }`}
-                >
-                  <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${hideDockIcon ? 'translate-x-6' : 'translate-x-0'}`} />
-                </button>
+                <Toggle checked={hideDockIcon} onClick={toggleHideDockIcon} />
               </div>
             )}
             <div className="flex items-center justify-between mt-3">
               <p className="text-sm text-slate-800 dark:text-slate-200 font-medium">{t("settings.show_hud")}</p>
-              <button
-                onClick={toggleShowHud}
-                className={`w-12 h-6 rounded-full p-1 border transition-all duration-200 ease-in-out cursor-pointer shrink-0 ${
-                  showHud
-                    ? "bg-primary border-blue-400/70 hover:bg-blue-500 hover:border-blue-300"
-                    : "bg-slate-200 dark:bg-slate-600 border-slate-300 dark:border-slate-500 hover:bg-slate-300 dark:hover:bg-slate-500 hover:border-slate-400 dark:hover:border-slate-400"
-                }`}
-              >
-                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${showHud ? 'translate-x-6' : 'translate-x-0'}`} />
-              </button>
+              <Toggle checked={showHud} onClick={toggleShowHud} />
             </div>
             {showHud && (
-              <div className="flex items-center justify-between mt-3 gap-4">
-                <p className="text-sm text-slate-800 dark:text-slate-200 font-medium shrink-0">{t("settings.hud_duration")}</p>
-                <div className="flex items-center gap-3 flex-1 max-w-[220px]">
-                  <input
-                    type="range"
-                    min={300}
-                    max={6000}
-                    step={100}
-                    value={hudDuration}
-                    onChange={(e) => onHudDurationChange(Number(e.target.value))}
-                    className="flex-1 accent-blue-500 cursor-pointer"
-                  />
-                  <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums w-10 text-right shrink-0">
-                    {(hudDuration / 1000).toFixed(1)}s
+              <div className="flex items-center justify-between mt-3 gap-3">
+                <p className="text-sm text-slate-800 dark:text-slate-200 font-medium shrink-0">
+                  {t("settings.hud_duration")}
+                  <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums font-normal ml-1">
+                    ({hudDuration / 1000}s)
                   </span>
-                </div>
+                </p>
+                <input
+                  type="range"
+                  min={300}
+                  max={6000}
+                  step={100}
+                  value={hudDuration}
+                  onChange={(e) => onHudDurationChange(Number(e.target.value))}
+                  className="w-24 accent-blue-500 cursor-pointer shrink-0"
+                />
               </div>
             )}
           </div>
@@ -1090,6 +1063,34 @@ function App() {
 
       <Footer version={appVersion} />
     </main>
+  );
+}
+
+function Toggle({
+  checked,
+  onClick,
+}: {
+  checked: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onClick}
+      className={`relative w-11 h-6 rounded-full shrink-0 cursor-pointer transition-colors duration-200 ${
+        checked
+          ? "bg-primary hover:bg-blue-500"
+          : "bg-slate-300 dark:bg-slate-600 hover:bg-slate-400 dark:hover:bg-slate-500"
+      }`}
+    >
+      <span
+        className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-200 ease-in-out ${
+          checked ? "translate-x-5" : "translate-x-0"
+        }`}
+      />
+    </button>
   );
 }
 
