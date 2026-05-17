@@ -14,8 +14,9 @@ use core_graphics::event::{
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
 use crate::{
-    ActionConfig, ActionMappingEntry, DirectionalActionKind, IndependentActionKind, JumpDirection,
-    ModifierKey, Trigger, ACTION_MAPPINGS, CAPS_DOWN, CAPS_PRESSED_AT_MS, DID_REMAP, IS_PAUSED,
+    js_keycode_name, ActionConfig, ActionMappingEntry, DirectionalActionKind,
+    IndependentActionKind, JumpDirection, ModifierKey, Trigger, ACTION_MAPPINGS, CAPS_DOWN,
+    CAPS_PRESSED_AT_MS, DID_REMAP, IS_PAUSED,
 };
 
 // Magic value stamped on injected events to prevent feedback loops
@@ -260,6 +261,98 @@ fn modtap_on_modifier_flags(modifier: ModifierKey, flags: CGEventFlags) -> Optio
         s.last_clean_tap_ms = now;
         None
     }
+}
+
+/// Fire the action bound to a double-tapped modifier.
+///
+/// KeyCombo needs special handling here (vs. the Caps path's flag-only
+/// `post_key`): the detection fires at the instant the physical modifier is
+/// released, so a flag-stamped lone key event races the genuine modifier-up
+/// transition and Carbon/global-hotkey matching in other apps rejects it. We
+/// instead defer briefly so the real release settles, then synthesize an
+/// explicit modifier-down → target down/up → modifier-up sequence with
+/// cumulative flags — a self-consistent combo independent of physical key
+/// state. Those synthetic events go through `post_key`, which stamps
+/// INJECTED_EVENT_MAGIC, so the tap callback skips them (no feedback loop, no
+/// re-detection). Non-KeyCombo actions keep the original
+/// `execute_action_mapping` behavior unchanged.
+fn fire_double_tap_modifier_action(action: ActionConfig) {
+    if let ActionConfig::KeyCombo {
+        target_key,
+        with_ctrl,
+        with_alt,
+        with_cmd,
+        with_target_shift,
+    } = action
+    {
+        let Some(mac_keycode) = js_keycode_to_mac_keycode(target_key) else {
+            log_macos(
+                "WARN",
+                &format!(
+                    "double-tap KeyCombo: unknown JS keycode {}, cannot map to macOS",
+                    target_key
+                ),
+            );
+            return;
+        };
+        let mut combo = String::new();
+        if with_cmd {
+            combo.push_str("Cmd+");
+        }
+        if with_ctrl {
+            combo.push_str("Ctrl+");
+        }
+        if with_alt {
+            combo.push_str("Alt+");
+        }
+        if with_target_shift {
+            combo.push_str("Shift+");
+        }
+        combo.push_str(&js_keycode_name(target_key));
+        log_macos(
+            "INFO",
+            &format!("double-tap KeyCombo synthesizing: {}", combo),
+        );
+        thread::spawn(move || {
+            // Let the physical modifier-release that triggered us fully settle.
+            thread::sleep(std::time::Duration::from_millis(50));
+            if IS_PAUSED.load(Ordering::SeqCst) {
+                return;
+            }
+            let mut mods: Vec<(u16, CGEventFlags)> = Vec::new();
+            if with_cmd {
+                mods.push((KC_LCOMMAND, CGEventFlags::CGEventFlagCommand));
+            }
+            if with_ctrl {
+                mods.push((KC_LCTRL, CGEventFlags::CGEventFlagControl));
+            }
+            if with_alt {
+                mods.push((KC_LOPTION, CGEventFlags::CGEventFlagAlternate));
+            }
+            if with_target_shift {
+                mods.push((KC_LSHIFT, CGEventFlags::CGEventFlagShift));
+            }
+
+            // Press modifiers with cumulative flags, then the target key, then
+            // release modifiers in reverse — mirrors a real keystroke.
+            let mut acc = CGEventFlags::empty();
+            for (kc, fl) in &mods {
+                acc |= *fl;
+                post_key(*kc, true, acc);
+            }
+            post_key(mac_keycode, true, acc);
+            post_key(mac_keycode, false, acc);
+            for (kc, fl) in mods.iter().rev() {
+                acc &= !*fl;
+                post_key(*kc, false, acc);
+            }
+        });
+        return;
+    }
+
+    // Non-KeyCombo actions: unchanged down-then-up behavior.
+    execute_action_mapping(&action, true, CGEventFlags::empty());
+    execute_action_mapping(&action, false, CGEventFlags::empty());
 }
 
 #[repr(C)]
@@ -521,11 +614,11 @@ fn mac_keycode_to_js_keycode(mac_keycode: u16) -> Option<u16> {
         0x13 => Some(50),  // 2
         0x14 => Some(51),  // 3
         0x15 => Some(52),  // 4
-        0x16 => Some(53),  // 5
-        0x17 => Some(54),  // 6
-        0x18 => Some(55),  // 7
-        0x19 => Some(56),  // 8
-        0x1A => Some(57),  // 9
+        0x17 => Some(53),  // 5
+        0x16 => Some(54),  // 6
+        0x1A => Some(55),  // 7
+        0x1C => Some(56),  // 8
+        0x19 => Some(57),  // 9
         0x2B => Some(188), // ,
         0x2F => Some(190), // .
         _ => None,
@@ -565,11 +658,11 @@ fn js_keycode_to_mac_keycode(js_keycode: u16) -> Option<u16> {
         50 => Some(0x13),  // 2
         51 => Some(0x14),  // 3
         52 => Some(0x15),  // 4
-        53 => Some(0x16),  // 5
-        54 => Some(0x17),  // 6
-        55 => Some(0x18),  // 7
-        56 => Some(0x19),  // 8
-        57 => Some(0x1A),  // 9
+        53 => Some(0x17),  // 5
+        54 => Some(0x16),  // 6
+        55 => Some(0x1A),  // 7
+        56 => Some(0x1C),  // 8
+        57 => Some(0x19),  // 9
         188 => Some(0x2B), // ,
         190 => Some(0x2F), // .
         186 => Some(0x29), // ;
@@ -1229,8 +1322,7 @@ pub fn start_keyboard_hook() {
                                         keycode
                                     ),
                                 );
-                                execute_action_mapping(&action, true, CGEventFlags::empty());
-                                execute_action_mapping(&action, false, CGEventFlags::empty());
+                                fire_double_tap_modifier_action(action);
                             }
                         }
                     } else if event_type_matches(event_type, CGEventType::KeyDown) {

@@ -203,6 +203,22 @@ struct PermissionStatuses {
     input_monitoring: &'static str,
 }
 
+#[tauri::command]
+fn open_privacy_settings(app: AppHandle, pane: String) -> Result<(), String> {
+    let url = match pane.as_str() {
+        "accessibility" => {
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        }
+        "input_monitoring" => {
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
+        }
+        other => return Err(format!("unknown settings pane: {}", other)),
+    };
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| format!("failed to open settings pane: {}", e))
+}
+
 #[cfg(target_os = "macos")]
 fn macos_accessibility_granted() -> bool {
     extern "C" {
@@ -403,7 +419,7 @@ fn default_action_mappings() -> Vec<ActionMappingEntry> {
     defaults
 }
 
-fn js_keycode_name(key: u16) -> String {
+pub(crate) fn js_keycode_name(key: u16) -> String {
     match key {
         48..=57 => ((b'0' + (key as u8 - 48)) as char).to_string(),
         65..=90 => ((b'A' + (key as u8 - 65)) as char).to_string(),
@@ -1333,6 +1349,7 @@ pub fn run() {
             get_action_mappings,
             get_app_config,
             set_hide_dock_icon,
+            open_privacy_settings,
             export_action_mappings_to_path,
             import_action_mappings_from_path,
             add_mapping,

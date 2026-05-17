@@ -672,8 +672,8 @@ function App() {
           {permissionsCollapsed === false && (
             <div className="mt-4">
               <div className="space-y-2 text-sm">
-                <PermissionRow label={t("perm.accessibility")} status={permissions?.accessibility ?? "not_required"} />
-                <PermissionRow label={t("perm.input_monitoring")} status={permissions?.input_monitoring ?? "not_required"} />
+                <PermissionRow label={t("perm.accessibility")} status={permissions?.accessibility ?? "not_required"} kind="accessibility" />
+                <PermissionRow label={t("perm.input_monitoring")} status={permissions?.input_monitoring ?? "not_required"} kind="input_monitoring" />
               </div>
               <div className="flex items-center justify-between mt-3">
                 <p className="text-[11px] text-slate-400 dark:text-slate-500">
@@ -1081,9 +1081,11 @@ function Footer({ version }: { version: string }) {
 function PermissionRow({
   label,
   status,
+  kind,
 }: {
   label: string;
   status: "granted" | "not_granted" | "not_required";
+  kind?: "accessibility" | "input_monitoring";
 }) {
   const text =
     status === "granted" ? t("perm.granted") : status === "not_granted" ? t("perm.not_granted") : t("perm.not_required");
@@ -1094,10 +1096,24 @@ function PermissionRow({
       ? "text-xs px-2 py-1 rounded-md border transition-colors bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700/50"
       : "text-xs px-2 py-1 rounded-md border transition-colors bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600";
 
+  const clickable = status === "not_granted" && !!kind;
+
   return (
     <div className="group flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:border-slate-300 dark:hover:border-slate-500">
       <span className="text-slate-700 dark:text-slate-300">{label}</span>
-      <span className={badgeClass}>{text}</span>
+      {clickable ? (
+        <button
+          onClick={() => { invoke("open_privacy_settings", { pane: kind }).catch(console.error); }}
+          title={`${t("perm.open_settings")} — ${label}`}
+          aria-label={`${t("perm.open_settings")} — ${label}`}
+          className={`${badgeClass} inline-flex items-center gap-1 cursor-pointer hover:bg-red-200 dark:hover:bg-red-900/50`}
+        >
+          {text}
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+        </button>
+      ) : (
+        <span className={badgeClass}>{text}</span>
+      )}
     </div>
   );
 }
