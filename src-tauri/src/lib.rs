@@ -423,8 +423,17 @@ pub(crate) fn js_keycode_name(key: u16) -> String {
     match key {
         48..=57 => ((b'0' + (key as u8 - 48)) as char).to_string(),
         65..=90 => ((b'A' + (key as u8 - 65)) as char).to_string(),
-        8 => "Del".to_string(),
+        112..=123 => format!("F{}", key - 111),
+        8 => "Backspace".to_string(),
+        9 => "Tab".to_string(),
         13 => "Enter".to_string(),
+        27 => "Esc".to_string(),
+        32 => "Space".to_string(),
+        46 => "Fwd Del".to_string(),
+        33 => "PgUp".to_string(),
+        34 => "PgDn".to_string(),
+        35 => "End".to_string(),
+        36 => "Home".to_string(),
         37 => "Left".to_string(),
         38 => "Up".to_string(),
         39 => "Right".to_string(),
@@ -435,7 +444,10 @@ pub(crate) fn js_keycode_name(key: u16) -> String {
         189 => "-".to_string(),
         190 => ".".to_string(),
         191 => "/".to_string(),
+        192 => "`".to_string(),
+        219 => "[".to_string(),
         220 => "\\".to_string(),
+        221 => "]".to_string(),
         222 => "'".to_string(),
         _ => format!("Key{}", key),
     }
@@ -445,7 +457,7 @@ fn yaml_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "''"))
 }
 
-fn directional_action_name(action: &DirectionalActionKind) -> &'static str {
+pub(crate) fn directional_action_name(action: &DirectionalActionKind) -> &'static str {
     match action {
         DirectionalActionKind::Left => "left",
         DirectionalActionKind::Right => "right",
@@ -458,14 +470,14 @@ fn directional_action_name(action: &DirectionalActionKind) -> &'static str {
     }
 }
 
-fn jump_direction_name(direction: &JumpDirection) -> &'static str {
+pub(crate) fn jump_direction_name(direction: &JumpDirection) -> &'static str {
     match direction {
         JumpDirection::Up => "up",
         JumpDirection::Down => "down",
     }
 }
 
-fn independent_action_name(action: &IndependentActionKind) -> &'static str {
+pub(crate) fn independent_action_name(action: &IndependentActionKind) -> &'static str {
     match action {
         IndependentActionKind::Backspace => "backspace",
         IndependentActionKind::NextLine => "next_line",

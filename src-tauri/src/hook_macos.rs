@@ -14,9 +14,9 @@ use core_graphics::event::{
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
 use crate::{
-    js_keycode_name, ActionConfig, ActionMappingEntry, DirectionalActionKind,
-    IndependentActionKind, JumpDirection, ModifierKey, Trigger, ACTION_MAPPINGS, CAPS_DOWN,
-    CAPS_PRESSED_AT_MS, DID_REMAP, IS_PAUSED,
+    directional_action_name, independent_action_name, js_keycode_name, jump_direction_name,
+    ActionConfig, ActionMappingEntry, DirectionalActionKind, IndependentActionKind, JumpDirection,
+    ModifierKey, Trigger, ACTION_MAPPINGS, CAPS_DOWN, CAPS_PRESSED_AT_MS, DID_REMAP, IS_PAUSED,
 };
 
 // Magic value stamped on injected events to prevent feedback loops
@@ -263,6 +263,63 @@ fn modtap_on_modifier_flags(modifier: ModifierKey, flags: CGEventFlags) -> Optio
     }
 }
 
+/// Human-readable "Cmd+Shift+V"-style string for a KeyCombo.
+fn key_combo_string(
+    target_key: u16,
+    with_ctrl: bool,
+    with_alt: bool,
+    with_cmd: bool,
+    with_target_shift: bool,
+) -> String {
+    let mut s = String::new();
+    if with_cmd {
+        s.push_str("Cmd+");
+    }
+    if with_ctrl {
+        s.push_str("Ctrl+");
+    }
+    if with_alt {
+        s.push_str("Alt+");
+    }
+    if with_target_shift {
+        s.push_str("Shift+");
+    }
+    s.push_str(&js_keycode_name(target_key));
+    s
+}
+
+/// Readable one-line description of any action, for logs.
+fn describe_action(action: &ActionConfig) -> String {
+    match action {
+        ActionConfig::KeyCombo {
+            target_key,
+            with_ctrl,
+            with_alt,
+            with_cmd,
+            with_target_shift,
+        } => key_combo_string(
+            *target_key,
+            *with_ctrl,
+            *with_alt,
+            *with_cmd,
+            *with_target_shift,
+        ),
+        ActionConfig::Directional { action } => {
+            format!("directional {}", directional_action_name(action))
+        }
+        ActionConfig::Jump { direction, count } => {
+            format!("jump {} x{}", jump_direction_name(direction), count)
+        }
+        ActionConfig::Independent { action } => {
+            format!("independent {}", independent_action_name(action))
+        }
+        ActionConfig::InputSource { input_source_id } => {
+            format!("input source {}", input_source_id)
+        }
+        ActionConfig::Command { command } => format!("command: {}", command),
+    }
+}
+
 /// Fire the action bound to a double-tapped modifier.
 ///
 /// KeyCombo needs special handling here (vs. the Caps path's flag-only
@@ -295,23 +352,12 @@ fn fire_double_tap_modifier_action(action: ActionConfig) {
             );
             return;
         };
-        let mut combo = String::new();
-        if with_cmd {
-            combo.push_str("Cmd+");
-        }
-        if with_ctrl {
-            combo.push_str("Ctrl+");
-        }
-        if with_alt {
-            combo.push_str("Alt+");
-        }
-        if with_target_shift {
-            combo.push_str("Shift+");
-        }
-        combo.push_str(&js_keycode_name(target_key));
         log_macos(
             "INFO",
-            &format!("double-tap KeyCombo synthesizing: {}", combo),
+            &format!(
+                "double-tap KeyCombo synthesizing: {}",
+                key_combo_string(target_key, with_ctrl, with_alt, with_cmd, with_target_shift)
+            ),
         );
         thread::spawn(move || {
             // Let the physical modifier-release that triggered us fully settle.
@@ -581,108 +627,178 @@ fn queue_input_source_switch_on_main(source_id: String) {
     }
 }
 
+// Exact inverse of `js_keycode_to_mac_keycode`. Keep the two in lockstep:
+// every forward entry must have a matching reverse entry, or Caps+<key>
+// saves in config but silently never fires.
 fn mac_keycode_to_js_keycode(mac_keycode: u16) -> Option<u16> {
     match mac_keycode {
-        0x00 => Some(65),  // A
-        0x0B => Some(66),  // B
-        0x08 => Some(67),  // C
-        0x02 => Some(68),  // D
-        0x0E => Some(69),  // E
-        0x03 => Some(70),  // F
-        0x05 => Some(71),  // G
-        0x04 => Some(72),  // H
-        0x22 => Some(73),  // I
-        0x26 => Some(74),  // J
-        0x28 => Some(75),  // K
-        0x25 => Some(76),  // L
-        0x2E => Some(77),  // M
-        0x2D => Some(78),  // N
-        0x1F => Some(79),  // O
-        0x23 => Some(80),  // P
-        0x0C => Some(81),  // Q
-        0x0F => Some(82),  // R
-        0x01 => Some(83),  // S
-        0x11 => Some(84),  // T
-        0x20 => Some(85),  // U
-        0x09 => Some(86),  // V
-        0x0D => Some(87),  // W
-        0x07 => Some(88),  // X
-        0x10 => Some(89),  // Y
-        0x06 => Some(90),  // Z
-        0x1D => Some(48),  // 0
-        0x12 => Some(49),  // 1
-        0x13 => Some(50),  // 2
-        0x14 => Some(51),  // 3
-        0x15 => Some(52),  // 4
-        0x17 => Some(53),  // 5
-        0x16 => Some(54),  // 6
-        0x1A => Some(55),  // 7
-        0x1C => Some(56),  // 8
-        0x19 => Some(57),  // 9
+        // Letters A–Z
+        0x00 => Some(65), // A
+        0x0B => Some(66), // B
+        0x08 => Some(67), // C
+        0x02 => Some(68), // D
+        0x0E => Some(69), // E
+        0x03 => Some(70), // F
+        0x05 => Some(71), // G
+        0x04 => Some(72), // H
+        0x22 => Some(73), // I
+        0x26 => Some(74), // J
+        0x28 => Some(75), // K
+        0x25 => Some(76), // L
+        0x2E => Some(77), // M
+        0x2D => Some(78), // N
+        0x1F => Some(79), // O
+        0x23 => Some(80), // P
+        0x0C => Some(81), // Q
+        0x0F => Some(82), // R
+        0x01 => Some(83), // S
+        0x11 => Some(84), // T
+        0x20 => Some(85), // U
+        0x09 => Some(86), // V
+        0x0D => Some(87), // W
+        0x07 => Some(88), // X
+        0x10 => Some(89), // Y
+        0x06 => Some(90), // Z
+        // Digits 0–9 (top row)
+        0x1D => Some(48), // 0
+        0x12 => Some(49), // 1
+        0x13 => Some(50), // 2
+        0x14 => Some(51), // 3
+        0x15 => Some(52), // 4
+        0x17 => Some(53), // 5
+        0x16 => Some(54), // 6
+        0x1A => Some(55), // 7
+        0x1C => Some(56), // 8
+        0x19 => Some(57), // 9
+        // Punctuation / symbols (ANSI/US physical layout)
+        0x29 => Some(186), // ;
+        0x18 => Some(187), // =
+        0x1B => Some(189), // -
         0x2B => Some(188), // ,
         0x2F => Some(190), // .
+        0x2C => Some(191), // /
+        0x2A => Some(220), // \
+        0x27 => Some(222), // '
+        0x21 => Some(219), // [
+        0x1E => Some(221), // ]
+        0x32 => Some(192), // `
+        // Whitespace / control
+        0x33 => Some(8),  // Backspace
+        0x30 => Some(9),  // Tab
+        0x24 => Some(13), // Enter / Return
+        0x35 => Some(27), // Escape
+        0x31 => Some(32), // Space
+        0x75 => Some(46), // Forward Delete
+        // Navigation cluster
+        0x7B => Some(37), // Left
+        0x7E => Some(38), // Up
+        0x7C => Some(39), // Right
+        0x7D => Some(40), // Down
+        0x73 => Some(36), // Home
+        0x77 => Some(35), // End
+        0x74 => Some(33), // Page Up
+        0x79 => Some(34), // Page Down
+        // Function keys F1–F12
+        0x7A => Some(112), // F1
+        0x78 => Some(113), // F2
+        0x63 => Some(114), // F3
+        0x76 => Some(115), // F4
+        0x60 => Some(116), // F5
+        0x61 => Some(117), // F6
+        0x62 => Some(118), // F7
+        0x64 => Some(119), // F8
+        0x65 => Some(120), // F9
+        0x6D => Some(121), // F10
+        0x67 => Some(122), // F11
+        0x6F => Some(123), // F12
         _ => None,
     }
 }
 
+// JavaScript KeyboardEvent.keyCode -> macOS virtual keycode (Apple
+// HIToolbox/Events.h kVK_*). Verified against the macOS SDK header; the
+// reverse table below is kept an exact inverse of this one.
 fn js_keycode_to_mac_keycode(js_keycode: u16) -> Option<u16> {
     match js_keycode {
-        65 => Some(0x00),  // A
-        66 => Some(0x0B),  // B
-        67 => Some(0x08),  // C
-        68 => Some(0x02),  // D
-        69 => Some(0x0E),  // E
-        70 => Some(0x03),  // F
-        71 => Some(0x05),  // G
-        72 => Some(0x04),  // H
-        73 => Some(0x22),  // I
-        74 => Some(0x26),  // J
-        75 => Some(0x28),  // K
-        76 => Some(0x25),  // L
-        77 => Some(0x2E),  // M
-        78 => Some(0x2D),  // N
-        79 => Some(0x1F),  // O
-        80 => Some(0x23),  // P
-        81 => Some(0x0C),  // Q
-        82 => Some(0x0F),  // R
-        83 => Some(0x01),  // S
-        84 => Some(0x11),  // T
-        85 => Some(0x20),  // U
-        86 => Some(0x09),  // V
-        87 => Some(0x0D),  // W
-        88 => Some(0x07),  // X
-        89 => Some(0x10),  // Y
-        90 => Some(0x06),  // Z
-        48 => Some(0x1D),  // 0
-        49 => Some(0x12),  // 1
-        50 => Some(0x13),  // 2
-        51 => Some(0x14),  // 3
-        52 => Some(0x15),  // 4
-        53 => Some(0x17),  // 5
-        54 => Some(0x16),  // 6
-        55 => Some(0x1A),  // 7
-        56 => Some(0x1C),  // 8
-        57 => Some(0x19),  // 9
+        // Letters A–Z
+        65 => Some(0x00), // A
+        66 => Some(0x0B), // B
+        67 => Some(0x08), // C
+        68 => Some(0x02), // D
+        69 => Some(0x0E), // E
+        70 => Some(0x03), // F
+        71 => Some(0x05), // G
+        72 => Some(0x04), // H
+        73 => Some(0x22), // I
+        74 => Some(0x26), // J
+        75 => Some(0x28), // K
+        76 => Some(0x25), // L
+        77 => Some(0x2E), // M
+        78 => Some(0x2D), // N
+        79 => Some(0x1F), // O
+        80 => Some(0x23), // P
+        81 => Some(0x0C), // Q
+        82 => Some(0x0F), // R
+        83 => Some(0x01), // S
+        84 => Some(0x11), // T
+        85 => Some(0x20), // U
+        86 => Some(0x09), // V
+        87 => Some(0x0D), // W
+        88 => Some(0x07), // X
+        89 => Some(0x10), // Y
+        90 => Some(0x06), // Z
+        // Digits 0–9 (top row)
+        48 => Some(0x1D), // 0
+        49 => Some(0x12), // 1
+        50 => Some(0x13), // 2
+        51 => Some(0x14), // 3
+        52 => Some(0x15), // 4
+        53 => Some(0x17), // 5
+        54 => Some(0x16), // 6
+        55 => Some(0x1A), // 7
+        56 => Some(0x1C), // 8
+        57 => Some(0x19), // 9
+        // Punctuation / symbols (ANSI/US physical layout)
+        186 => Some(0x29), // ;
+        187 => Some(0x18), // =
+        189 => Some(0x1B), // -
         188 => Some(0x2B), // ,
         190 => Some(0x2F), // .
-        186 => Some(0x29), // ;
-        187 => Some(0x18), // = (shares with 7 on some layouts, use 0x18 cautiously)
-        189 => Some(0x1B), // -
         191 => Some(0x2C), // /
-        220 => Some(0x2A), // backslash
+        220 => Some(0x2A), // \
         222 => Some(0x27), // '
         219 => Some(0x21), // [
         221 => Some(0x1E), // ]
         192 => Some(0x32), // `
-        8 => Some(0x33),   // Backspace/Delete
-        13 => Some(0x24),  // Enter
-        9 => Some(0x30),   // Tab
-        27 => Some(0x35),  // Escape
-        32 => Some(0x31),  // Space
-        37 => Some(0x7B),  // Left
-        38 => Some(0x7E),  // Up
-        39 => Some(0x7C),  // Right
-        40 => Some(0x7D),  // Down
+        // Whitespace / control
+        8 => Some(0x33),  // Backspace
+        9 => Some(0x30),  // Tab
+        13 => Some(0x24), // Enter / Return
+        27 => Some(0x35), // Escape
+        32 => Some(0x31), // Space
+        46 => Some(0x75), // Forward Delete
+        // Navigation cluster
+        37 => Some(0x7B), // Left
+        38 => Some(0x7E), // Up
+        39 => Some(0x7C), // Right
+        40 => Some(0x7D), // Down
+        36 => Some(0x73), // Home
+        35 => Some(0x77), // End
+        33 => Some(0x74), // Page Up
+        34 => Some(0x79), // Page Down
+        // Function keys F1–F12
+        112 => Some(0x7A), // F1
+        113 => Some(0x78), // F2
+        114 => Some(0x63), // F3
+        115 => Some(0x76), // F4
+        116 => Some(0x60), // F5
+        117 => Some(0x61), // F6
+        118 => Some(0x62), // F7
+        119 => Some(0x64), // F8
+        120 => Some(0x65), // F9
+        121 => Some(0x6D), // F10
+        122 => Some(0x67), // F11
+        123 => Some(0x6F), // F12
         _ => None,
     }
 }
@@ -1060,6 +1176,22 @@ fn handle_caps_remap(keycode: u16, key_down: bool, active_modifiers: CGEventFlag
         return false;
     };
 
+    if key_down {
+        let trigger = if shift_held {
+            format!("Caps+Shift+{}", js_keycode_name(js_keycode))
+        } else {
+            format!("Caps+{}", js_keycode_name(js_keycode))
+        };
+        log_macos(
+            "INFO",
+            &format!(
+                "Caps remap: {} -> {}",
+                trigger,
+                describe_action(&mapping.action)
+            ),
+        );
+    }
+
     execute_action_mapping(&mapping.action, key_down, active_modifiers);
     true
 }
@@ -1404,19 +1536,11 @@ pub fn start_keyboard_hook() {
                 if CAPS_DOWN.load(Ordering::SeqCst) {
                     let key_down = event_type_matches(event_type, CGEventType::KeyDown);
                     let active_modifiers = active_modifier_flags(flags);
-                    let shift_held = active_modifiers.contains(CGEventFlags::CGEventFlagShift);
 
+                    // handle_caps_remap logs a readable "Caps remap: <trigger>
+                    // -> <action>" line itself (on key_down).
                     if handle_caps_remap(keycode, key_down, active_modifiers) {
                         DID_REMAP.store(true, Ordering::SeqCst);
-                        if key_down {
-                            log_macos(
-                                "INFO",
-                                &format!(
-                                    "Caps remap handled keydown: keycode={} shift={}",
-                                    keycode, shift_held
-                                ),
-                            );
-                        }
                         event.set_type(CGEventType::Null);
                         return None;
                     }
