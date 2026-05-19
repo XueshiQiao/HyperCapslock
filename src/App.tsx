@@ -28,7 +28,12 @@ type DirectionalAction =
 
 type JumpDirection = "up" | "down";
 
-type IndependentAction = "backspace" | "next_line" | "insert_quotes";
+type IndependentAction =
+  | "backspace"
+  | "next_line"
+  | "insert_quotes"
+  | "toggle_caps_lock"
+  | "switch_input_source";
 
 type ActionConfig =
   | { kind: "directional"; action: DirectionalAction }
@@ -69,6 +74,7 @@ function modifierTriggerLabel(m: ModifierKey): string {
 
 type Trigger =
   | { kind: "hyper_plus_key"; key: number; with_shift: boolean }
+  | { kind: "single_tap_hyper" }
   | { kind: "double_tap_hyper" }
   | { kind: "double_tap_modifier"; modifier: ModifierKey };
 
@@ -78,12 +84,14 @@ type ActionMappingEntry = {
 };
 
 function triggerSortKey(t: Trigger): string {
+  if (t.kind === "single_tap_hyper") return "0:single";
   if (t.kind === "double_tap_hyper") return "0:double";
   if (t.kind === "double_tap_modifier") return `0:modifier:${t.modifier}`;
   return `1:${String(t.key).padStart(4, "0")}:${t.with_shift ? "1" : "0"}`;
 }
 
 function triggerUniqueId(t: Trigger): string {
+  if (t.kind === "single_tap_hyper") return "single_tap_hyper";
   if (t.kind === "double_tap_hyper") return "double_tap_hyper";
   if (t.kind === "double_tap_modifier") return `dtm:${t.modifier}`;
   return `hyper:${t.key}:${t.with_shift ? "s" : "n"}`;
@@ -167,7 +175,11 @@ function actionToPresentation(action: ActionConfig): ActionPresentation {
       };
     case "independent": {
       const iconMap: Record<IndependentAction, string> = {
-        backspace: "Delete", next_line: "Enter", insert_quotes: "Code",
+        backspace: "Delete",
+        next_line: "Enter",
+        insert_quotes: "Code",
+        toggle_caps_lock: "Caps",
+        switch_input_source: "Input",
       };
       return { category: t("group.independent"), value: t(`action.${action.action}`), icon: iconMap[action.action] };
     }
@@ -207,7 +219,7 @@ function App() {
   const [actionMappings, setActionMappings] = useState<ActionMappingEntry[]>([]);
   // Combined trigger picker: "plain" = Caps+Key, "with_shift" = Caps+Shift+Key,
   // "double_tap" = Caps×2, "dtm:<modifier>" = double-tap that modifier.
-  type TriggerSel = "plain" | "with_shift" | "double_tap" | `dtm:${ModifierKey}`;
+  type TriggerSel = "plain" | "with_shift" | "single_tap" | "double_tap" | `dtm:${ModifierKey}`;
   const [newTriggerSel, setNewTriggerSel] = useState<TriggerSel>("plain");
   const [newKey, setNewKey] = useState<number | null>(null);
   const [newKeyDisplay, setNewKeyDisplay] = useState("");
@@ -335,6 +347,9 @@ function App() {
   }
 
   function buildDraftTrigger(): Trigger | null {
+    if (newTriggerSel === "single_tap") {
+      return { kind: "single_tap_hyper" };
+    }
     if (newTriggerSel === "double_tap") {
       return { kind: "double_tap_hyper" };
     }
@@ -399,7 +414,9 @@ function App() {
   function openEditModal(entry: ActionMappingEntry) {
     resetDraftFields();
     // Pre-fill trigger
-    if (entry.trigger.kind === "double_tap_hyper") {
+    if (entry.trigger.kind === "single_tap_hyper") {
+      setNewTriggerSel("single_tap");
+    } else if (entry.trigger.kind === "double_tap_hyper") {
       setNewTriggerSel("double_tap");
     } else if (entry.trigger.kind === "double_tap_modifier") {
       setNewTriggerSel(`dtm:${entry.trigger.modifier}`);
@@ -881,7 +898,13 @@ function App() {
                       className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2 px-3 border border-slate-200/50 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-500 transition-colors group cursor-pointer"
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        {entry.trigger.kind === "double_tap_hyper" ? (
+                        {entry.trigger.kind === "single_tap_hyper" ? (
+                          <>
+                            <Kbd>Caps</Kbd>
+                            <span className="text-slate-400 dark:text-slate-500 font-light text-xs">×</span>
+                            <Kbd>1</Kbd>
+                          </>
+                        ) : entry.trigger.kind === "double_tap_hyper" ? (
                           <>
                             <Kbd>Caps</Kbd>
                             <span className="text-slate-400 dark:text-slate-500 font-light text-xs">×</span>
@@ -975,6 +998,7 @@ function App() {
                 options={[
                   { value: "plain", label: t("mappings.caps") },
                   { value: "with_shift", label: t("mappings.caps_shift") },
+                  { value: "single_tap", label: t("trigger.single_tap_hyper") },
                   { value: "double_tap", label: t("trigger.double_tap_hyper") },
                   ...MODIFIER_KEYS.map((m) => ({
                     value: `dtm:${m}`,
@@ -1078,6 +1102,8 @@ function App() {
                       { value: "backspace", label: t("action.backspace") },
                       { value: "next_line", label: t("action.next_line") },
                       { value: "insert_quotes", label: t("action.insert_quotes") },
+                      { value: "toggle_caps_lock", label: t("action.toggle_caps_lock") },
+                      { value: "switch_input_source", label: t("action.switch_input_source") },
                     ]}
                   />
                 )}
@@ -1402,6 +1428,7 @@ function ActionIcon({ icon, className }: { icon: string; className?: string }) {
     case "WordLeft": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5 5-5M18 17l-5-5 5-5" /></svg>;
     case "Code": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>;
     case "Input": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 0c2.2 2.3 3.5 5.4 3.5 10S14.2 19.7 12 22m0-20C9.8 4.3 8.5 7.4 8.5 12S9.8 19.7 12 22m-9-10h18" /></svg>;
+    case "Caps": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12l7-7 7 7M9 12v6h6v-6" /></svg>;
     case "Command": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 8h8v8H8zM8 2a4 4 0 110 8M2 8a4 4 0 108 0m4 8a4 4 0 108 0m-8 6a4 4 0 110-8" /></svg>;
     case "KeyCombo": return <svg className={commonClasses} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" /></svg>;
     default: return null;

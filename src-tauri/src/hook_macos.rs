@@ -46,7 +46,7 @@ const KC_FN: u16 = 63;
 
 const MACOS_LOG_PATH: &str = "/tmp/hypercapslock-macos.log";
 const CAPS_TAP_MAX_MS: u64 = 200;
-const DOUBLE_TAP_WINDOW_MS: u64 = 300;
+const DOUBLE_TAP_WINDOW_MS: u64 = 200;
 static LOG_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 static EVENT_TAP_PORT: AtomicUsize = AtomicUsize::new(0);
 // Timestamp (ms) of the last unmatched short tap pending a possible 2nd tap.
@@ -370,6 +370,8 @@ fn hud_parts(action: &ActionConfig) -> (String, String) {
                 IndependentActionKind::Backspace => ("⌫", "Backspace"),
                 IndependentActionKind::NextLine => ("↵", "New Line"),
                 IndependentActionKind::InsertQuotes => ("\u{201C}\u{201D}", "Insert Quotes"),
+                IndependentActionKind::ToggleCapsLock => ("\u{21EA}", "Toggle Caps Lock"),
+                IndependentActionKind::SwitchInputSource => ("\u{2328}", "Switch Input Source"),
             };
             (sym.to_string(), name.to_string())
         }
@@ -883,8 +885,9 @@ fn event_type_matches(a: CGEventType, b: CGEventType) -> bool {
     (a as u32) == (b as u32)
 }
 
-/// Toggle CapsLock state via IOKit (the only reliable way on macOS).
-fn toggle_caps_lock() {
+/// Read the current CapsLock modifier-lock state from IOHIDSystem.
+/// Returns `None` if any step of the IOKit dance fails.
+fn read_caps_lock_state() -> Option<bool> {
     #[link(name = "IOKit", kind = "framework")]
     extern "C" {
         fn IOServiceGetMatchingService(mainPort: u32, matching: *mut std::ffi::c_void) -> u32;
@@ -893,30 +896,22 @@ fn toggle_caps_lock() {
         fn IOServiceClose(connect: u32) -> i32;
         fn IOObjectRelease(object: u32) -> i32;
         fn IOHIDGetModifierLockState(handle: u32, selector: i32, state: *mut bool) -> i32;
-        fn IOHIDSetModifierLockState(handle: u32, selector: i32, state: bool) -> i32;
     }
     extern "C" {
         static mach_task_self_: u32;
     }
-
     const KIO_HID_PARAM_CONNECT_TYPE: u32 = 1;
     const KIO_HID_CAPS_LOCK_STATE: i32 = 1;
 
     unsafe {
         let matching = IOServiceMatching(b"IOHIDSystem\0".as_ptr() as *const i8);
         if matching.is_null() {
-            log_macos("ERROR", "IOServiceMatching(IOHIDSystem) returned null.");
-            return;
+            return None;
         }
         let service = IOServiceGetMatchingService(0, matching);
         if service == 0 {
-            log_macos(
-                "ERROR",
-                "IOServiceGetMatchingService(IOHIDSystem) returned 0.",
-            );
-            return;
+            return None;
         }
-
         let mut connect: u32 = 0;
         let kr = IOServiceOpen(
             service,
@@ -926,22 +921,237 @@ fn toggle_caps_lock() {
         );
         IOObjectRelease(service);
         if kr != 0 {
-            log_macos("ERROR", &format!("IOServiceOpen failed with code {}.", kr));
+            return None;
+        }
+        let mut state = false;
+        let kr = IOHIDGetModifierLockState(connect, KIO_HID_CAPS_LOCK_STATE, &mut state);
+        IOServiceClose(connect);
+        if kr != 0 {
+            return None;
+        }
+        Some(state)
+    }
+}
+
+/// Force a CapsLock lock-state change via IOKit. This bypasses HIToolbox and
+/// updates the kernel AlphaShift bit / keyboard LED directly. Keeps basic
+/// CapsLock-toggle behavior working for users who don't have the Sequoia
+/// "Use 中/英 key to switch to and from ABC" setting enabled.
+///
+/// Returns `true` on success. The caller in the pre-empt path uses this to
+/// decide whether to XOR the in-flight key's AlphaShift flag: if the kernel
+/// state didn't actually flip, the XOR would mis-case the in-flight key.
+fn set_caps_lock_state(new_state: bool) -> bool {
+    #[link(name = "IOKit", kind = "framework")]
+    extern "C" {
+        fn IOServiceGetMatchingService(mainPort: u32, matching: *mut std::ffi::c_void) -> u32;
+        fn IOServiceMatching(name: *const i8) -> *mut std::ffi::c_void;
+        fn IOServiceOpen(service: u32, owning_task: u32, r#type: u32, connect: *mut u32) -> i32;
+        fn IOServiceClose(connect: u32) -> i32;
+        fn IOObjectRelease(object: u32) -> i32;
+        fn IOHIDSetModifierLockState(handle: u32, selector: i32, state: bool) -> i32;
+    }
+    extern "C" {
+        static mach_task_self_: u32;
+    }
+    const KIO_HID_PARAM_CONNECT_TYPE: u32 = 1;
+    const KIO_HID_CAPS_LOCK_STATE: i32 = 1;
+
+    unsafe {
+        let matching = IOServiceMatching(b"IOHIDSystem\0".as_ptr() as *const i8);
+        if matching.is_null() {
+            log_macos("ERROR", "set_caps_lock_state: IOServiceMatching null.");
+            return false;
+        }
+        let service = IOServiceGetMatchingService(0, matching);
+        if service == 0 {
+            log_macos("ERROR", "set_caps_lock_state: matching service 0.");
+            return false;
+        }
+        let mut connect: u32 = 0;
+        let kr = IOServiceOpen(
+            service,
+            mach_task_self_,
+            KIO_HID_PARAM_CONNECT_TYPE,
+            &mut connect,
+        );
+        IOObjectRelease(service);
+        if kr != 0 {
+            log_macos(
+                "ERROR",
+                &format!("set_caps_lock_state: IOServiceOpen failed code {}.", kr),
+            );
+            return false;
+        }
+        let set_kr = IOHIDSetModifierLockState(connect, KIO_HID_CAPS_LOCK_STATE, new_state);
+        IOServiceClose(connect);
+        if set_kr != 0 {
+            log_macos(
+                "WARN",
+                &format!(
+                    "set_caps_lock_state: IOHIDSetModifierLockState returned {}.",
+                    set_kr
+                ),
+            );
+            return false;
+        }
+        true
+    }
+}
+
+/// Synthesize Ctrl+Space (macOS default for "Select the previous input
+/// source") so Apple's own input-source dispatcher does the work. The system
+/// toggles between the two most-recently-used input sources — same semantics
+/// as a hardware 中/英 key. We can't natively trigger HIToolbox's
+/// Caps→ABC setting from userspace (its event-source filter ignores all
+/// synthetic CapsLock events at the WindowServer layer); routing through the
+/// official input-source shortcut is the most "native-feeling" path that
+/// actually works without a DriverKit virtual keyboard.
+///
+/// Each event is stamped with `INJECTED_EVENT_MAGIC` so our own tap ignores
+/// the sequence.
+///
+/// Threading + pacing: we spawn into a background thread and insert a small
+/// inter-event delay. Two reasons.
+///   1. The event tap callback returns immediately, so the user's next
+///      physical keypress doesn't queue behind our synthesis.
+///   2. Bursting four CGEvents in microseconds occasionally lets
+///      WindowServer coalesce / drop them — observed as input-source
+///      switches "missing" under fast tapping. The same pacing trick is
+///      used by `force_input_source_activation` (50 ms Kana sleep) and
+///      `fire_double_tap_modifier_action` (50 ms settle).
+fn synthesize_ctrl_space() {
+    thread::spawn(|| {
+        if IS_PAUSED.load(Ordering::SeqCst) {
             return;
         }
+        const KC_SPACE: u16 = 0x31;
+        let Ok(src) = CGEventSource::new(CGEventSourceStateID::HIDSystemState) else {
+            log_macos(
+                "WARN",
+                "synthesize_ctrl_space: failed to create CGEventSource",
+            );
+            return;
+        };
+        let ctrl_flag = CGEventFlags::CGEventFlagControl;
+        let seq: [(u16, bool, CGEventFlags); 4] = [
+            (KC_LCTRL, true, ctrl_flag),
+            (KC_SPACE, true, ctrl_flag),
+            (KC_SPACE, false, ctrl_flag),
+            (KC_LCTRL, false, CGEventFlags::empty()),
+        ];
+        for (i, (kc, down, flags)) in seq.iter().enumerate() {
+            match CGEvent::new_keyboard_event(src.clone(), *kc, *down) {
+                Ok(e) => {
+                    e.set_flags(*flags);
+                    e.set_integer_value_field(
+                        EventField::EVENT_SOURCE_USER_DATA,
+                        INJECTED_EVENT_MAGIC,
+                    );
+                    e.post(CGEventTapLocation::HID);
+                }
+                Err(_) => {
+                    log_macos(
+                        "WARN",
+                        "synthesize_ctrl_space: failed to create one of the keyboard events",
+                    );
+                    return;
+                }
+            }
+            if i < seq.len() - 1 {
+                thread::sleep(std::time::Duration::from_millis(8));
+            }
+        }
+    });
+}
 
-        let mut current_state = false;
-        IOHIDGetModifierLockState(connect, KIO_HID_CAPS_LOCK_STATE, &mut current_state);
-        IOHIDSetModifierLockState(connect, KIO_HID_CAPS_LOCK_STATE, !current_state);
+/// Look up the configured `SingleTapHyper` action, if any.
+fn find_single_tap_action() -> Option<ActionConfig> {
+    let guard = ACTION_MAPPINGS.lock().unwrap();
+    let mappings = guard.as_ref()?;
+    mappings
+        .iter()
+        .find(|m| matches!(m.trigger, Trigger::SingleTapHyper))
+        .map(|m| m.action.clone())
+}
+
+/// Dispatcher for a confirmed Caps short-tap (held ≤ CAPS_TAP_MAX_MS, no
+/// chord). Branches on whether the user configured a `SingleTapHyper`
+/// mapping:
+///
+///   - **No mapping**: the historical default — toggle the system CapsLock
+///     lock state via IOKit (`toggle_caps_lock`). Returns `true` because the
+///     AlphaShift bit flipped; the pre-empt path uses this to XOR-patch the
+///     in-flight key's case-resolution flag.
+///
+///   - **Mapping present**: fire its action via `execute_action_mapping`
+///     (down + up phase, same shape as `DoubleTapHyper`). Suppresses the
+///     default CapsLock toggle. Returns `true` only if the action itself is
+///     `Independent::ToggleCapsLock` (the user explicitly bound it to a
+///     CapsLock flip) — that's the only case where the pre-empt XOR patch
+///     should apply.
+fn fire_caps_short_tap() -> bool {
+    if let Some(action) = find_single_tap_action() {
+        log_macos(
+            "INFO",
+            &format!("Caps single-tap action: {}", describe_action(&action)),
+        );
+        let (combo, caption) = hud_parts(&action);
+        emit_hud("Caps".to_string(), combo, caption);
+        // Special-case the ToggleCapsLock action: short-circuit through
+        // `toggle_caps_lock` directly so its bool result reaches the
+        // pre-empt path. Going through `execute_action_mapping` would
+        // discard the success signal (it returns `()`), making the XOR
+        // patch unsafe if IOKit silently failed.
+        if let ActionConfig::Independent {
+            action: IndependentActionKind::ToggleCapsLock,
+        } = action
+        {
+            return toggle_caps_lock();
+        }
+        execute_action_mapping(&action, true, CGEventFlags::empty());
+        execute_action_mapping(&action, false, CGEventFlags::empty());
+        false
+    } else {
+        toggle_caps_lock()
+    }
+}
+
+/// Direct IOKit CapsLock toggle. Used as the default Caps short-tap behavior
+/// (when no `SingleTapHyper` mapping is configured) and as the implementation
+/// of the `Independent::ToggleCapsLock` action.
+///
+/// Returns `true` only when the AlphaShift bit was actually flipped. The
+/// pre-empt-on-next-keypress path uses this to decide whether to XOR-patch
+/// the in-flight key's `AlphaShift` flag: a no-op patch against a state that
+/// didn't actually change would corrupt the displayed case.
+fn toggle_caps_lock() -> bool {
+    let Some(current_state) = read_caps_lock_state() else {
+        log_macos(
+            "ERROR",
+            "toggle_caps_lock: could not read current CapsLock state; aborting toggle.",
+        );
+        return false;
+    };
+    let new_state = !current_state;
+    if set_caps_lock_state(new_state) {
         log_macos(
             "INFO",
             &format!(
                 "CapsLock toggled via IOKit: previous_state={} new_state={}",
-                current_state, !current_state
+                current_state, new_state
             ),
         );
-
-        IOServiceClose(connect);
+        true
+    } else {
+        log_macos(
+            "ERROR",
+            &format!(
+                "CapsLock toggle failed at IOKit set step (previous_state={}).",
+                current_state
+            ),
+        );
+        false
     }
 }
 
@@ -987,7 +1197,7 @@ fn handle_short_tap() {
             "INFO",
             "Caps(F18) prior pending tap expired without 2nd tap; firing CapsLock toggle synchronously.",
         );
-        toggle_caps_lock();
+        fire_caps_short_tap();
     }
 
     if dt_action.is_some() {
@@ -1020,7 +1230,7 @@ fn handle_short_tap() {
                     "INFO",
                     "Caps(F18) double-tap window elapsed; toggling CapsLock.",
                 );
-                toggle_caps_lock();
+                fire_caps_short_tap();
             }
         });
     } else {
@@ -1028,7 +1238,7 @@ fn handle_short_tap() {
             "INFO",
             "Caps(F18) short tap; toggling CapsLock immediately.",
         );
-        toggle_caps_lock();
+        fire_caps_short_tap();
     }
 }
 
@@ -1175,6 +1385,16 @@ fn execute_action_mapping(action: &ActionConfig, key_down: bool, active_modifier
                     for _ in 0..3 {
                         post_key_tap(KC_LEFT, CGEventFlags::empty());
                     }
+                }
+            }
+            IndependentActionKind::ToggleCapsLock => {
+                if key_down {
+                    toggle_caps_lock();
+                }
+            }
+            IndependentActionKind::SwitchInputSource => {
+                if key_down {
+                    synthesize_ctrl_space();
                 }
             }
         },
@@ -1600,20 +1820,33 @@ pub fn start_keyboard_hook() {
                     let pending = LAST_TAP_AT_MS.swap(0, Ordering::SeqCst);
                     if pending > 0 && !IS_PAUSED.load(Ordering::SeqCst) {
                         let age_ms = now_millis().saturating_sub(pending);
-                        let old_flags = event.get_flags();
-                        let patched = old_flags ^ CGEventFlags::CGEventFlagAlphaShift;
-                        log_macos(
-                            "INFO",
-                            &format!(
-                                "Caps(F18) pending toggle pre-empted by next keypress: keycode={} age={}ms; toggling CapsLock synchronously and flipping in-flight AlphaShift flag (0x{:x} -> 0x{:x}).",
-                                keycode,
-                                age_ms,
-                                old_flags.bits(),
-                                patched.bits()
-                            ),
-                        );
-                        toggle_caps_lock();
-                        event.set_flags(patched);
+                        // Synthesize the tap first; only patch the in-flight key's
+                        // AlphaShift flag if the kernel state actually flipped.
+                        // Otherwise the XOR would mis-case the typed character.
+                        let kernel_flipped = fire_caps_short_tap();
+                        if kernel_flipped {
+                            let old_flags = event.get_flags();
+                            let patched = old_flags ^ CGEventFlags::CGEventFlagAlphaShift;
+                            log_macos(
+                                "INFO",
+                                &format!(
+                                    "Caps(F18) pending toggle pre-empted by next keypress: keycode={} age={}ms; toggled CapsLock and flipped in-flight AlphaShift flag (0x{:x} -> 0x{:x}).",
+                                    keycode,
+                                    age_ms,
+                                    old_flags.bits(),
+                                    patched.bits()
+                                ),
+                            );
+                            event.set_flags(patched);
+                        } else {
+                            log_macos(
+                                "WARN",
+                                &format!(
+                                    "Caps(F18) pending toggle pre-empted by next keypress: keycode={} age={}ms; kernel state flip failed — skipping in-flight AlphaShift patch.",
+                                    keycode, age_ms
+                                ),
+                            );
+                        }
                     }
                 }
 

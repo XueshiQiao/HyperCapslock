@@ -86,6 +86,17 @@ pub(crate) enum IndependentActionKind {
     Backspace,
     NextLine,
     InsertQuotes,
+    /// Flip the system CapsLock lock state (the historical default on a
+    /// short Caps tap). Exposed as an explicit action so users can pick it
+    /// as a `SingleTapHyper` target — handy when they've configured another
+    /// trigger to do the input-source switch and still want one mapping
+    /// that toggles caps.
+    ToggleCapsLock,
+    /// Switch macOS input source by synthesizing the system "Select previous
+    /// input source" shortcut (Ctrl+Space by default). Mirrors the China-
+    /// market 中/英 key behavior: toggles between the two most-recently-used
+    /// input sources via Apple's own dispatcher.
+    SwitchInputSource,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -142,6 +153,12 @@ pub(crate) enum Trigger {
         #[serde(default)]
         with_shift: bool,
     },
+    /// Single tap of Caps with no key held (held ≤ CAPS_TAP_MAX_MS, no
+    /// chord). When configured, the bound action replaces the historical
+    /// "toggle CapsLock" behavior on a short tap. Coexists with
+    /// `DoubleTapHyper` — both still wait DOUBLE_TAP_WINDOW_MS to
+    /// disambiguate if both are configured.
+    SingleTapHyper,
     DoubleTapHyper,
     DoubleTapModifier {
         modifier: ModifierKey,
@@ -498,6 +515,8 @@ pub(crate) fn independent_action_name(action: &IndependentActionKind) -> &'stati
         IndependentActionKind::Backspace => "backspace",
         IndependentActionKind::NextLine => "next_line",
         IndependentActionKind::InsertQuotes => "insert_quotes",
+        IndependentActionKind::ToggleCapsLock => "toggle_caps_lock",
+        IndependentActionKind::SwitchInputSource => "switch_input_source",
     }
 }
 
@@ -518,9 +537,10 @@ fn modifier_key_name(modifier: ModifierKey) -> &'static str {
 fn render_action_mappings_yaml_with_comments(mappings: &[ActionMappingEntry]) -> String {
     let mut lines = vec![
         "# HyperCapslock action mappings".to_string(),
-        "# trigger.kind: hyper_plus_key (Caps+Key), double_tap_hyper (Caps tapped twice),"
+        "# trigger.kind: hyper_plus_key (Caps+Key), single_tap_hyper (Caps tapped once),"
             .to_string(),
-        "#   or double_tap_modifier (a modifier key tapped twice)".to_string(),
+        "#   double_tap_hyper (Caps tapped twice), or double_tap_modifier".to_string(),
+        "#   (a modifier key tapped twice)".to_string(),
         "# key uses JavaScript keyCode".to_string(),
     ];
 
@@ -531,6 +551,10 @@ fn render_action_mappings_yaml_with_comments(mappings: &[ActionMappingEntry]) ->
                 lines.push("    kind: hyper_plus_key".to_string());
                 lines.push(format!("    key: {} # {}", key, js_keycode_name(*key)));
                 lines.push(format!("    with_shift: {}", with_shift));
+            }
+            Trigger::SingleTapHyper => {
+                lines.push("- trigger:".to_string());
+                lines.push("    kind: single_tap_hyper".to_string());
             }
             Trigger::DoubleTapHyper => {
                 lines.push("- trigger:".to_string());
