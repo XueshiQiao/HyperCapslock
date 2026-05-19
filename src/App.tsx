@@ -226,6 +226,7 @@ function App() {
   const [newTargetShift, setNewTargetShift] = useState(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingTrigger, setEditingTrigger] = useState<Trigger | null>(null);
   const [permissionsCollapsed, setPermissionsCollapsed] = useState<boolean | null>(null);
   const [showLangMenu, setShowLangMenu] = useState(false);
   const langRef = useRef<HTMLDivElement | null>(null);
@@ -370,11 +371,86 @@ function App() {
     }
   }
 
-  async function upsertActionMapping() {
+  function resetDraftFields() {
+    setNewTriggerSel("plain");
+    setNewKey(null);
+    setNewKeyDisplay("");
+    setNewActionKind("directional");
+    setNewDirectionalAction("left");
+    setNewJumpDirection("up");
+    setNewJumpCount(10);
+    setNewIndependentAction("backspace");
+    setNewInputSourceId("");
+    setNewCommand("");
+    setNewTargetKey(null);
+    setNewTargetKeyDisplay("");
+    setNewTargetCtrl(false);
+    setNewTargetAlt(false);
+    setNewTargetCmd(false);
+    setNewTargetShift(false);
+  }
+
+  function openAddModal() {
+    resetDraftFields();
+    setEditingTrigger(null);
+    setShowAddModal(true);
+  }
+
+  function openEditModal(entry: ActionMappingEntry) {
+    resetDraftFields();
+    // Pre-fill trigger
+    if (entry.trigger.kind === "double_tap_hyper") {
+      setNewTriggerSel("double_tap");
+    } else if (entry.trigger.kind === "double_tap_modifier") {
+      setNewTriggerSel(`dtm:${entry.trigger.modifier}`);
+    } else {
+      setNewTriggerSel(entry.trigger.with_shift ? "with_shift" : "plain");
+      setNewKey(entry.trigger.key);
+      setNewKeyDisplay(keyCodeToDisplay(entry.trigger.key));
+    }
+    // Pre-fill action
+    const action = entry.action;
+    setNewActionKind(action.kind);
+    switch (action.kind) {
+      case "directional":
+        setNewDirectionalAction(action.action);
+        break;
+      case "jump":
+        setNewJumpDirection(action.direction);
+        setNewJumpCount(action.count);
+        break;
+      case "independent":
+        setNewIndependentAction(action.action);
+        break;
+      case "input_source":
+        setNewInputSourceId(action.input_source_id);
+        break;
+      case "command":
+        setNewCommand(action.command);
+        break;
+      case "key_combo":
+        setNewTargetKey(action.target_key);
+        setNewTargetKeyDisplay(keyCodeToDisplay(action.target_key));
+        setNewTargetCtrl(action.with_ctrl);
+        setNewTargetAlt(action.with_alt);
+        setNewTargetCmd(action.with_cmd);
+        setNewTargetShift(action.with_target_shift);
+        break;
+    }
+    setEditingTrigger(entry.trigger);
+    setShowAddModal(true);
+  }
+
+  function closeMappingModal() {
+    setShowAddModal(false);
+    setEditingTrigger(null);
+  }
+
+  async function upsertActionMapping(): Promise<boolean> {
     const trigger = buildDraftTrigger();
-    if (!trigger) return;
+    if (!trigger) return false;
     const action = buildDraftAction();
-    if (!action) return;
+    if (!action) return false;
 
     try {
       await invoke("upsert_action_mapping", { trigger, action });
@@ -384,9 +460,11 @@ function App() {
       if (action.kind === "command") setNewCommand("");
       if (action.kind === "input_source") setNewInputSourceId("");
       showToast(t("toast.mapping_saved"), "success");
+      return true;
     } catch (e: any) {
       console.error(e);
       showToast((e?.toString?.() ?? t("toast.mapping_save_failed")).replace("Error: ", ""), "error");
+      return false;
     }
   }
 
@@ -779,7 +857,7 @@ function App() {
                 {t("config.export")}
               </button>
               <button
-                onClick={() => setShowAddModal(true)}
+                onClick={openAddModal}
                 className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors font-medium"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
@@ -799,7 +877,8 @@ function App() {
                   return (
                     <div
                       key={triggerUniqueId(entry.trigger)}
-                      className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2 px-3 border border-slate-200/50 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-500 transition-colors group"
+                      onDoubleClick={() => openEditModal(entry)}
+                      className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2 px-3 border border-slate-200/50 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-500 transition-colors group cursor-pointer"
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         {entry.trigger.kind === "double_tap_hyper" ? (
@@ -841,7 +920,22 @@ function App() {
                           </span>
                           <ActionIcon icon={presentation.icon} className={presentation.iconClassName} />
                         </div>
-                        <button onClick={() => removeActionMappingByTrigger(entry.trigger)} className="text-slate-400 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 transition-colors">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openEditModal(entry); }}
+                          onDoubleClick={(e) => e.stopPropagation()}
+                          title={t("mappings.edit")}
+                          aria-label={t("mappings.edit")}
+                          className="text-slate-400 dark:text-slate-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeActionMappingByTrigger(entry.trigger); }}
+                          onDoubleClick={(e) => e.stopPropagation()}
+                          title={t("mappings.delete")}
+                          aria-label={t("mappings.delete")}
+                          className="text-slate-400 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                        >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                         </button>
                       </div>
@@ -860,12 +954,12 @@ function App() {
       {/* Add Mapping Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeMappingModal} />
           <div className="relative w-full max-w-[420px] mx-4 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl shadow-2xl p-6 animate-modal-in">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-slate-800 dark:text-slate-200 font-semibold text-base">{t("mappings.add_title")}</h2>
+              <h2 className="text-slate-800 dark:text-slate-200 font-semibold text-base">{editingTrigger ? t("mappings.edit_title") : t("mappings.add_title")}</h2>
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={closeMappingModal}
                 className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -877,6 +971,7 @@ function App() {
                 value={newTriggerSel}
                 onChange={(value) => setNewTriggerSel(value as typeof newTriggerSel)}
                 wrapperClassName="col-span-1"
+                disabled={!!editingTrigger}
                 options={[
                   { value: "plain", label: t("mappings.caps") },
                   { value: "with_shift", label: t("mappings.caps_shift") },
@@ -893,7 +988,7 @@ function App() {
                 placeholder={!triggerNeedsKey ? "—" : t("mappings.press_key")}
                 value={!triggerNeedsKey ? "" : newKeyDisplay}
                 readOnly
-                disabled={!triggerNeedsKey}
+                disabled={!triggerNeedsKey || !!editingTrigger}
                 onKeyDown={(e) => {
                   e.preventDefault();
                   if (["Shift", "Control", "Alt", "Meta", "CapsLock"].includes(e.key)) return;
@@ -923,7 +1018,7 @@ function App() {
                   { value: "directional", label: t("group.directional") },
                   { value: "jump", label: t("group.jump") },
                   { value: "independent", label: t("group.independent") },
-                  ...(permissions?.platform === "macos"
+                  ...(permissions?.platform === "macos" || newActionKind === "input_source"
                     ? [{ value: "input_source", label: t("group.input_source") }]
                     : []),
                   { value: "command", label: t("group.command") },
@@ -1051,7 +1146,7 @@ function App() {
             </div>
 
             <button
-              onClick={async () => { await upsertActionMapping(); setShowAddModal(false); }}
+              onClick={async () => { if (await upsertActionMapping()) closeMappingModal(); }}
               disabled={!canSaveAction}
               className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 py-2.5 transition-colors text-sm font-medium"
             >
