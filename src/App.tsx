@@ -643,7 +643,7 @@ function App() {
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-[#0f172a] p-6 select-none overflow-y-auto relative">
 
-      {/* Drag region — invisible strip at top for window dragging */}
+      {/* Drag region — covers everything above the Status/Settings row */}
       <div
         data-tauri-drag-region
         onMouseDown={(e) => {
@@ -653,7 +653,7 @@ function App() {
               : getCurrentWindow().startDragging();
           }
         }}
-        className="fixed top-0 left-0 right-0 h-8 z-40"
+        className="fixed top-0 left-0 right-0 h-44 z-40"
       />
 
       {/* Theme + Language Buttons */}

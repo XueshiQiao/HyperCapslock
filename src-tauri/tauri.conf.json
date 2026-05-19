@@ -17,7 +17,8 @@
         "width": 666,
         "height": 1100,
         "visible": false,
-        "titleBarStyle": "Overlay"
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
       }
     ],
     "security": {
