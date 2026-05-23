@@ -50,6 +50,7 @@ final class AppState: ObservableObject {
 
     func bootstrap() {
         config.load()
+        FileLog.shared.info("bootstrap: loaded \(config.mappings.count) mappings; appConfig=\(config.appConfig)")
         applyHudSettings()
         applyActivationPolicy(hide: config.appConfig.hideDockIcon)
         autostart = LaunchAtLogin.isEnabled
@@ -61,6 +62,7 @@ final class AppState: ObservableObject {
     private func applyHudSettings() {
         HudCenter.shared.updateSettings(enabled: config.appConfig.showHud,
                                         durationMs: config.appConfig.hudDurationMs)
+        FileLog.shared.info("HUD settings applied: enabled=\(config.appConfig.showHud) duration=\(config.appConfig.hudDurationMs)ms")
     }
 
     // MARK: - Theme
