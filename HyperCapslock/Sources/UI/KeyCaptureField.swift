@@ -40,7 +40,7 @@ struct KeyCaptureField: NSViewRepresentable {
         private var capturing = false
 
         override var acceptsFirstResponder: Bool { enabled }
-        override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: 34) }
+        override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: 28) }
 
         override func mouseDown(with event: NSEvent) {
             guard enabled else { return }

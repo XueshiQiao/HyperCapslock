@@ -39,7 +39,12 @@ struct AddEditMappingView: View {
                     .disabled(editing)
 
                     if triggerNeedsKey {
-                        LabeledContent(loc.t("mappings.key")) {
+                        // HStack (default .center alignment) instead of LabeledContent:
+                        // LabeledContent top-aligns its label when the trailing control
+                        // is taller than the label, which left "Key" misaligned.
+                        HStack {
+                            Text(loc.t("mappings.key"))
+                            Spacer()
                             KeyCaptureField(jsKeyCode: $key, enabled: !editing, placeholder: loc.t("mappings.press_key"))
                                 .frame(width: 140, height: 28)
                         }
@@ -61,6 +66,7 @@ struct AddEditMappingView: View {
                 }
             }
             .formStyle(.grouped)
+            .scrollDisabled(true)
 
             Divider()
             HStack {

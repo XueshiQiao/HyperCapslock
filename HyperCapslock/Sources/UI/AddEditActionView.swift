@@ -29,6 +29,7 @@ struct AddEditActionView: View {
                 }
             }
             .formStyle(.grouped)
+            .scrollDisabled(true)
 
             Divider()
             HStack {
@@ -60,7 +61,9 @@ struct AddEditActionView: View {
         case "command":
             TextField(loc.t("group.command"), text: $draft.command, prompt: Text("open -a Calculator"))
         case "key_combo":
-            LabeledContent(loc.t("group.key_combo")) {
+            HStack {
+                Text(loc.t("group.key_combo"))
+                Spacer()
                 KeyCaptureField(jsKeyCode: $draft.targetKey, enabled: true, placeholder: loc.t("mappings.press_key"))
                     .frame(width: 140, height: 28)
             }

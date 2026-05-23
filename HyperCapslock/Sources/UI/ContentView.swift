@@ -22,10 +22,13 @@ struct SidebarIcon: View {
     let color: Color
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(.white)
-            .frame(width: 20, height: 20)
-            .background(RoundedRectangle(cornerRadius: 5).fill(color))
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 26, height: 26)
+            .background(RoundedRectangle(cornerRadius: 6).fill(color))
+            // Rasterize so the row-selection vibrancy can't tint/blend the tile —
+            // keeps the icon its true color on the selected (blue) row.
+            .drawingGroup()
     }
 }
 
@@ -39,26 +42,26 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $page) {
-                Label { Text(loc.t("nav.settings")) } icon: { SidebarIcon(symbol: "gearshape.fill", color: .gray) }
-                    .tag(SidebarPage.settings)
-                Label { Text(loc.t("nav.mappings")) } icon: { SidebarIcon(symbol: "keyboard.fill", color: .blue) }
-                    .tag(SidebarPage.mappings)
-                Label { Text(loc.t("nav.actions")) } icon: { SidebarIcon(symbol: "bolt.fill", color: .orange) }
-                    .tag(SidebarPage.actions)
-                Label { Text(loc.t("nav.about")) } icon: { SidebarIcon(symbol: "info.circle.fill", color: .gray) }
-                    .tag(SidebarPage.about)
+                sidebarRow(.settings, loc.t("nav.settings"), "gearshape.fill", .gray)
+                sidebarRow(.mappings, loc.t("nav.mappings"), "keyboard.fill", .blue)
+                sidebarRow(.actions, loc.t("nav.actions"), "bolt.fill", .orange)
+                sidebarRow(.about, loc.t("nav.about"), "info.circle.fill", .gray)
             }
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 215, ideal: 220, max: 240)
             .safeAreaInset(edge: .top, spacing: 0) { brand }
             .safeAreaInset(edge: .bottom, spacing: 0) { statusFooter }
         } detail: {
-            switch page ?? .settings {
-            case .settings: SettingsPage()
-            case .mappings: MappingsPage()
-            case .actions: ActionsPage()
-            case .about: AboutPage()
+            Group {
+                switch page ?? .settings {
+                case .settings: SettingsPage()
+                case .mappings: MappingsPage()
+                case .actions: ActionsPage()
+                case .about: AboutPage()
+                }
             }
+            // Match System Settings' taller rows (SwiftUI's grouped-Form default is tighter).
+            .environment(\.defaultMinListRowHeight, 34)
         }
         .frame(minWidth: 760, minHeight: 560)
         .overlay(alignment: .bottom) {
@@ -67,18 +70,27 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.2), value: app.toast)
     }
 
-    private var brand: some View {
+    private func sidebarRow(_ p: SidebarPage, _ title: String, _ symbol: String, _ color: Color) -> some View {
         HStack(spacing: 9) {
+            SidebarIcon(symbol: symbol, color: color)
+            Text(title)
+        }
+        .padding(.vertical, 2)
+        .tag(p)
+    }
+
+    private var brand: some View {
+        HStack(spacing: 10) {
             Image(nsImage: NSApp.applicationIconImage)
-                .resizable().frame(width: 30, height: 30)
-                .clipShape(RoundedRectangle(cornerRadius: 7))
-            VStack(alignment: .leading, spacing: 0) {
-                Text("HyperCapslock").font(.system(size: 13, weight: .bold))
-                Text("v\(app.appVersion)").font(.system(size: 10)).foregroundColor(.secondary)
+                .resizable().frame(width: 34, height: 34)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            VStack(alignment: .leading, spacing: 1) {
+                Text("HyperCapslock").font(.system(size: 14, weight: .bold))
+                Text("v\(app.appVersion)").font(.system(size: 11)).foregroundColor(.secondary)
             }
             Spacer()
         }
-        .padding(.horizontal, 18).padding(.top, 14).padding(.bottom, 6)
+        .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 12)
     }
 
     private var statusFooter: some View {
