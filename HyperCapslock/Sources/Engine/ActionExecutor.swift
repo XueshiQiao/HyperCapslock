@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import AppKit
 
 // MARK: - Human-readable descriptions (logs + HUD)
 
@@ -23,6 +24,7 @@ func describeAction(_ action: ActionConfig) -> String {
     case .independent(let a): return "independent \(a.rawValue)"
     case .inputSource(let id): return "input source \(id)"
     case .command(let cmd): return "command: \(cmd)"
+    case .openApp(let bid, let name): return "open app \(name) (\(bid))"
     }
 }
 
@@ -58,6 +60,8 @@ func hudParts(_ action: ActionConfig) -> (String, String) {
         return ("\u{2328}", id)
     case .command(let cmd):
         return ("Shell", cmd)
+    case .openApp(_, let name):
+        return ("App", name)
     }
 }
 
@@ -84,7 +88,7 @@ enum ActionExecutor {
     /// modifier intent).
     static func allowShiftFallback(_ action: ActionConfig) -> Bool {
         switch action {
-        case .inputSource, .command, .keyCombo: return false
+        case .inputSource, .command, .keyCombo, .openApp: return false
         default: return true
         }
     }
@@ -191,6 +195,23 @@ enum ActionExecutor {
             if cmd { flags.insert(.maskCommand) }
             if shift { flags.insert(.maskShift) }
             KeyPoster.post(mac, keyDown: keyDown, flags: flags)
+        case .openApp(let bundleID, _):
+            if keyDown {
+                FileLog.shared.info("Open-app mapping triggered: bundleID=\(bundleID)")
+                // Launch Services lookup + launch off the CGEventTap callback thread
+                // (same reason `.command` dispatches): don't block the hot path.
+                DispatchQueue.global().async {
+                    guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+                        FileLog.shared.error("Open-app: no application found for bundle id \(bundleID)")
+                        return
+                    }
+                    let cfg = NSWorkspace.OpenConfiguration()
+                    cfg.activates = true
+                    NSWorkspace.shared.openApplication(at: url, configuration: cfg) { _, error in
+                        if let error { FileLog.shared.error("Open-app failed for \(bundleID): \(error.localizedDescription)") }
+                    }
+                }
+            }
         }
     }
 

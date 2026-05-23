@@ -61,6 +61,7 @@ func actionSymbol(_ config: ActionConfig) -> String {
     case .inputSource: return "globe"
     case .command: return "terminal"
     case .keyCombo: return "command"
+    case .openApp: return "arrow.up.forward.app"
     }
 }
 
@@ -85,6 +86,8 @@ func actionPresentation(_ action: ActionConfig, _ loc: LocalizationManager) -> A
         if cmd { parts.append("Cmd") }; if shift { parts.append("Shift") }
         parts.append(keyCodeDisplay(key))
         return ActionPresentation(category: loc.t("group.key_combo"), value: parts.joined(separator: "+"), symbol: actionSymbol(action))
+    case .openApp(let bid, let name):
+        return ActionPresentation(category: loc.t("group.open_app"), value: name.isEmpty ? bid : name, symbol: actionSymbol(action))
     }
 }
 

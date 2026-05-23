@@ -85,6 +85,7 @@ final class LocalizationManager: ObservableObject {
             "trigger.experimental": "experimental", "trigger.double_tap_hint": "Tap Caps twice quickly",
             "group.directional": "Directional", "group.jump": "Jump", "group.independent": "Independent",
             "group.input_source": "Input Source", "group.command": "Command", "group.key_combo": "Key Combo",
+            "group.open_app": "Open App", "actions.app": "App", "actions.choose_app": "Choose…", "actions.no_app": "No app selected",
             "action.left": "Left", "action.right": "Right", "action.up": "Up", "action.down": "Down",
             "action.word_forward": "Word Forward", "action.word_back": "Word Back",
             "action.home": "Home", "action.end": "End", "action.backspace": "Backspace",
@@ -133,6 +134,7 @@ final class LocalizationManager: ObservableObject {
             "about.version": "Version", "about.links": "Links",
             "mappings.trigger": "Trigger", "mappings.key": "Key", "actions.count": "Count",
             "toast.action_saved": "Action saved", "toast.action_removed": "Action removed", "toast.action_remove_failed": "Failed to remove action",
+            "toast.app_no_bundle_id": "Couldn't read that app's identifier.",
         ],
         .zh: [
             "app.subtitle": "唤醒沉睡的 Capslock",
@@ -156,6 +158,7 @@ final class LocalizationManager: ObservableObject {
             "trigger.experimental": "实验性", "trigger.double_tap_hint": "快速连点两下 Caps",
             "group.directional": "方向", "group.jump": "跳转", "group.independent": "独立",
             "group.input_source": "输入法", "group.command": "命令", "group.key_combo": "组合键",
+            "group.open_app": "打开应用", "actions.app": "应用", "actions.choose_app": "选择…", "actions.no_app": "未选择应用",
             "action.left": "左", "action.right": "右", "action.up": "上", "action.down": "下",
             "action.word_forward": "下一个词", "action.word_back": "上一个词",
             "action.home": "行首", "action.end": "行尾", "action.backspace": "退格",
@@ -202,6 +205,7 @@ final class LocalizationManager: ObservableObject {
             "about.version": "版本", "about.links": "链接",
             "mappings.trigger": "触发", "mappings.key": "按键", "actions.count": "次数",
             "toast.action_saved": "动作已保存", "toast.action_removed": "动作已删除", "toast.action_remove_failed": "删除动作失败",
+            "toast.app_no_bundle_id": "无法读取该应用的标识符。",
         ],
         .ja: [
             "app.subtitle": "Capslockをもっとパワフルに！",
@@ -225,6 +229,7 @@ final class LocalizationManager: ObservableObject {
             "trigger.experimental": "実験的", "trigger.double_tap_hint": "Caps を素早く2回押す",
             "group.directional": "方向", "group.jump": "ジャンプ", "group.independent": "独立",
             "group.input_source": "入力ソース", "group.command": "コマンド", "group.key_combo": "キーコンボ",
+            "group.open_app": "アプリを開く", "actions.app": "アプリ", "actions.choose_app": "選択…", "actions.no_app": "アプリ未選択",
             "action.left": "左", "action.right": "右", "action.up": "上", "action.down": "下",
             "action.word_forward": "次の単語", "action.word_back": "前の単語",
             "action.home": "行頭", "action.end": "行末", "action.backspace": "バックスペース",
@@ -270,6 +275,7 @@ final class LocalizationManager: ObservableObject {
             "actions.name": "名前", "actions.name_placeholder": "例: 電卓を開く", "actions.type": "種類",
             "about.version": "バージョン", "about.links": "リンク",
             "toast.action_saved": "アクションを保存しました", "toast.action_removed": "アクションを削除しました", "toast.action_remove_failed": "アクションの削除に失敗",
+            "toast.app_no_bundle_id": "アプリの識別子を取得できませんでした。",
         ],
         .de: [
             "app.subtitle": "Mach deine Capslock-Taste wieder mächtig!",
@@ -293,6 +299,7 @@ final class LocalizationManager: ObservableObject {
             "trigger.experimental": "experimentell", "trigger.double_tap_hint": "Caps zweimal schnell tippen",
             "group.directional": "Richtung", "group.jump": "Sprung", "group.independent": "Unabhängig",
             "group.input_source": "Eingabequelle", "group.command": "Befehl", "group.key_combo": "Tastenkombination",
+            "group.open_app": "App öffnen", "actions.app": "App", "actions.choose_app": "Auswählen…", "actions.no_app": "Keine App ausgewählt",
             "action.left": "Links", "action.right": "Rechts", "action.up": "Oben", "action.down": "Unten",
             "action.word_forward": "Wort vor", "action.word_back": "Wort zurück",
             "action.home": "Zeilenanfang", "action.end": "Zeilenende", "action.backspace": "Rücktaste",
@@ -338,6 +345,7 @@ final class LocalizationManager: ObservableObject {
             "actions.name": "Name", "actions.name_placeholder": "z. B. Rechner öffnen", "actions.type": "Typ",
             "about.version": "Version", "about.links": "Links",
             "toast.action_saved": "Aktion gespeichert", "toast.action_removed": "Aktion entfernt", "toast.action_remove_failed": "Aktion konnte nicht entfernt werden",
+            "toast.app_no_bundle_id": "App-Kennung konnte nicht gelesen werden.",
         ],
     ]
 }

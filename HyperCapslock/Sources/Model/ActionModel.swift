@@ -48,6 +48,7 @@ enum ActionConfig: Equatable {
     case inputSource(inputSourceID: String)
     case command(String)
     case keyCombo(targetKey: UInt16, withCtrl: Bool, withAlt: Bool, withCmd: Bool, withTargetShift: Bool)
+    case openApp(bundleID: String, name: String)
 
     var kindTag: String {
         switch self {
@@ -57,6 +58,7 @@ enum ActionConfig: Equatable {
         case .inputSource: return "input_source"
         case .command: return "command"
         case .keyCombo: return "key_combo"
+        case .openApp: return "open_app"
         }
     }
 }
@@ -71,6 +73,8 @@ extension ActionConfig: Codable {
         case withAlt = "with_alt"
         case withCmd = "with_cmd"
         case withTargetShift = "with_target_shift"
+        case bundleID = "bundle_id"
+        case appName = "app_name"
     }
 
     init(from decoder: Decoder) throws {
@@ -95,6 +99,9 @@ extension ActionConfig: Codable {
                 withAlt: try c.decodeIfPresent(Bool.self, forKey: .withAlt) ?? false,
                 withCmd: try c.decodeIfPresent(Bool.self, forKey: .withCmd) ?? false,
                 withTargetShift: try c.decodeIfPresent(Bool.self, forKey: .withTargetShift) ?? false)
+        case "open_app":
+            self = .openApp(bundleID: try c.decode(String.self, forKey: .bundleID),
+                            name: try c.decodeIfPresent(String.self, forKey: .appName) ?? "")
         default:
             throw DecodingError.dataCorruptedError(forKey: .kind, in: c,
                 debugDescription: "unknown action kind: \(kind)")
@@ -122,6 +129,9 @@ extension ActionConfig: Codable {
             try c.encode(alt, forKey: .withAlt)
             try c.encode(cmd, forKey: .withCmd)
             try c.encode(shift, forKey: .withTargetShift)
+        case .openApp(let bid, let name):
+            try c.encode(bid, forKey: .bundleID)
+            try c.encode(name, forKey: .appName)
         }
     }
 }

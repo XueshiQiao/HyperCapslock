@@ -1,4 +1,6 @@
 import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
 
 /// Editor for a custom action: a name + an action-config form, in a native
 /// grouped Form so labels/controls align like System Settings. Only kinds with
@@ -27,6 +29,7 @@ struct AddEditActionView: View {
                         Text(loc.t("group.input_source")).tag("input_source")
                         Text(loc.t("group.command")).tag("command")
                         Text(loc.t("group.key_combo")).tag("key_combo")
+                        Text(loc.t("group.open_app")).tag("open_app")
                     }
                     detail
                 }
@@ -63,6 +66,17 @@ struct AddEditActionView: View {
                 .font(.system(.body, design: .monospaced))
         case "command":
             TextField(loc.t("group.command"), text: $draft.command, prompt: Text("open -a Calculator"))
+        case "open_app":
+            LabeledContent(loc.t("actions.app")) {
+                HStack(spacing: 8) {
+                    if let icon = appIcon(draft.appBundleID) {
+                        Image(nsImage: icon).resizable().frame(width: 18, height: 18)
+                    }
+                    Text(draft.appName.isEmpty ? loc.t("actions.no_app") : draft.appName)
+                        .foregroundStyle(draft.appName.isEmpty ? .secondary : .primary)
+                    Button(loc.t("actions.choose_app")) { chooseApp() }
+                }
+            }
         case "key_combo":
             HStack {
                 Text(loc.t("group.key_combo"))
@@ -82,6 +96,31 @@ struct AddEditActionView: View {
     private func modToggle(_ symbol: String, _ binding: Binding<Bool>) -> some View {
         Button { binding.wrappedValue.toggle() } label: { Text(symbol).frame(width: 26) }
             .buttonStyle(.bordered).tint(binding.wrappedValue ? .blue : .secondary)
+    }
+
+    /// Let the user pick any installed .app; store its bundle id (stable if the
+    /// app later moves) plus a display name for the UI/HUD.
+    private func chooseApp() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.application]
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let bid = Bundle(url: url)?.bundleIdentifier, !bid.isEmpty else {
+            app.showToast(loc.t("toast.app_no_bundle_id"), isError: true)
+            return
+        }
+        draft.appBundleID = bid
+        let display = FileManager.default.displayName(atPath: url.path)
+        draft.appName = display.hasSuffix(".app") ? String(display.dropLast(4)) : display
+    }
+
+    private func appIcon(_ bundleID: String) -> NSImage? {
+        guard !bundleID.isEmpty,
+              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
+        return NSWorkspace.shared.icon(forFile: url.path)
     }
 
     private func prefill() {
@@ -119,6 +158,8 @@ struct ActionConfigDraft {
     var command = ""
     var targetKey: UInt16?
     var tCtrl = false, tAlt = false, tCmd = false, tShift = false
+    var appBundleID = ""
+    var appName = ""
 
     mutating func load(_ config: ActionConfig) {
         switch config {
@@ -129,6 +170,8 @@ struct ActionConfigDraft {
         case .command(let c): kind = "command"; command = c
         case .keyCombo(let k, let ctrl, let alt, let cmd, let shift):
             kind = "key_combo"; targetKey = k; tCtrl = ctrl; tAlt = alt; tCmd = cmd; tShift = shift
+        case .openApp(let bid, let name):
+            kind = "open_app"; appBundleID = bid; appName = name
         }
     }
 
@@ -146,6 +189,9 @@ struct ActionConfigDraft {
         case "key_combo":
             guard let k = targetKey else { return nil }
             return .keyCombo(targetKey: k, withCtrl: tCtrl, withAlt: tAlt, withCmd: tCmd, withTargetShift: tShift)
+        case "open_app":
+            let bid = appBundleID.trimmingCharacters(in: .whitespaces)
+            return bid.isEmpty ? nil : .openApp(bundleID: bid, name: appName.isEmpty ? bid : appName)
         default: return nil
         }
     }

@@ -411,6 +411,8 @@ final class ConfigStore: ObservableObject {
             throw ConfigError.invalidEntry(importing ? "Imported entry has empty input_source_id" : "input_source_id cannot be empty")
         case .jump(_, let count) where count < 1:
             throw ConfigError.invalidEntry(importing ? "Imported entry has invalid jump count (< 1)" : "jump count must be >= 1")
+        case .openApp(let bid, _) where bid.trimmingCharacters(in: .whitespaces).isEmpty:
+            throw ConfigError.invalidEntry(importing ? "Imported entry has empty bundle_id" : "bundle_id cannot be empty")
         default:
             break
         }
