@@ -7,9 +7,9 @@ private let modifierOrder: [ModifierKey] = [
 
 private let keepInlineSentinel = "__inline__"
 
-/// Bind a trigger to an Action chosen from the library. Editing a legacy inline
-/// mapping migrates it to an `action_id` on save (unless the user keeps the
-/// "current" inline). New custom actions are created on the Actions page.
+/// Bind a trigger to an Action from the library (native grouped Form). Editing a
+/// legacy inline mapping migrates it to an `action_id` on save (unless the user
+/// keeps the "current" inline). New custom actions are created on the Actions tab.
 struct AddEditMappingView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var config: ConfigStore
@@ -26,55 +26,52 @@ struct AddEditMappingView: View {
     private var triggerNeedsKey: Bool { triggerSel == "plain" || triggerSel == "with_shift" }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(editing ? loc.t("mappings.edit_title") : loc.t("mappings.add_title")).font(.headline)
-
-            // Trigger
-            HStack(spacing: 8) {
-                Picker("", selection: $triggerSel) {
-                    Text(loc.t("mappings.caps")).tag("plain")
-                    Text(loc.t("mappings.caps_shift")).tag("with_shift")
-                    Text(loc.t("trigger.single_tap_hyper")).tag("single_tap")
-                    Text(loc.t("trigger.double_tap_hyper")).tag("double_tap")
-                    ForEach(modifierOrder, id: \.self) { m in
-                        Text(modifierTriggerLabel(m)).tag("dtm:\(m.rawValue)")
+        VStack(spacing: 0) {
+            Form {
+                Section {
+                    Picker(loc.t("mappings.trigger"), selection: $triggerSel) {
+                        Text(loc.t("mappings.caps")).tag("plain")
+                        Text(loc.t("mappings.caps_shift")).tag("with_shift")
+                        Text(loc.t("trigger.single_tap_hyper")).tag("single_tap")
+                        Text(loc.t("trigger.double_tap_hyper")).tag("double_tap")
+                        ForEach(modifierOrder, id: \.self) { m in Text(modifierTriggerLabel(m)).tag("dtm:\(m.rawValue)") }
                     }
-                }.labelsHidden().disabled(editing)
-                Text("+").foregroundColor(triggerNeedsKey ? .secondary : Color.secondary.opacity(0.4))
-                KeyCaptureField(jsKeyCode: $key, enabled: triggerNeedsKey && !editing, placeholder: loc.t("mappings.press_key")).frame(height: 34)
-            }
+                    .disabled(editing)
 
-            Image(systemName: "arrow.down").foregroundColor(.secondary).frame(maxWidth: .infinity)
-
-            // Action (from library)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(loc.t("mappings.action")).font(.system(size: 11, weight: .semibold)).foregroundColor(.secondary)
-                Picker("", selection: $selectedActionId) {
-                    if keptInlineConfig != nil {
-                        Text(loc.t("mappings.current_inline")).tag(keepInlineSentinel)
-                    }
-                    Section(loc.t("actions.builtin")) {
-                        ForEach(BuiltinActions.all, id: \.id) { a in
-                            Text(a.nameKey.map { loc.t($0) } ?? a.name).tag(a.id)
+                    if triggerNeedsKey {
+                        LabeledContent(loc.t("mappings.key")) {
+                            KeyCaptureField(jsKeyCode: $key, enabled: !editing, placeholder: loc.t("mappings.press_key"))
+                                .frame(width: 140, height: 28)
                         }
                     }
-                    if !config.customActions.isEmpty {
-                        Section(loc.t("actions.custom")) {
-                            ForEach(config.customActions, id: \.id) { a in Text(a.name).tag(a.id) }
+                }
+
+                Section {
+                    Picker(loc.t("mappings.action"), selection: $selectedActionId) {
+                        if keptInlineConfig != nil { Text(loc.t("mappings.current_inline")).tag(keepInlineSentinel) }
+                        Section(loc.t("actions.builtin")) {
+                            ForEach(BuiltinActions.all, id: \.id) { a in Text(a.nameKey.map { loc.t($0) } ?? a.name).tag(a.id) }
+                        }
+                        if !config.customActions.isEmpty {
+                            Section(loc.t("actions.custom")) { ForEach(config.customActions, id: \.id) { a in Text(a.name).tag(a.id) } }
                         }
                     }
-                }.labelsHidden()
-                Text(loc.t("mappings.action_hint")).font(.system(size: 11)).foregroundColor(.secondary)
+                } footer: {
+                    Text(loc.t("mappings.action_hint")).font(.caption).foregroundStyle(.secondary)
+                }
             }
+            .formStyle(.grouped)
 
+            Divider()
             HStack {
                 Spacer()
                 Button(loc.t("update.cancel")) { dismiss() }
-                Button(loc.t("mappings.save")) { save() }
-                    .buttonStyle(.borderedProminent).disabled(!isValid)
+                Button(loc.t("mappings.save")) { save() }.keyboardShortcut(.defaultAction).disabled(draftTrigger == nil)
             }
+            .padding(12)
         }
-        .padding(20).frame(width: 440)
+        .frame(width: 480, height: 250)
+        .navigationTitle(editing ? loc.t("mappings.edit_title") : loc.t("mappings.add_title"))
         .onAppear(perform: prefill)
     }
 
@@ -95,8 +92,6 @@ struct AddEditMappingView: View {
             return .hyperPlusKey(key: key, withShift: triggerSel == "with_shift")
         }
     }
-
-    private var isValid: Bool { draftTrigger != nil }
 
     private func save() {
         guard let trigger = draftTrigger else { return }
@@ -120,18 +115,15 @@ struct AddEditMappingView: View {
         case .singleTapHyper: triggerSel = "single_tap"
         case .doubleTapHyper: triggerSel = "double_tap"
         case .doubleTapModifier(let m): triggerSel = "dtm:\(m.rawValue)"
-        case .hyperPlusKey(let k, let withShift):
-            triggerSel = withShift ? "with_shift" : "plain"; key = k
+        case .hyperPlusKey(let k, let withShift): triggerSel = withShift ? "with_shift" : "plain"; key = k
         }
         if let id = entry.actionId {
-            // Preserve the id even if currently unresolvable, so saving an
-            // untouched (dangling) mapping doesn't silently rewrite it.
             selectedActionId = id
         } else if let inline = entry.inlineAction {
             if let builtin = BuiltinActions.matching(inline) {
-                selectedActionId = builtin.id          // migrate to a matching built-in on save
+                selectedActionId = builtin.id
             } else {
-                keptInlineConfig = inline               // offer "keep current inline"
+                keptInlineConfig = inline
                 selectedActionId = keepInlineSentinel
             }
         }

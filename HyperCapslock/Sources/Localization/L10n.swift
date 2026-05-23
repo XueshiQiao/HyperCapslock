@@ -129,7 +129,8 @@ final class LocalizationManager: ObservableObject {
             "actions.used_by": "{count} mapping(s)", "actions.delete_blocked": "Can't delete — used by: {triggers}",
             "actions.edit_title": "Edit Action", "actions.add_title": "New Action",
             "actions.name": "Name", "actions.name_placeholder": "e.g. Open Calculator", "actions.type": "Type",
-            "about.version": "Version", "about.license": "GPL-3.0",
+            "about.version": "Version", "about.license": "GPL-3.0", "about.links": "Links",
+            "mappings.trigger": "Trigger", "mappings.key": "Key", "actions.count": "Count",
             "toast.action_saved": "Action saved", "toast.action_removed": "Action removed", "toast.action_remove_failed": "Failed to remove action",
         ],
         .zh: [
@@ -196,7 +197,8 @@ final class LocalizationManager: ObservableObject {
             "actions.used_by": "{count} 个映射", "actions.delete_blocked": "无法删除 — 被以下触发键引用:{triggers}",
             "actions.edit_title": "编辑动作", "actions.add_title": "新建动作",
             "actions.name": "名称", "actions.name_placeholder": "例如 打开计算器", "actions.type": "类型",
-            "about.version": "版本", "about.license": "GPL-3.0",
+            "about.version": "版本", "about.license": "GPL-3.0", "about.links": "链接",
+            "mappings.trigger": "触发", "mappings.key": "按键", "actions.count": "次数",
             "toast.action_saved": "动作已保存", "toast.action_removed": "动作已删除", "toast.action_remove_failed": "删除动作失败",
         ],
         .ja: [

@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Editor for a custom action: a name + an action-config form. Built-in actions
-/// are never edited here. Only kinds that carry meaningful parameters are
-/// offered (directional/independent are fixed presets — they live as built-ins).
+/// Editor for a custom action: a name + an action-config form, in a native
+/// grouped Form so labels/controls align like System Settings. Only kinds with
+/// meaningful parameters are offered (directional/independent are built-in presets).
 struct AddEditActionView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var loc: LocalizationManager
@@ -15,64 +15,57 @@ struct AddEditActionView: View {
     private var editing: Bool { if case .edit = mode { return true }; return false }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text(editing ? loc.t("actions.edit_title") : loc.t("actions.add_title")).font(.headline)
-
-            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 14) {
-                GridRow {
-                    Text(loc.t("actions.name")).gridColumnAlignment(.leading)
-                    TextField(loc.t("actions.name_placeholder"), text: $name)
-                        .frame(maxWidth: .infinity)
-                }
-                GridRow {
-                    Text(loc.t("actions.type"))
-                    typePicker.frame(maxWidth: .infinity, alignment: .leading)
-                }
-                GridRow {
-                    Color.clear.frame(width: 0, height: 0)
-                    detail.frame(maxWidth: .infinity, alignment: .leading)
+        VStack(spacing: 0) {
+            Form {
+                Section {
+                    TextField(loc.t("actions.name"), text: $name, prompt: Text(loc.t("actions.name_placeholder")))
+                    Picker(loc.t("actions.type"), selection: $draft.kind) {
+                        Text(loc.t("group.jump")).tag("jump")
+                        Text(loc.t("group.input_source")).tag("input_source")
+                        Text(loc.t("group.command")).tag("command")
+                        Text(loc.t("group.key_combo")).tag("key_combo")
+                    }
+                    detail
                 }
             }
+            .formStyle(.grouped)
 
+            Divider()
             HStack {
                 Spacer()
                 Button(loc.t("update.cancel")) { dismiss() }
                 Button(loc.t("mappings.save")) { save() }
-                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || draft.build() == nil)
             }
+            .padding(12)
         }
-        .padding(20).frame(width: 440)
+        .frame(width: 480, height: 300)
+        .navigationTitle(editing ? loc.t("actions.edit_title") : loc.t("actions.add_title"))
         .onAppear(perform: prefill)
-    }
-
-    private var typePicker: some View {
-        Picker("", selection: $draft.kind) {
-            Text(loc.t("group.jump")).tag("jump")
-            Text(loc.t("group.input_source")).tag("input_source")
-            Text(loc.t("group.command")).tag("command")
-            Text(loc.t("group.key_combo")).tag("key_combo")
-        }
-        .labelsHidden().fixedSize()
     }
 
     @ViewBuilder private var detail: some View {
         switch draft.kind {
         case "jump":
-            HStack(spacing: 8) {
-                Picker("", selection: $draft.jumpDir) {
-                    Text(loc.t("action.up")).tag(JumpDirection.up); Text(loc.t("action.down")).tag(JumpDirection.down)
-                }.labelsHidden().frame(width: 110)
-                TextField("", value: $draft.jumpCount, format: .number).frame(width: 60)
+            Picker(loc.t("group.directional"), selection: $draft.jumpDir) {
+                Text(loc.t("action.up")).tag(JumpDirection.up); Text(loc.t("action.down")).tag(JumpDirection.down)
+            }
+            LabeledContent(loc.t("actions.count")) {
+                TextField("", value: $draft.jumpCount, format: .number).frame(width: 70).multilineTextAlignment(.trailing)
             }
         case "input_source":
-            TextField("e.g. com.apple.keylayout.ABC", text: $draft.inputSourceID).font(.system(.body, design: .monospaced))
+            TextField(loc.t("group.input_source"), text: $draft.inputSourceID, prompt: Text("com.apple.keylayout.ABC"))
+                .font(.system(.body, design: .monospaced))
         case "command":
-            TextField("e.g. open -a Calculator", text: $draft.command)
+            TextField(loc.t("group.command"), text: $draft.command, prompt: Text("open -a Calculator"))
         case "key_combo":
-            VStack(alignment: .leading, spacing: 8) {
-                KeyCaptureField(jsKeyCode: $draft.targetKey, enabled: true, placeholder: loc.t("mappings.press_key")).frame(height: 34)
-                HStack(spacing: 8) {
+            LabeledContent(loc.t("group.key_combo")) {
+                KeyCaptureField(jsKeyCode: $draft.targetKey, enabled: true, placeholder: loc.t("mappings.press_key"))
+                    .frame(width: 140, height: 28)
+            }
+            LabeledContent(loc.t("mappings.action")) {
+                HStack(spacing: 6) {
                     modToggle("⌘", $draft.tCmd); modToggle("⌃", $draft.tCtrl); modToggle("⌥", $draft.tAlt); modToggle("⇧", $draft.tShift)
                 }
             }
@@ -81,7 +74,7 @@ struct AddEditActionView: View {
     }
 
     private func modToggle(_ symbol: String, _ binding: Binding<Bool>) -> some View {
-        Button { binding.wrappedValue.toggle() } label: { Text(symbol).frame(width: 34) }
+        Button { binding.wrappedValue.toggle() } label: { Text(symbol).frame(width: 26) }
             .buttonStyle(.bordered).tint(binding.wrappedValue ? .blue : .secondary)
     }
 
@@ -95,10 +88,8 @@ struct AddEditActionView: View {
         guard let config = draft.build() else { return }
         do {
             switch mode {
-            case .add:
-                _ = try app.addCustomAction(name: name, config: config)
-            case .edit(let action):
-                try app.updateCustomAction(Action(id: action.id, name: name, config: config, isBuiltin: false))
+            case .add: _ = try app.addCustomAction(name: name, config: config)
+            case .edit(let action): try app.updateCustomAction(Action(id: action.id, name: name, config: config, isBuiltin: false))
             }
             app.showToast(loc.t("toast.action_saved"))
             dismiss()

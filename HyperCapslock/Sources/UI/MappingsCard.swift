@@ -22,14 +22,8 @@ private func triggerSortKey(_ t: Trigger) -> String {
     }
 }
 
-struct ActionDisplay {
-    let text: String
-    let symbol: String
-    let invalid: Bool
-}
+struct ActionDisplay { let text: String; let symbol: String; let invalid: Bool }
 
-/// Resolve how a mapping's action should be shown: a library action's name,
-/// an inline action's description, or an invalid marker.
 @MainActor
 func mappingActionDisplay(_ entry: ActionMappingEntry, _ loc: LocalizationManager) -> ActionDisplay {
     if let id = entry.actionId {
@@ -105,44 +99,43 @@ struct MappingsPage: View {
     }
 
     var body: some View {
-        PageScaffold(title: loc.t("nav.mappings"), trailing: AnyView(
-            HStack(spacing: 8) {
-                Button { importConfig() } label: { Label(loc.t("config.import"), systemImage: "square.and.arrow.down") }.buttonStyle(.bordered)
-                Button { exportConfig() } label: { Label(loc.t("config.export"), systemImage: "square.and.arrow.up") }.buttonStyle(.bordered)
-                Button { sheet = .add } label: { Label(loc.t("mappings.add"), systemImage: "plus") }.buttonStyle(.borderedProminent)
-            })) {
+        Form {
             if config.mappings.isEmpty {
-                Text(loc.t("mappings.empty")).font(.system(size: 12)).italic().foregroundColor(.secondary)
+                Section { Text(loc.t("mappings.empty")).foregroundStyle(.secondary) }
             } else {
-                Card {
-                    VStack(spacing: 0) {
-                        ForEach(Array(sorted.enumerated()), id: \.element.trigger) { idx, entry in
-                            if idx > 0 { Divider() }
-                            mappingRow(entry)
-                        }
-                    }
+                Section {
+                    ForEach(sorted, id: \.trigger) { entry in mappingRow(entry) }
                 }
             }
         }
+        .formStyle(.grouped)
+        .navigationTitle(loc.t("nav.mappings"))
+        .toolbar {
+            ToolbarItemGroup {
+                Button { importConfig() } label: { Image(systemName: "square.and.arrow.down") }.help(loc.t("config.import"))
+                Button { exportConfig() } label: { Image(systemName: "square.and.arrow.up") }.help(loc.t("config.export"))
+                Button { sheet = .add } label: { Image(systemName: "plus") }.help(loc.t("mappings.add"))
+            }
+        }
         .sheet(item: $sheet) { mode in
-            AddEditMappingView(mode: mode)
-                .environmentObject(app).environmentObject(config).environmentObject(loc)
+            AddEditMappingView(mode: mode).environmentObject(app).environmentObject(config).environmentObject(loc)
         }
     }
 
     private func mappingRow(_ entry: ActionMappingEntry) -> some View {
         let d = mappingActionDisplay(entry, loc)
-        return HStack(spacing: 10) {
+        return LabeledContent {
+            HStack(spacing: 8) {
+                Image(systemName: d.symbol).foregroundStyle(d.invalid ? .orange : .secondary)
+                Text(d.text).foregroundStyle(d.invalid ? .orange : .secondary).lineLimit(1).truncationMode(.middle)
+                Button { sheet = .edit(entry) } label: { Image(systemName: "pencil") }.buttonStyle(.borderless)
+                Button {
+                    app.removeMapping(entry.trigger); app.showToast(loc.t("toast.mapping_removed"))
+                } label: { Image(systemName: "trash") }.buttonStyle(.borderless)
+            }
+        } label: {
             triggerChips(entry.trigger)
-            Spacer(minLength: 8)
-            Image(systemName: d.symbol).font(.system(size: 12)).foregroundColor(d.invalid ? .orange : .accentColor)
-            Text(d.text).font(.system(size: 12)).foregroundColor(d.invalid ? .orange : .secondary).lineLimit(1).truncationMode(.middle)
-            Button { sheet = .edit(entry) } label: { Image(systemName: "pencil") }.buttonStyle(.plain).foregroundColor(.secondary)
-            Button {
-                app.removeMapping(entry.trigger); app.showToast(loc.t("toast.mapping_removed"))
-            } label: { Image(systemName: "trash") }.buttonStyle(.plain).foregroundColor(.secondary)
         }
-        .padding(.horizontal, 14).padding(.vertical, 8)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { sheet = .edit(entry) }
     }

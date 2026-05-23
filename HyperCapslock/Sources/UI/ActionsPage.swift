@@ -13,54 +13,61 @@ struct ActionsPage: View {
     @State private var sheet: ActionSheetMode?
 
     var body: some View {
-        PageScaffold(title: loc.t("nav.actions"), trailing: AnyView(
-            Button { sheet = .add } label: { Label(loc.t("actions.add"), systemImage: "plus") }
-                .buttonStyle(.borderedProminent))) {
-
-            // Custom actions
-            SettingsSection(title: loc.t("actions.custom")) {
+        Form {
+            Section(loc.t("actions.custom")) {
                 if config.customActions.isEmpty {
-                    SettingsRow(label: loc.t("actions.none_custom"), isFirst: true) { EmptyView() }
+                    Text(loc.t("actions.none_custom")).foregroundStyle(.secondary)
                 } else {
-                    ForEach(Array(config.customActions.enumerated()), id: \.element.id) { idx, action in
-                        actionRow(action, isFirst: idx == 0, editable: true)
-                    }
+                    ForEach(config.customActions) { action in actionRow(action, editable: true) }
                 }
             }
-
-            // Built-in actions (read-only)
-            SettingsSection(title: loc.t("actions.builtin")) {
-                ForEach(Array(BuiltinActions.all.enumerated()), id: \.element.id) { idx, action in
-                    actionRow(action, isFirst: idx == 0, editable: false)
-                }
+            Section {
+                ForEach(BuiltinActions.all) { action in actionRow(action, editable: false) }
+            } header: {
+                Text(loc.t("actions.builtin"))
+            } footer: {
+                Text(loc.t("actions.builtin_hint")).font(.caption).foregroundStyle(.secondary)
             }
-            Text(loc.t("actions.builtin_hint")).font(.system(size: 11)).foregroundColor(.secondary).padding(.horizontal, 4)
+        }
+        .formStyle(.grouped)
+        .navigationTitle(loc.t("nav.actions"))
+        .toolbar {
+            ToolbarItem {
+                Button { sheet = .add } label: { Image(systemName: "plus") }.help(loc.t("actions.add"))
+            }
         }
         .sheet(item: $sheet) { mode in
-            AddEditActionView(mode: mode)
-                .environmentObject(app).environmentObject(config).environmentObject(loc)
+            AddEditActionView(mode: mode).environmentObject(app).environmentObject(config).environmentObject(loc)
         }
     }
 
-    private func actionRow(_ action: Action, isFirst: Bool, editable: Bool) -> some View {
+    private func actionRow(_ action: Action, editable: Bool) -> some View {
         let name = action.nameKey.map { loc.t($0) } ?? action.name
         let desc = actionPresentation(action.config, loc).value
         let refCount = config.mappingsReferencing(actionId: action.id).count
-        // Only show the description line when it adds info (custom actions);
-        // for built-ins the name and description are identical → one line.
-        return SettingsRow(label: name, sublabel: name == desc ? nil : desc, isFirst: isFirst) {
+        return LabeledContent {
             HStack(spacing: 10) {
-                Image(systemName: actionSymbol(action.config)).font(.system(size: 12)).foregroundColor(.accentColor)
                 if refCount > 0 {
                     Text(loc.t("actions.used_by", ["count": String(refCount)]))
-                        .font(.system(size: 10)).foregroundColor(.secondary)
+                        .font(.caption2).foregroundStyle(.secondary)
                         .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Capsule().fill(Color.secondary.opacity(0.12)))
+                        .background(Capsule().fill(Color.secondary.opacity(0.15)))
                 }
                 if editable {
-                    Button { sheet = .edit(action) } label: { Image(systemName: "pencil") }.buttonStyle(.plain).foregroundColor(.secondary)
-                    Button { delete(action) } label: { Image(systemName: "trash") }.buttonStyle(.plain).foregroundColor(.secondary)
+                    Button { sheet = .edit(action) } label: { Image(systemName: "pencil") }.buttonStyle(.borderless)
+                    Button { delete(action) } label: { Image(systemName: "trash") }.buttonStyle(.borderless)
+                } else {
+                    Image(systemName: actionSymbol(action.config)).foregroundStyle(.secondary)
                 }
+            }
+        } label: {
+            if editable && name != desc {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name)
+                    Text(desc).font(.caption).foregroundStyle(.secondary)
+                }
+            } else {
+                Text(name)   // built-ins: one line (name == description)
             }
         }
     }
