@@ -59,7 +59,15 @@ struct PermissionsCard: View {
             if granted {
                 badge(loc.t("perm.granted"), color: .green, clickable: false)
             } else {
-                Button { Permissions.openPrivacyPane(pane) } label: {
+                Button {
+                    // Trigger the real system request first — for Input Monitoring
+                    // this is what registers the app in the Settings list.
+                    switch pane {
+                    case .accessibility: Permissions.promptAccessibility()
+                    case .inputMonitoring: Permissions.requestInputMonitoring()
+                    }
+                    Permissions.openPrivacyPane(pane)
+                } label: {
                     HStack(spacing: 4) {
                         Text(loc.t("perm.not_granted"))
                         Image(systemName: "arrow.right")
