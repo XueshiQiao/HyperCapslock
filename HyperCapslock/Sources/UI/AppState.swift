@@ -144,8 +144,8 @@ final class AppState: ObservableObject {
 
     // MARK: - Mapping operations (wrap ConfigStore, surface errors as messages)
 
-    func upsertMapping(trigger: Trigger, actionId: String?, inlineAction: ActionConfig? = nil) throws {
-        try config.upsert(trigger: trigger, actionId: actionId, inlineAction: inlineAction)
+    func upsertMapping(trigger: Trigger, actionId: String?, inlineAction: ActionConfig? = nil, bindings: [MappingBinding] = []) throws {
+        try config.upsert(trigger: trigger, actionId: actionId, inlineAction: inlineAction, bindings: bindings)
     }
 
     func removeMapping(_ trigger: Trigger) {

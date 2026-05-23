@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 private let modifierOrder: [ModifierKey] = [
     .leftCommand, .rightCommand, .leftControl, .rightControl,
@@ -7,7 +8,50 @@ private let modifierOrder: [ModifierKey] = [
 
 private let keepInlineSentinel = "__inline__"
 
-/// Bind a trigger to an Action from the library (native grouped Form). Editing a
+/// An editable per-app rule. `preserved` is non-nil when the rule came from a
+/// config shape the editor can't represent (exclude lists, multiple/unknown
+/// conditions, or an inline action) — shown read-only and round-tripped verbatim
+/// so we never silently drop hand-edited or future config.
+private struct BindingDraft: Identifiable {
+    let id = UUID()
+    var apps: [AppRef] = []
+    var actionId: String = "builtin.move_left"
+    var preserved: MappingBinding?
+
+    var isEditable: Bool { preserved == nil }
+
+    /// Build the editor's view of a stored binding, or mark it preserved.
+    init(from binding: MappingBinding) {
+        if case let .frontmostApp(include, exclude)? = binding.when.first,
+           binding.when.count == 1, exclude.isEmpty, !include.isEmpty,
+           let actionId = binding.actionId, binding.inlineAction == nil,
+           ActionsRegistry.shared.action(byID: actionId) != nil {
+            self.apps = include.map { AppRef(bundleID: $0, name: appDisplayName($0)) }
+            self.actionId = actionId
+        } else {
+            self.preserved = binding
+        }
+    }
+
+    init() {}
+
+    func toBinding() -> MappingBinding {
+        if let preserved { return preserved }
+        return MappingBinding(when: [.frontmostApp(include: apps.map { $0.bundleID }, exclude: [])],
+                              actionId: actionId)
+    }
+}
+
+/// Best-effort display name for a bundle id (falls back to the id itself).
+private func appDisplayName(_ bundleID: String) -> String {
+    if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+        let n = FileManager.default.displayName(atPath: url.path)
+        return n.hasSuffix(".app") ? String(n.dropLast(4)) : n
+    }
+    return bundleID
+}
+
+/// Bind a trigger to a default Action plus optional per-app overrides. Editing a
 /// legacy inline mapping migrates it to an `action_id` on save (unless the user
 /// keeps the "current" inline). New custom actions are created on the Actions tab.
 struct AddEditMappingView: View {
@@ -21,12 +65,10 @@ struct AddEditMappingView: View {
     @State private var key: UInt16?
     @State private var selectedActionId = "builtin.move_left"
     @State private var keptInlineConfig: ActionConfig?
-    /// Last real (non-sentinel) action selection, so picking "Create New Action…"
-    /// can revert the picker while the create sheet is open.
     @State private var lastRealActionId = "builtin.move_left"
     @State private var showCreateAction = false
-    /// UUID-suffixed so it can never equal a real action id (even a hand-edited one).
     @State private var createActionSentinel = "__create_action__-" + UUID().uuidString
+    @State private var rules: [BindingDraft] = []
 
     private var editing: Bool { if case .edit = mode { return true }; return false }
     private var triggerNeedsKey: Bool { triggerSel == "plain" || triggerSel == "with_shift" }
@@ -45,9 +87,6 @@ struct AddEditMappingView: View {
                     .disabled(editing)
 
                     if triggerNeedsKey {
-                        // HStack (default .center alignment) instead of LabeledContent:
-                        // LabeledContent top-aligns its label when the trailing control
-                        // is taller than the label, which left "Key" misaligned.
                         HStack {
                             Text(loc.t("mappings.key"))
                             Spacer()
@@ -58,7 +97,7 @@ struct AddEditMappingView: View {
                 }
 
                 Section {
-                    Picker(loc.t("mappings.action"), selection: $selectedActionId) {
+                    Picker(loc.t("mappings.default_action"), selection: $selectedActionId) {
                         if keptInlineConfig != nil { Text(loc.t("mappings.current_inline")).tag(keepInlineSentinel) }
                         Section(loc.t("actions.builtin")) {
                             ForEach(BuiltinActions.all, id: \.id) { a in Text(a.nameKey.map { loc.t($0) } ?? a.name).tag(a.id) }
@@ -72,19 +111,35 @@ struct AddEditMappingView: View {
                     }
                     .onChange(of: selectedActionId) { _, newValue in
                         if newValue == createActionSentinel {
-                            // Not a real selection: revert the picker and open the create sheet.
                             selectedActionId = lastRealActionId
                             showCreateAction = true
                         } else {
                             lastRealActionId = newValue
                         }
                     }
+                } header: {
+                    Text(loc.t("mappings.default_action"))
                 } footer: {
-                    Text(loc.t("mappings.action_hint")).font(.caption).foregroundStyle(.secondary)
+                    Text(loc.t("mappings.default_action_hint")).font(.caption).foregroundStyle(.secondary)
+                }
+
+                Section {
+                    ForEach($rules) { $rule in
+                        RuleRowView(rule: $rule,
+                                    onMoveUp: { move(rule.id, by: -1) },
+                                    onMoveDown: { move(rule.id, by: 1) },
+                                    onDelete: { rules.removeAll { $0.id == rule.id } })
+                    }
+                    Button {
+                        rules.append(BindingDraft())
+                    } label: { Label(loc.t("mappings.add_app_rule"), systemImage: "plus") }
+                } header: {
+                    Text(loc.t("mappings.app_rules"))
+                } footer: {
+                    Text(loc.t("mappings.app_rules_hint")).font(.caption).foregroundStyle(.secondary)
                 }
             }
             .formStyle(.grouped)
-            .scrollDisabled(true)
 
             Divider()
             HStack {
@@ -94,7 +149,7 @@ struct AddEditMappingView: View {
             }
             .padding(12)
         }
-        .frame(width: 480, height: 250)
+        .frame(width: 520, height: 560)
         .navigationTitle(editing ? loc.t("mappings.edit_title") : loc.t("mappings.add_title"))
         .onAppear(perform: prefill)
         .sheet(isPresented: $showCreateAction) {
@@ -103,6 +158,13 @@ struct AddEditMappingView: View {
             })
             .environmentObject(app).environmentObject(config).environmentObject(loc)
         }
+    }
+
+    private func move(_ id: UUID, by delta: Int) {
+        guard let i = rules.firstIndex(where: { $0.id == id }) else { return }
+        let j = i + delta
+        guard j >= 0, j < rules.count else { return }
+        rules.swapAt(i, j)
     }
 
     private func modifierTriggerLabel(_ m: ModifierKey) -> String {
@@ -125,11 +187,17 @@ struct AddEditMappingView: View {
 
     private func save() {
         guard let trigger = draftTrigger else { return }
+        // Editable rules must name at least one app.
+        if rules.contains(where: { $0.isEditable && $0.apps.isEmpty }) {
+            app.showToast(loc.t("toast.rule_needs_app"), isError: true)
+            return
+        }
+        let bindings = rules.map { $0.toBinding() }
         do {
             if selectedActionId == keepInlineSentinel, let inline = keptInlineConfig {
-                try app.upsertMapping(trigger: trigger, actionId: nil, inlineAction: inline)
+                try app.upsertMapping(trigger: trigger, actionId: nil, inlineAction: inline, bindings: bindings)
             } else {
-                try app.upsertMapping(trigger: trigger, actionId: selectedActionId)
+                try app.upsertMapping(trigger: trigger, actionId: selectedActionId, bindings: bindings)
             }
             app.showToast(loc.t("toast.mapping_saved"))
             dismiss()
@@ -158,5 +226,72 @@ struct AddEditMappingView: View {
             }
         }
         lastRealActionId = selectedActionId
+        rules = entry.bindings.map(BindingDraft.init(from:))
+    }
+}
+
+/// One per-app rule: an editable include-list of apps + an action, or a
+/// read-only "advanced" row for shapes the editor can't represent.
+private struct RuleRowView: View {
+    @EnvironmentObject var config: ConfigStore
+    @EnvironmentObject var loc: LocalizationManager
+    @Binding var rule: BindingDraft
+    let onMoveUp: () -> Void
+    let onMoveDown: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Text(loc.t("mappings.applies_in")).font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button(action: onMoveUp) { Image(systemName: "chevron.up") }.buttonStyle(.borderless)
+                Button(action: onMoveDown) { Image(systemName: "chevron.down") }.buttonStyle(.borderless)
+                Button(action: onDelete) { Image(systemName: "trash") }.buttonStyle(.borderless).foregroundStyle(.red)
+            }
+
+            if rule.isEditable {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(rule.apps) { app in
+                            appChip(app)
+                        }
+                        Button {
+                            if let picked = AppChooser.choose(),
+                               !rule.apps.contains(where: { $0.bundleID.lowercased() == picked.bundleID.lowercased() }) {
+                                rule.apps.append(picked)
+                            }
+                        } label: { Label(loc.t("mappings.add_app"), systemImage: "plus") }
+                            .buttonStyle(.borderless)
+                    }
+                }
+                Picker(loc.t("mappings.rule_action"), selection: $rule.actionId) {
+                    Section(loc.t("actions.builtin")) {
+                        ForEach(BuiltinActions.all, id: \.id) { a in Text(a.nameKey.map { loc.t($0) } ?? a.name).tag(a.id) }
+                    }
+                    if !config.customActions.isEmpty {
+                        Section(loc.t("actions.custom")) { ForEach(config.customActions, id: \.id) { a in Text(a.name).tag(a.id) } }
+                    }
+                }
+            } else {
+                Label(loc.t("mappings.advanced_rule"), systemImage: "curlybraces")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func appChip(_ app: AppRef) -> some View {
+        HStack(spacing: 4) {
+            if let icon = AppChooser.icon(app.bundleID) {
+                Image(nsImage: icon).resizable().frame(width: 16, height: 16)
+            }
+            Text(app.name).font(.caption)
+            Button { rule.apps.removeAll { $0.bundleID == app.bundleID } } label: {
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+            }.buttonStyle(.plain)
+        }
+        .padding(.horizontal, 8).padding(.vertical, 4)
+        .background(Capsule().fill(Color.secondary.opacity(0.15)))
     }
 }

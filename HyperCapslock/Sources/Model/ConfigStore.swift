@@ -42,7 +42,9 @@ final class ConfigStore: ObservableObject {
     private var preservedMappingNodes: [String: Node] = [:]
     private var preservedActionNodes: [String: Node] = [:]
 
-    private static let mappingKnownKeys: Set<String> = ["trigger", "key", "with_shift", "action_id", "action"]
+    // "bindings" is known so the fresh encode owns it: when a user clears all
+    // per-app rules, the merge step must NOT resurrect a stale preserved node.
+    private static let mappingKnownKeys: Set<String> = ["trigger", "key", "with_shift", "action_id", "action", "bindings"]
     private static let actionKnownKeys: Set<String> = ["id", "name", "action"]
 
     // MARK: Default keycodes (JavaScript keyCode values)
@@ -108,8 +110,11 @@ final class ConfigStore: ObservableObject {
 
         mappings = loadedMappings
         customActions = loadedActions
-        MappingsRegistry.shared.set(loadedMappings)
+        // Register actions BEFORE mappings so the tap thread never resolves a
+        // mapping/binding against a stale action registry (matters on import,
+        // which runs while the tap is live).
         ActionsRegistry.shared.setCustom(loadedActions)
+        MappingsRegistry.shared.set(loadedMappings)
 
         // Persist only when we seeded into a fresh/empty file — never overwrite
         // an existing file we couldn't parse.
@@ -195,17 +200,19 @@ final class ConfigStore: ObservableObject {
     /// Upsert a mapping. Prefer binding by `actionId` (clears any inline action —
     /// the gradual inline→id migration). Pass `inlineAction` only for legacy/
     /// ad-hoc bindings without a library action.
-    func upsert(trigger: Trigger, actionId: String?, inlineAction: ActionConfig?) throws {
+    func upsert(trigger: Trigger, actionId: String?, inlineAction: ActionConfig?, bindings: [MappingBinding] = []) throws {
         if actionId == nil, let inline = inlineAction {
             try Self.validate(inline)
         }
         if let id = actionId, ActionsRegistry.shared.action(byID: id) == nil {
             throw ConfigError.invalidEntry("Unknown action id: \(id)")
         }
+        try bindings.forEach { try Self.validate($0) }
         var m = mappings
         let entry = ActionMappingEntry(trigger: trigger,
                                        actionId: actionId,
-                                       inlineAction: actionId == nil ? inlineAction : nil)
+                                       inlineAction: actionId == nil ? inlineAction : nil,
+                                       bindings: bindings)
         if let idx = m.firstIndex(where: { $0.trigger == trigger }) {
             m[idx] = entry
         } else {
@@ -252,8 +259,12 @@ final class ConfigStore: ObservableObject {
     }
 
     /// Trigger labels of mappings that reference `actionId` (delete-protection).
+    /// Checks the default action AND every per-app binding so a custom action
+    /// used only by a rule can't be silently deleted.
     func mappingsReferencing(actionId: String) -> [Trigger] {
-        mappings.filter { $0.actionId == actionId }.map(\.trigger)
+        mappings.filter { entry in
+            entry.actionId == actionId || entry.bindings.contains { $0.actionId == actionId }
+        }.map(\.trigger)
     }
 
     func removeCustomAction(id: String) throws {
@@ -319,8 +330,9 @@ final class ConfigStore: ObservableObject {
         catch { throw ConfigError.io("Invalid config: \(error.localizedDescription)") }
 
         if importedMappings.isEmpty { throw ConfigError.emptyImport }
-        for entry in importedMappings where entry.actionId == nil {
-            if let inline = entry.inlineAction { try Self.validate(inline, importing: true) }
+        for entry in importedMappings {
+            if entry.actionId == nil, let inline = entry.inlineAction { try Self.validate(inline, importing: true) }
+            try entry.bindings.forEach { try Self.validate($0, importing: true) }
         }
         Self.normalize(&importedMappings)
 
@@ -333,8 +345,10 @@ final class ConfigStore: ObservableObject {
 
         mappings = importedMappings
         customActions = merged
-        MappingsRegistry.shared.set(importedMappings)
+        // Actions before mappings: the tap is live during import, so a binding
+        // referencing a newly-imported custom action must find it registered.
         ActionsRegistry.shared.setCustom(merged)
+        MappingsRegistry.shared.set(importedMappings)
         saveToDisk()
         return importedMappings.count
     }
@@ -415,6 +429,25 @@ final class ConfigStore: ObservableObject {
             throw ConfigError.invalidEntry(importing ? "Imported entry has empty bundle_id" : "bundle_id cannot be empty")
         default:
             break
+        }
+    }
+
+    /// A per-app binding must target at least one condition and resolve to an
+    /// action (known id, or a valid inline action).
+    static func validate(_ binding: MappingBinding, importing: Bool = false) throws {
+        if binding.when.isEmpty {
+            throw ConfigError.invalidEntry(importing ? "Imported per-app rule has no condition" : "A per-app rule must target at least one app")
+        }
+        if let id = binding.actionId {
+            // On import the referenced action may be a custom action from the
+            // same file that isn't registered yet — only resolution-check live.
+            if !importing && ActionsRegistry.shared.action(byID: id) == nil {
+                throw ConfigError.invalidEntry("Unknown action id in per-app rule: \(id)")
+            }
+        } else if let inline = binding.inlineAction {
+            try validate(inline, importing: importing)
+        } else {
+            throw ConfigError.invalidEntry(importing ? "Imported per-app rule has no action" : "A per-app rule must have an action")
         }
     }
 

@@ -103,4 +103,93 @@ final class HyperCapslockTests: XCTestCase {
         XCTAssertNil(abc?.actionId)
         if case .inputSource = abc?.inlineAction {} else { XCTFail("ABC default should be inline input_source") }
     }
+
+    // MARK: Per-app scoped mappings (bindings)
+
+    func testBindingsRoundTrip() throws {
+        let entry = ActionMappingEntry(
+            trigger: .hyperPlusKey(key: 72, withShift: false),
+            actionId: "builtin.move_left",
+            bindings: [
+                MappingBinding(when: [.frontmostApp(include: ["com.apple.Safari", "com.google.Chrome"], exclude: [])],
+                        actionId: "builtin.move_right"),
+                MappingBinding(when: [.frontmostApp(include: [], exclude: ["com.apple.Terminal"])],
+                        inlineAction: .command("echo hi")),
+            ])
+        let yaml = try YAMLEncoder().encode([entry])
+        let decoded = try YAMLDecoder().decode([ActionMappingEntry].self, from: yaml)
+        XCTAssertEqual(decoded, [entry])
+    }
+
+    /// A mapping with no per-app rules must not emit a `bindings` key, so
+    /// existing configs stay byte-identical to today's output.
+    func testNoBindingsKeyWhenEmpty() throws {
+        let entry = ActionMappingEntry(trigger: .hyperPlusKey(key: 72, withShift: false), actionId: "builtin.move_left")
+        let yaml = try YAMLEncoder().encode([entry])
+        XCTAssertFalse(yaml.contains("bindings"), "empty bindings should be omitted from YAML")
+    }
+
+    /// An unrecognized condition type decodes to `.unknown` (never throws) and
+    /// is never satisfied (fail-closed).
+    func testUnknownConditionFailsClosed() throws {
+        let yaml = """
+        - trigger: { kind: hyper_plus_key, key: 72, with_shift: false }
+          action_id: builtin.move_left
+          bindings:
+            - when:
+                - type: input_source
+                  is: com.apple.keylayout.US
+              action_id: builtin.move_right
+        """
+        let decoded = try YAMLDecoder().decode([ActionMappingEntry].self, from: yaml)
+        let cond = decoded.first?.bindings.first?.when.first
+        XCTAssertEqual(cond, .unknown)
+        XCTAssertFalse(cond?.isSatisfied(RuntimeContext(frontmostBundleID: "com.apple.Safari")) ?? true)
+    }
+
+    func testConditionMatchingIncludeExcludeCaseInsensitive() {
+        let include = Condition.frontmostApp(include: ["com.apple.Safari"], exclude: [])
+        XCTAssertTrue(include.isSatisfied(RuntimeContext(frontmostBundleID: "COM.APPLE.SAFARI")))
+        XCTAssertFalse(include.isSatisfied(RuntimeContext(frontmostBundleID: "com.apple.Terminal")))
+        XCTAssertFalse(include.isSatisfied(RuntimeContext(frontmostBundleID: nil)))
+
+        let exclude = Condition.frontmostApp(include: [], exclude: ["com.apple.Terminal"])
+        XCTAssertTrue(exclude.isSatisfied(RuntimeContext(frontmostBundleID: "com.apple.Safari")))
+        XCTAssertFalse(exclude.isSatisfied(RuntimeContext(frontmostBundleID: "com.apple.Terminal")))
+
+        let degenerate = Condition.frontmostApp(include: [], exclude: [])
+        XCTAssertFalse(degenerate.isSatisfied(RuntimeContext(frontmostBundleID: "com.apple.Safari")))
+    }
+
+    func testBindingMatchesIsAndOverConditions() {
+        let b = MappingBinding(when: [
+            .frontmostApp(include: ["com.apple.Safari"], exclude: []),
+            .frontmostApp(include: [], exclude: ["com.apple.Safari"]),  // contradicts the first
+        ], actionId: "builtin.move_right")
+        XCTAssertFalse(b.matches(RuntimeContext(frontmostBundleID: "com.apple.Safari")))
+        XCTAssertFalse(MappingBinding(when: [], actionId: "x").matches(RuntimeContext(frontmostBundleID: "com.apple.Safari")))
+    }
+
+    func testEffectiveActionOrderFallbackAndNoOp() {
+        let entry = ActionMappingEntry(
+            trigger: .hyperPlusKey(key: 74, withShift: false),
+            actionId: "builtin.move_down",
+            bindings: [
+                MappingBinding(when: [.frontmostApp(include: ["com.apple.Safari"], exclude: [])], actionId: "builtin.move_right"),
+                MappingBinding(when: [.frontmostApp(include: ["com.googlecode.iterm2"], exclude: [])], actionId: "builtin.move_left"),
+            ])
+        // Safari → first matching binding wins.
+        XCTAssertEqual(ActionExecutor.effectiveAction(entry, RuntimeContext(frontmostBundleID: "com.apple.Safari")), .directional(.right))
+        // iTerm2 → second binding.
+        XCTAssertEqual(ActionExecutor.effectiveAction(entry, RuntimeContext(frontmostBundleID: "com.googlecode.iterm2")), .directional(.left))
+        // Finder (no binding matches) → default.
+        XCTAssertEqual(ActionExecutor.effectiveAction(entry, RuntimeContext(frontmostBundleID: "com.apple.finder")), .directional(.down))
+
+        // No default + no matching binding → nil (caller swallows as no-op).
+        let scopedOnly = ActionMappingEntry(
+            trigger: .hyperPlusKey(key: 74, withShift: false),
+            bindings: [MappingBinding(when: [.frontmostApp(include: ["com.apple.Safari"], exclude: [])], actionId: "builtin.move_right")])
+        XCTAssertNil(ActionExecutor.effectiveAction(scopedOnly, RuntimeContext(frontmostBundleID: "com.apple.finder")))
+        XCTAssertEqual(ActionExecutor.effectiveAction(scopedOnly, RuntimeContext(frontmostBundleID: "com.apple.Safari")), .directional(.right))
+    }
 }

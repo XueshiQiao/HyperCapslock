@@ -1,6 +1,7 @@
 import Foundation
 import CoreGraphics
 import AppKit
+import os
 
 // MARK: - Human-readable descriptions (logs + HUD)
 
@@ -93,7 +94,27 @@ enum ActionExecutor {
         }
     }
 
-    static func resolveMapping(jsKeycode: UInt16, shiftHeld: Bool) -> ActionMappingEntry? {
+    /// Snapshot of the runtime environment for binding evaluation. Reads only
+    /// the cached frontmost bundle id (a lock read) — safe on the tap thread.
+    static func currentContext() -> RuntimeContext {
+        RuntimeContext(frontmostBundleID: FrontmostAppTracker.shared.currentBundleID())
+    }
+
+    /// Effective action for a mapping under `ctx`: the first per-app binding
+    /// whose conditions all hold and that resolves to an action wins; otherwise
+    /// the default `actionId`/inline; otherwise nil (caller decides
+    /// swallow-vs-passthrough). An orphaned matching binding is skipped.
+    static func effectiveAction(_ entry: ActionMappingEntry, _ ctx: RuntimeContext) -> ActionConfig? {
+        for binding in entry.bindings where binding.matches(ctx) {
+            if let cfg = ActionsRegistry.shared.resolve(binding) { return cfg }
+        }
+        return ActionsRegistry.shared.resolve(entry)
+    }
+
+    /// Stage 1: find the trigger group for a Caps+key chord, applying the
+    /// shift-fallback — Caps+Shift+K with no exact group falls back to the
+    /// Caps+K group when *its effective action under `ctx`* allows it.
+    static func resolveEntry(jsKeycode: UInt16, shiftHeld: Bool, ctx: RuntimeContext) -> ActionMappingEntry? {
         MappingsRegistry.shared.withMappings { mappings in
             if let exact = mappings.first(where: {
                 if case .hyperPlusKey(let key, let withShift) = $0.trigger {
@@ -106,7 +127,7 @@ enum ActionExecutor {
                 if let fallback = mappings.first(where: { entry in
                     guard case .hyperPlusKey(let key, let withShift) = entry.trigger,
                           key == jsKeycode, withShift == false,
-                          let cfg = ActionsRegistry.shared.resolve(entry) else { return false }
+                          let cfg = effectiveAction(entry, ctx) else { return false }
                     return allowShiftFallback(cfg)
                 }) { return fallback }
             }
@@ -114,19 +135,19 @@ enum ActionExecutor {
         }
     }
 
-    static func findSingleTapAction() -> ActionConfig? {
+    static func findSingleTapAction(_ ctx: RuntimeContext) -> ActionConfig? {
         MappingsRegistry.shared.withMappings { m in
             guard let entry = m.first(where: { if case .singleTapHyper = $0.trigger { return true }; return false })
             else { return nil }
-            return ActionsRegistry.shared.resolve(entry)
+            return effectiveAction(entry, ctx)
         }
     }
 
-    static func findDoubleTapAction() -> ActionConfig? {
+    static func findDoubleTapAction(_ ctx: RuntimeContext) -> ActionConfig? {
         MappingsRegistry.shared.withMappings { m in
             guard let entry = m.first(where: { if case .doubleTapHyper = $0.trigger { return true }; return false })
             else { return nil }
-            return ActionsRegistry.shared.resolve(entry)
+            return effectiveAction(entry, ctx)
         }
     }
 
@@ -238,7 +259,7 @@ enum ActionExecutor {
     /// kernel CapsLock state was flipped (so the in-flight AlphaShift patch is safe).
     @discardableResult
     static func fireCapsShortTap() -> Bool {
-        if let action = findSingleTapAction() {
+        if let action = findSingleTapAction(currentContext()) {
             FileLog.shared.info("Caps single-tap action: \(describeAction(action))")
             let (combo, caption) = hudParts(action)
             HudCenter.shared.emit(trigger: "Caps", combo: combo, caption: caption)
@@ -259,7 +280,7 @@ enum ActionExecutor {
     static func handleShortTap() {
         let now = nowMillis()
         let prevTap = EngineState.shared.swapLastTapAtMs(0)
-        let dtAction = findDoubleTapAction()
+        let dtAction = findDoubleTapAction(currentContext())
 
         // 2nd tap within the double-tap window?
         if prevTap > 0, now &- prevTap <= EngineConstants.doubleTapWindowMs, let action = dtAction {
@@ -300,32 +321,65 @@ enum ActionExecutor {
 
     // MARK: - Caps + key chord
 
+    /// Action latched at key-DOWN so key-UP releases the SAME synthesized key
+    /// even if the frontmost app changes mid-chord. With per-app bindings the
+    /// resolved action is context-dependent, so re-resolving on key-up could
+    /// post the up of a *different* key (or none) and strand the down. The
+    /// stored value is `ActionConfig?`: a present entry means "we handled the
+    /// down" (nil inner = swallowed, no action posted); absent means we didn't.
+    private static let inFlightChord = OSAllocatedUnfairLock<[UInt16: ActionConfig?]>(initialState: [:])
+
     /// Returns true if the chord was handled (and the original key should be
     /// swallowed). Logs a readable "Caps remap: <trigger> -> <action>" on keyDown.
     static func handleCapsRemap(keycode: UInt16, keyDown: Bool, activeModifiers: CGEventFlags) -> Bool {
         let shiftHeld = activeModifiers.contains(.maskShift)
         guard let jsKeycode = KeyCodes.macToJs(keycode) else { return false }
-        guard let mapping = resolveMapping(jsKeycode: jsKeycode, shiftHeld: shiftHeld) else { return false }
 
-        // Resolve the mapping to its effective action (id → action, else inline).
-        // If unresolvable (orphaned/invalid mapping), don't swallow — let the key
-        // pass through normally and log it.
-        guard let action = ActionsRegistry.shared.resolve(mapping) else {
-            if keyDown {
-                FileLog.shared.warn("Caps remap: trigger matched but action is unresolved (invalid mapping, actionId=\(mapping.actionId ?? "nil")) — passing key through.")
+        // Key-UP: mirror the key-down decision via the latch so down/up always
+        // pair up, regardless of any app switch in between.
+        if !keyDown {
+            if let latched = inFlightChord.withLock({ $0.removeValue(forKey: jsKeycode) }) {
+                if let action = latched { execute(action, keyDown: false, activeModifiers: activeModifiers) }
+                return true   // handled the down (executed or swallowed) → swallow the up too
             }
-            return false
+            return false       // we passed the down through → pass the up through
         }
 
-        if keyDown {
-            let trigger = shiftHeld
-                ? "Caps+Shift+\(KeyCodes.name(jsKeycode))"
-                : "Caps+\(KeyCodes.name(jsKeycode))"
-            FileLog.shared.info("Caps remap: \(trigger) -> \(describeAction(action))")
-            let (combo, caption) = hudParts(action)
-            HudCenter.shared.emit(trigger: trigger, combo: combo, caption: caption)
+        // Key-DOWN. Autorepeat: a held chord re-fires key-down. Reuse the action
+        // latched at the FIRST down so the whole hold stays consistent and the
+        // eventual up pairs up — even if the app/shift/config changed mid-hold.
+        if let cached = inFlightChord.withLock({ $0[jsKeycode] }) {
+            if let action = cached { execute(action, keyDown: true, activeModifiers: activeModifiers) }
+            return true   // already our chord (autorepeat) → swallow
         }
-        execute(action, keyDown: keyDown, activeModifiers: activeModifiers)
+
+        // Fresh press. Stage 1: trigger group. No group → not ours; pass through.
+        let ctx = currentContext()
+        guard let mapping = resolveEntry(jsKeycode: jsKeycode, shiftHeld: shiftHeld, ctx: ctx) else { return false }
+        // Stage 2: effective action under the frontmost app. Latch it. Use
+        // updateValue, not subscript-assign: for a `[Key: Optional]` dictionary,
+        // `dict[key] = nil` REMOVES the entry, but we need to store an explicit
+        // nil meaning "we handled the down by swallowing".
+        let action = effectiveAction(mapping, ctx)
+        inFlightChord.withLock { _ = $0.updateValue(action, forKey: jsKeycode) }
+
+        let trigger = shiftHeld ? "Caps+Shift+\(KeyCodes.name(jsKeycode))" : "Caps+\(KeyCodes.name(jsKeycode))"
+        guard let action else {
+            // Group matched but no applicable binding and no resolvable default.
+            // The user claimed this chord → swallow it (no-op), do NOT pass the
+            // raw key through. (Divergence from the pre-bindings behavior.)
+            let base = "Caps remap: \(trigger) matched but no applicable action (frontmost=\(ctx.frontmostBundleID ?? "nil")) — swallowing."
+            if mapping.actionId != nil || mapping.inlineAction != nil {
+                FileLog.shared.warn(base + " (default action unresolved/orphaned)")
+            } else {
+                FileLog.shared.info(base)
+            }
+            return true
+        }
+        FileLog.shared.info("Caps remap: \(trigger) -> \(describeAction(action))")
+        let (combo, caption) = hudParts(action)
+        HudCenter.shared.emit(trigger: trigger, combo: combo, caption: caption)
+        execute(action, keyDown: true, activeModifiers: activeModifiers)
         return true
     }
 

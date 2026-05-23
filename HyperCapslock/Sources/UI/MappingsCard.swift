@@ -127,10 +127,22 @@ struct MappingsPage: View {
 
     private func mappingRow(_ entry: ActionMappingEntry) -> some View {
         let d = mappingActionDisplay(entry, loc)
+        let bindingsInvalid = entry.bindings.contains { ActionsRegistry.shared.resolve($0) == nil }
         return LabeledContent {
             HStack(spacing: 8) {
                 Image(systemName: d.symbol).foregroundStyle(d.invalid ? .orange : .secondary)
                 Text(d.text).foregroundStyle(d.invalid ? .orange : .secondary).lineLimit(1).truncationMode(.middle)
+                if !entry.bindings.isEmpty {
+                    HStack(spacing: 3) {
+                        Image(systemName: bindingsInvalid ? "exclamationmark.triangle.fill" : "macwindow")
+                        Text("\(entry.bindings.count)")
+                    }
+                    .font(.caption2)
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Capsule().fill((bindingsInvalid ? Color.orange : Color.accentColor).opacity(0.15)))
+                    .foregroundStyle(bindingsInvalid ? Color.orange : Color.accentColor)
+                    .help(bindingsInvalid ? loc.t("mappings.invalid") : loc.t("mappings.app_rules"))
+                }
                 Button { sheet = .edit(entry) } label: { Image(systemName: "pencil") }.buttonStyle(.borderless)
                 Button {
                     app.removeMapping(entry.trigger); app.showToast(loc.t("toast.mapping_removed"))

@@ -85,10 +85,11 @@ final class ModifierDoubleTap {
     }
 
     private static func configuredAction(_ m: ModifierKey) -> ActionConfig? {
-        MappingsRegistry.shared.withMappings { mappings in
+        let ctx = ActionExecutor.currentContext()
+        return MappingsRegistry.shared.withMappings { mappings in
             guard let entry = mappings.first(where: { if case .doubleTapModifier(let cfg) = $0.trigger { return cfg == m }; return false })
             else { return nil }
-            return ActionsRegistry.shared.resolve(entry)
+            return ActionExecutor.effectiveAction(entry, ctx)
         }
     }
 

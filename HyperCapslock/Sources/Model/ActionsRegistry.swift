@@ -38,4 +38,11 @@ final class ActionsRegistry {
         if let id = entry.actionId, let a = action(byID: id) { return a.config }
         return entry.inlineAction
     }
+
+    /// Effective action config for a per-app binding — same precedence as a
+    /// mapping: resolvable `actionId` wins, else inline, else nil.
+    func resolve(_ binding: MappingBinding) -> ActionConfig? {
+        if let id = binding.actionId, let a = action(byID: id) { return a.config }
+        return binding.inlineAction
+    }
 }

@@ -209,11 +209,17 @@ struct ActionMappingEntry: Equatable {
     /// Legacy / unmigrated: the action stored inline. Used when `actionId` is
     /// nil or unresolvable. Cleared on edit once an `actionId` is assigned.
     var inlineAction: ActionConfig?
+    /// Per-app (conditional) overrides, evaluated in order before the default
+    /// `actionId`/`inlineAction`. Empty for a plain global mapping. Serialized
+    /// under the `bindings` key only when non-empty, so existing configs stay
+    /// byte-identical until a per-app rule is added.
+    var bindings: [MappingBinding]
 
-    init(trigger: Trigger, actionId: String? = nil, inlineAction: ActionConfig? = nil) {
+    init(trigger: Trigger, actionId: String? = nil, inlineAction: ActionConfig? = nil, bindings: [MappingBinding] = []) {
         self.trigger = trigger
         self.actionId = actionId
         self.inlineAction = inlineAction
+        self.bindings = bindings
     }
 }
 
@@ -223,6 +229,7 @@ extension ActionMappingEntry: Codable {
         case withShift = "with_shift"
         case actionId = "action_id"
         case action
+        case bindings
     }
 
     init(from decoder: Decoder) throws {
@@ -240,6 +247,7 @@ extension ActionMappingEntry: Codable {
         }
         self.actionId = try c.decodeIfPresent(String.self, forKey: .actionId)
         self.inlineAction = try c.decodeIfPresent(ActionConfig.self, forKey: .action)
+        self.bindings = try c.decodeIfPresent([MappingBinding].self, forKey: .bindings) ?? []
     }
 
     func encode(to encoder: Encoder) throws {
@@ -247,5 +255,6 @@ extension ActionMappingEntry: Codable {
         try c.encode(trigger, forKey: .trigger)
         try c.encodeIfPresent(actionId, forKey: .actionId)
         try c.encodeIfPresent(inlineAction, forKey: .action)
+        if !bindings.isEmpty { try c.encode(bindings, forKey: .bindings) }
     }
 }
