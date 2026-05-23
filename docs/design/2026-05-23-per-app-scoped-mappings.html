@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Per-App Scoped Mappings — Design Spec</title>
+<style>
+  :root {
+    --bg: #faf9f5;
+    --surface: #ffffff;
+    --ink: #1f1e1c;
+    --ink-soft: #5a5751;
+    --ink-faint: #8a857c;
+    --rule: #e6e2d4;
+    --rule-soft: #efece1;
+    --code-bg: #f3f0e6;
+    --accent: #d97757;
+    --accent-soft: #f4e2d6;
+    --good: #4f8a5c;
+    --warn: #b6711c;
+    --bad: #b14338;
+    --serif: "Tiempos", "Source Serif Pro", "Iowan Old Style", Georgia, serif;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", "SF Mono", Menlo, Monaco, "Cascadia Code", monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .container {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 80px 40px 120px;
+  }
+
+  header.hero { margin-bottom: 56px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 18px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 48px;
+    line-height: 1.1;
+    margin: 0 0 20px;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+  }
+  .lede {
+    font-family: var(--serif);
+    font-size: 22px;
+    line-height: 1.45;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 640px;
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 30px;
+    line-height: 1.2;
+    margin: 64px 0 16px;
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 17px;
+    margin: 36px 0 10px;
+    letter-spacing: -0.005em;
+  }
+  p { margin: 0 0 16px; }
+  p, li { color: var(--ink); }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-soft); }
+  a:hover { border-bottom-color: var(--accent); }
+
+  ul, ol { padding-left: 24px; margin: 0 0 16px; }
+  li { margin-bottom: 8px; }
+  li code { font-size: 0.92em; }
+
+  code {
+    font-family: var(--mono);
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: #1f1e1c;
+    color: #f6f3eb;
+    padding: 20px 24px;
+    border-radius: 8px;
+    overflow-x: auto;
+    line-height: 1.55;
+    font-size: 13.5px;
+    margin: 20px 0 28px;
+  }
+  pre code {
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+  }
+  .tok-comment  { color: #9b9081; font-style: italic; }
+  .tok-keyword  { color: #e89b6f; }
+  .tok-fn       { color: #f0d68a; }
+  .tok-string   { color: #b8d49d; }
+  .tok-num      { color: #d8b9e3; }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px 32px;
+    margin: 32px 0 48px;
+    padding: 18px 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+  .meta-row b { color: var(--ink); font-weight: 500; margin-right: 8px; }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 18px 22px;
+    margin: 28px 0;
+    border-radius: 0 6px 6px 0;
+    color: var(--ink);
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .figure {
+    margin: 36px 0;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 28px 24px 18px;
+  }
+  .figure svg { display: block; width: 100%; height: auto; }
+  .figure .caption {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--rule);
+  }
+  .figure .caption b { color: var(--ink-soft); font-weight: 600; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 24px 0 32px;
+    font-size: 14.5px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  th {
+    font-weight: 600;
+    color: var(--ink-soft);
+    background: var(--rule-soft);
+    font-size: 13px;
+    letter-spacing: 0.01em;
+  }
+  td code { font-size: 0.88em; }
+
+  .pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .pill.good    { background: #e3f0e2; color: var(--good); }
+  .pill.warn    { background: #f5e7d0; color: var(--warn); }
+  .pill.bad     { background: #f5dad6; color: var(--bad); }
+  .pill.neutral { background: var(--rule-soft); color: var(--ink-soft); }
+
+  .footer {
+    margin-top: 96px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  /* SVG defaults */
+  svg text { font-family: var(--sans); font-size: 12.5px; fill: var(--ink); }
+  svg .label-mono  { font-family: var(--mono); font-size: 11.5px; fill: var(--ink-soft); }
+  svg .label-soft  { fill: var(--ink-soft); }
+  svg .label-faint { fill: var(--ink-faint); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ╔══ HERO ══════════════════════════════════════════════════════════╗ -->
+<header class="hero">
+  <div class="eyebrow">Design spec · HyperCapslock · 2026-05-23</div>
+  <h1>Per-app scoped mappings</h1>
+  <p class="lede">One trigger, many behaviors — let a single key chord resolve to a different action depending on which app is frontmost, without breaking a single existing config file.</p>
+</header>
+
+<div class="meta-row">
+  <span><b>Feature</b><code>per-app action scope</code></span>
+  <span><b>Touches</b><code>Model · Engine · UI</code></span>
+  <span><b>Compat</b><span class="pill good">LOSSLESS DOWNGRADE</span></span>
+  <span><b>Status</b><span class="pill warn">SPEC — NOT IMPLEMENTED</span></span>
+</div>
+
+<!-- ╔══ §1 ════════════════════════════════════════════════════════════╗ -->
+<h2>1 · What we're building</h2>
+
+<p>Today every mapping is global: <code>Caps+J</code> does the same thing in every app. We want a single trigger to <em>branch</em> by frontmost application — <code>Caps+J</code> is "down" everywhere, but "next browser tab" in Safari and "tmux switch pane" in iTerm2. This is conditional selection, not a filter: the same key produces genuinely different actions in different contexts.</p>
+
+<p>The design rests on one fact about this app: <strong>a trigger is stable and unique.</strong> A key chord <em>is</em> one trigger. So instead of scattering scoped copies of a trigger across the config, we keep the trigger as the top-level identity and hang an ordered list of conditional <em>bindings</em> underneath it.</p>
+
+<div class="callout">
+<span class="label">Core idea</span>
+<p>A mapping = one stable <b>trigger</b> + a single <b>default action</b> + an ordered list of <b>bindings</b>, where each binding is <code>{ when: [conditions], action }</code>. When the trigger fires, bindings are evaluated top-to-bottom; the first whose conditions match wins; otherwise the default action runs; otherwise the key is swallowed as a no-op.</p>
+</div>
+
+<!-- ╔══ §2 ════════════════════════════════════════════════════════════╗ -->
+<h2>2 · Two stages: selection vs execution</h2>
+
+<p>The whole feature lives in <strong>one</strong> of two independent stages. A key event first <em>selects</em> which action to run, then <em>executes</em> it. Per-app scope only changes selection. Execution — including how held modifiers (Option/Control/Cmd) are forwarded into the synthesized keystroke — is untouched.</p>
+
+<div class="figure">
+<svg viewBox="0 0 800 250" xmlns="http://www.w3.org/2000/svg" aria-label="Two-stage pipeline: selection then execution">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5a5751"/>
+    </marker>
+  </defs>
+
+  <text x="0" y="20" font-weight="600" fill="#1f1e1c">Key event → action, in two stages</text>
+
+  <!-- key event -->
+  <rect x="0" y="70" width="120" height="64" rx="8" fill="#f3f0e6" stroke="#e6e2d4"/>
+  <text x="60" y="98" text-anchor="middle" class="label-mono">Caps + J</text>
+  <text x="60" y="116" text-anchor="middle" class="label-faint" font-size="11">(+ held mods)</text>
+
+  <line x1="120" y1="102" x2="196" y2="102" stroke="#5a5751" marker-end="url(#arr)"/>
+
+  <!-- stage 1 -->
+  <rect x="200" y="58" width="220" height="88" rx="10" fill="#fff" stroke="#d97757" stroke-width="2"/>
+  <text x="310" y="84" text-anchor="middle" font-weight="600" fill="#d97757">STAGE 1 — Select</text>
+  <text x="310" y="106" text-anchor="middle" class="label-soft" font-size="12">match trigger → eval bindings</text>
+  <text x="310" y="124" text-anchor="middle" class="label-soft" font-size="12">by frontmost app → pick action</text>
+
+  <line x1="420" y1="102" x2="496" y2="102" stroke="#5a5751" marker-end="url(#arr)"/>
+
+  <!-- stage 2 -->
+  <rect x="500" y="58" width="220" height="88" rx="10" fill="#fff" stroke="#e6e2d4"/>
+  <text x="610" y="84" text-anchor="middle" font-weight="600" fill="#1f1e1c">STAGE 2 — Execute</text>
+  <text x="610" y="106" text-anchor="middle" class="label-soft" font-size="12">synthesize keystroke;</text>
+  <text x="610" y="124" text-anchor="middle" class="label-soft" font-size="12">forward held modifiers</text>
+
+  <line x1="720" y1="102" x2="784" y2="102" stroke="#5a5751" marker-end="url(#arr)"/>
+  <text x="792" y="106" text-anchor="end" class="label-faint" font-size="0"></text>
+
+  <!-- annotations -->
+  <rect x="200" y="172" width="220" height="48" rx="6" fill="#f4e2d6"/>
+  <text x="310" y="192" text-anchor="middle" class="label-mono" fill="#b6711c">THIS SPEC changes here</text>
+  <text x="310" y="209" text-anchor="middle" class="label-faint" font-size="11">per-app / bindings only</text>
+
+  <rect x="500" y="172" width="220" height="48" rx="6" fill="#eef0ee"/>
+  <text x="610" y="192" text-anchor="middle" class="label-mono" fill="#4f8a5c">UNCHANGED</text>
+  <text x="610" y="209" text-anchor="middle" class="label-faint" font-size="11">modifier forwarding = issue #5</text>
+</svg>
+<div class="caption"><b>Figure 1.</b> Scope is purely a Stage-1 concern. The Stage-2 modifier-forwarding policy (whether a held Option rides along into the produced key) is independent and tracked separately in <a href="https://github.com/XueshiQiao/HyperCapslock/issues/5">issue #5</a> — it is <em>not</em> part of this work.</div>
+</div>
+
+<p>One consequence worth recording: because a trigger can now resolve to different <em>action kinds</em> per app, the existing "modifier forwarding depends on action kind" rule becomes more visible. <code>Caps+Option+J</code> may forward Option in Finder (a <code>directional</code> action) but drop it in Safari (a <code>keyCombo</code>). That is pre-existing behavior, not a regression introduced here — see issue #5.</p>
+
+<!-- ╔══ §3 ════════════════════════════════════════════════════════════╗ -->
+<h2>3 · Disk format &amp; downgrade safety</h2>
+
+<p>The hard constraint: an older build keys the entire config by trigger — it dedupes <code>mappings</code> by trigger, finds entries by trigger, and keys its lossless-preservation tables by trigger. Any duplicate-trigger entry that lands in <code>mappings</code> is destroyed when an old build saves. So the format must keep <code>mappings</code> trigger-unique and put everything new where old builds will preserve-but-ignore it.</p>
+
+<p>The grouping model satisfies this for free. The <strong>default</strong> action stays in the existing <code>action_id</code> (or inline <code>action</code>) field — exactly where old builds read it. The conditional <strong>bindings</strong> go in a new per-mapping <code>bindings</code> key, which old builds treat as an unknown per-mapping key and round-trip verbatim through the existing preservation machinery.</p>
+
+<pre><code><span class="tok-comment"># action_mappings.yml</span>
+actions:
+  next-tab:
+    name: <span class="tok-string">"Next browser tab"</span>
+    action: { kind: key_combo, target_key: <span class="tok-num">30</span>, with_cmd: <span class="tok-keyword">true</span> }
+
+mappings:
+  - trigger: { kind: hyper_plus_key, key: <span class="tok-num">38</span>, with_shift: <span class="tok-keyword">false</span> }
+    action_id: builtin.down            <span class="tok-comment"># ← DEFAULT. Old builds read this.</span>
+    bindings:                          <span class="tok-comment"># ← NEW. Ordered. Old builds preserve + ignore.</span>
+      - when: [ { type: frontmost_app, include: [com.apple.Safari, com.google.Chrome] } ]
+        action: next-tab
+      - when: [ { type: frontmost_app, include: [com.googlecode.iterm2] } ]
+        action_id: builtin.down        <span class="tok-comment"># bindings reference actions the same way mappings do</span></code></pre>
+
+<div class="figure">
+<svg viewBox="0 0 800 260" xmlns="http://www.w3.org/2000/svg" aria-label="How new vs old builds read the same file">
+  <defs>
+    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5a5751"/>
+    </marker>
+  </defs>
+
+  <text x="0" y="20" font-weight="600" fill="#1f1e1c">Same file, two readers</text>
+
+  <!-- the file in the middle -->
+  <rect x="300" y="48" width="200" height="164" rx="10" fill="#f3f0e6" stroke="#e6e2d4"/>
+  <text x="400" y="70" text-anchor="middle" class="label-mono" fill="#5a5751">mappings[0]</text>
+  <rect x="318" y="84" width="164" height="40" rx="5" fill="#fff" stroke="#e6e2d4"/>
+  <text x="400" y="103" text-anchor="middle" class="label-mono" font-size="11">action_id:</text>
+  <text x="400" y="118" text-anchor="middle" class="label-mono" font-size="11" fill="#1f1e1c">builtin.down</text>
+  <rect x="318" y="132" width="164" height="62" rx="5" fill="#fff" stroke="#d97757" stroke-dasharray="4 3"/>
+  <text x="400" y="151" text-anchor="middle" class="label-mono" font-size="11" fill="#d97757">bindings:</text>
+  <text x="400" y="167" text-anchor="middle" class="label-faint" font-size="10.5">Safari → next-tab</text>
+  <text x="400" y="182" text-anchor="middle" class="label-faint" font-size="10.5">iTerm2 → …</text>
+
+  <!-- new build (left) -->
+  <rect x="20" y="92" width="220" height="76" rx="10" fill="#fff" stroke="#4f8a5c" stroke-width="2"/>
+  <text x="130" y="118" text-anchor="middle" font-weight="600" fill="#4f8a5c">New build</text>
+  <text x="130" y="139" text-anchor="middle" class="label-soft" font-size="12">reads default + bindings;</text>
+  <text x="130" y="156" text-anchor="middle" class="label-soft" font-size="12">branches by app</text>
+  <line x1="300" y1="120" x2="244" y2="120" stroke="#5a5751" marker-end="url(#arr2)"/>
+
+  <!-- old build (right) -->
+  <rect x="560" y="92" width="220" height="76" rx="10" fill="#fff" stroke="#b6711c" stroke-width="2"/>
+  <text x="670" y="114" text-anchor="middle" font-weight="600" fill="#b6711c">Old build</text>
+  <text x="670" y="135" text-anchor="middle" class="label-soft" font-size="12">reads default only;</text>
+  <text x="670" y="152" text-anchor="middle" class="label-soft" font-size="12">keeps bindings verbatim</text>
+  <line x1="500" y1="120" x2="556" y2="120" stroke="#5a5751" marker-end="url(#arr2)"/>
+
+  <!-- verdict -->
+  <text x="130" y="200" text-anchor="middle" class="label-mono" fill="#4f8a5c">full feature</text>
+  <text x="670" y="200" text-anchor="middle" class="label-mono" fill="#b6711c">global default works;</text>
+  <text x="670" y="216" text-anchor="middle" class="label-mono" fill="#b6711c">overrides dormant — zero loss</text>
+</svg>
+<div class="caption"><b>Figure 2.</b> Because <code>mappings</code> stays trigger-unique, the old build's dedupe never fires and <code>bindings</code> survives a save untouched. A user who never adds an app rule produces a file byte-identical to today's.</div>
+</div>
+
+<p>Implementation note: add <code>"bindings"</code> to <code>ConfigStore.mappingKnownKeys</code> in the <em>new</em> build. This isn't about double-emission (<code>mergeUnknownKeys</code> only re-adds a key the fresh encode omitted, so a freshly-encoded <code>bindings</code> is never duplicated). It's about <strong>avoiding zombie data</strong>: if <code>bindings</code> stays "unknown" and a user clears all app rules, the fresh encode drops the key, the preserved stale node merges back, and the deleted rules resurrect. Marking it known stops that. Old builds — which lack the entry — keep treating <code>bindings</code> as unknown and preserve it verbatim; that asymmetry is exactly what we want.</p>
+
+<!-- ╔══ §4 ════════════════════════════════════════════════════════════╗ -->
+<h2>4 · In-memory model</h2>
+
+<p>On disk the default lives in <code>action_id</code> and the rest in <code>bindings</code>, but in memory it is one uniform structure. <code>ActionMappingEntry</code> gains a <code>bindings</code> array; each <code>Binding</code> mirrors the existing action-reference duality (id preferred, inline fallback) and carries an ordered <code>when</code> list of typed conditions.</p>
+
+<div class="figure">
+<svg viewBox="0 0 800 270" xmlns="http://www.w3.org/2000/svg" aria-label="In-memory data model">
+  <text x="0" y="20" font-weight="600" fill="#1f1e1c">ActionMappingEntry, extended</text>
+
+  <!-- entry -->
+  <rect x="0" y="44" width="300" height="206" rx="10" fill="#fff" stroke="#d97757" stroke-width="2"/>
+  <text x="18" y="70" font-weight="600" fill="#d97757">ActionMappingEntry</text>
+  <text x="18" y="96" class="label-mono">trigger: Trigger</text>
+  <text x="18" y="118" class="label-mono">actionId: String?</text>
+  <text x="18" y="140" class="label-mono">inlineAction: ActionConfig?</text>
+  <text x="18" y="156" class="label-faint" font-size="10.5">↑ the default / global fallback</text>
+  <line x1="14" y1="172" x2="286" y2="172" stroke="#e6e2d4" stroke-dasharray="3 3"/>
+  <text x="18" y="194" class="label-mono" fill="#d97757">bindings: [Binding]</text>
+  <text x="18" y="210" class="label-faint" font-size="10.5">NEW · ordered · may be empty</text>
+  <text x="18" y="232" class="label-faint" font-size="10.5">empty bindings + default = today's</text>
+  <text x="18" y="246" class="label-faint" font-size="10.5">plain global mapping</text>
+
+  <!-- binding -->
+  <rect x="340" y="44" width="220" height="120" rx="10" fill="#fff" stroke="#e6e2d4"/>
+  <text x="358" y="70" font-weight="600" fill="#1f1e1c">Binding</text>
+  <text x="358" y="96" class="label-mono">when: [Condition]</text>
+  <text x="358" y="113" class="label-faint" font-size="10.5">non-empty (validated)</text>
+  <text x="358" y="135" class="label-mono">actionId: String?</text>
+  <text x="358" y="155" class="label-mono">inlineAction: ActionConfig?</text>
+  <line x1="300" y1="190" x2="338" y2="120" stroke="#8a857c" stroke-dasharray="3 3"/>
+
+  <!-- condition -->
+  <rect x="600" y="44" width="200" height="120" rx="10" fill="#fff" stroke="#e6e2d4"/>
+  <text x="618" y="70" font-weight="600" fill="#1f1e1c">Condition</text>
+  <text x="618" y="96" class="label-mono" font-size="11">.frontmostApp(</text>
+  <text x="628" y="113" class="label-mono" font-size="11">include: [String],</text>
+  <text x="628" y="130" class="label-mono" font-size="11">exclude: [String])</text>
+  <text x="618" y="152" class="label-faint" font-size="10.5">extensible: more types later</text>
+  <line x1="560" y1="100" x2="598" y2="100" stroke="#8a857c" stroke-dasharray="3 3"/>
+
+  <!-- runtime side note -->
+  <rect x="340" y="186" width="460" height="64" rx="8" fill="#f3f0e6" stroke="#e6e2d4"/>
+  <text x="358" y="210" class="label-mono" fill="#5a5751">RuntimeContext { frontmostBundleID: String? }</text>
+  <text x="358" y="232" class="label-faint" font-size="11">built once per event; conditions are evaluated against it</text>
+</svg>
+<div class="caption"><b>Figure 3.</b> No per-binding <code>id</code>. Conflict resolution is positional order (saved verbatim), the UI rewrites the whole array on every edit, and the lossless guarantee stays at mapping granularity — so a stable binding identity buys nothing.</div>
+</div>
+
+<p>Why no binding <code>id</code>: the only scenario that would need one is preserving a <em>future</em> version's unknown sub-fields inside a binding across a user reorder. That extends the lossless contract below mapping level, which we explicitly do not promise (consistent with today). If that ever changes, revisit.</p>
+
+<!-- ╔══ §5 ════════════════════════════════════════════════════════════╗ -->
+<h2>5 · Resolution algorithm</h2>
+
+<p>Selection is two nested steps: pick the trigger <em>group</em> (this is where the existing shift-fallback lives), then pick a <em>binding</em> within it by current context. Conflict resolution within a group is pure declaration order — first match wins.</p>
+
+<div class="figure">
+<svg viewBox="0 0 800 360" xmlns="http://www.w3.org/2000/svg" aria-label="Resolution flowchart">
+  <defs>
+    <marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5a5751"/>
+    </marker>
+  </defs>
+
+  <text x="0" y="20" font-weight="600" fill="#1f1e1c">resolveAction(trigger, shiftHeld, context)</text>
+
+  <!-- match group -->
+  <rect x="280" y="44" width="240" height="46" rx="8" fill="#fff" stroke="#e6e2d4"/>
+  <text x="400" y="72" text-anchor="middle" class="label-soft">match trigger group (+ shift-fallback)</text>
+
+  <!-- diamond: group found? -->
+  <polygon points="400,104 470,138 400,172 330,138" fill="#fff" stroke="#d97757" stroke-width="1.5"/>
+  <text x="400" y="142" text-anchor="middle" class="label-soft" font-size="12">group found?</text>
+  <line x1="400" y1="90" x2="400" y2="104" stroke="#5a5751" marker-end="url(#arr3)"/>
+
+  <text x="486" y="134" class="label-mono" fill="#b14338">no</text>
+  <line x1="470" y1="138" x2="660" y2="138" stroke="#5a5751" marker-end="url(#arr3)"/>
+  <rect x="660" y="116" width="130" height="44" rx="8" fill="#f5dad6"/>
+  <text x="725" y="143" text-anchor="middle" class="label-mono" fill="#b14338">pass key through</text>
+
+  <text x="412" y="190" class="label-mono" fill="#4f8a5c">yes</text>
+  <line x1="400" y1="172" x2="400" y2="196" stroke="#5a5751" marker-end="url(#arr3)"/>
+
+  <!-- eval bindings in order -->
+  <rect x="280" y="196" width="240" height="46" rx="8" fill="#fff" stroke="#e6e2d4"/>
+  <text x="400" y="224" text-anchor="middle" class="label-soft">eval bindings top→bottom vs context</text>
+
+  <!-- diamond: any binding matches? -->
+  <polygon points="400,256 478,292 400,328 322,292" fill="#fff" stroke="#d97757" stroke-width="1.5"/>
+  <text x="400" y="289" text-anchor="middle" class="label-soft" font-size="12">first match?</text>
+  <line x1="400" y1="242" x2="400" y2="256" stroke="#5a5751" marker-end="url(#arr3)"/>
+
+  <!-- yes -> binding action -->
+  <text x="494" y="288" class="label-mono" fill="#4f8a5c">yes</text>
+  <line x1="478" y1="292" x2="600" y2="292" stroke="#5a5751" marker-end="url(#arr3)"/>
+  <rect x="600" y="270" width="190" height="44" rx="8" fill="#e3f0e2"/>
+  <text x="695" y="297" text-anchor="middle" class="label-mono" fill="#4f8a5c">run binding action</text>
+
+  <!-- no -> default -->
+  <text x="250" y="288" class="label-mono" fill="#b6711c">none</text>
+  <line x1="322" y1="292" x2="200" y2="292" stroke="#5a5751" marker-end="url(#arr3)"/>
+  <rect x="10" y="262" width="190" height="60" rx="8" fill="#f5e7d0"/>
+  <text x="105" y="286" text-anchor="middle" class="label-mono" fill="#b6711c">default action_id?</text>
+  <text x="105" y="305" text-anchor="middle" class="label-faint" font-size="10.5">yes → run it · no → no-op (swallow)</text>
+</svg>
+<div class="caption"><b>Figure 4.</b> "No group" means the trigger isn't mapped at all → the key passes through normally (today's behavior). "Group matched but nothing applies" → swallow as a no-op, because the user did claim this chord — note this is a deliberate change from today, where <code>handleCapsRemap</code> passes the key through when a matched mapping has no resolvable action.</div>
+</div>
+
+<p>The shift-fallback interaction generalizes cleanly. When <code>Caps+Shift+J</code> has no group of its own, fall back to the <code>Caps+J</code> group, resolve <em>its</em> effective action under the current context, and apply <code>allowShiftFallback</code> to that resolved action. Group-selection happens first; binding-selection second.</p>
+
+<pre><code><span class="tok-comment">// ActionExecutor — sketch (Engine thread; reads cached context)</span>
+<span class="tok-keyword">static func</span> <span class="tok-fn">effectiveAction</span>(_ entry: ActionMappingEntry, _ ctx: RuntimeContext) -&gt; ActionConfig? {
+    <span class="tok-keyword">for</span> b <span class="tok-keyword">in</span> entry.bindings {                 <span class="tok-comment">// declaration order = priority</span>
+        <span class="tok-keyword">if</span> conditionsSatisfied(b.when, ctx) {     <span class="tok-comment">// unknown condition type ⇒ false</span>
+            <span class="tok-keyword">if let</span> a = ActionsRegistry.shared.resolve(b) { <span class="tok-keyword">return</span> a }
+        }
+    }
+    <span class="tok-keyword">return</span> ActionsRegistry.shared.resolve(entry)  <span class="tok-comment">// default; nil ⇒ caller no-ops</span>
+}</code></pre>
+
+<!-- ╔══ §6 ════════════════════════════════════════════════════════════╗ -->
+<h2>6 · Frontmost-app tracking &amp; threading</h2>
+
+<p>The <code>CGEventTap</code> callback runs on a dedicated CFRunLoop thread, not the main thread. Calling <code>NSWorkspace.shared.frontmostApplication</code> there is unsafe and can block the hot path. So the frontmost bundle id is <strong>cached</strong>: a main-thread observer updates it on app-activation notifications; the engine thread only reads the cached value behind a lock — the same shape as <code>EngineState</code>.</p>
+
+<div class="figure">
+<svg viewBox="0 0 800 240" xmlns="http://www.w3.org/2000/svg" aria-label="Two-thread cache for frontmost app">
+  <defs>
+    <marker id="arr4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5a5751"/>
+    </marker>
+  </defs>
+
+  <text x="0" y="20" font-weight="600" fill="#1f1e1c">FrontmostAppTracker — write on main, read on tap thread</text>
+
+  <!-- main lane -->
+  <text x="0" y="64" class="label-mono" fill="#5a5751">main thread</text>
+  <line x1="0" y1="78" x2="800" y2="78" stroke="#efece1" stroke-width="1.5"/>
+  <rect x="120" y="52" width="230" height="40" rx="8" fill="#fff" stroke="#e6e2d4"/>
+  <text x="235" y="77" text-anchor="middle" class="label-soft" font-size="12">didActivateApplicationNotification</text>
+
+  <!-- tap lane -->
+  <text x="0" y="184" class="label-mono" fill="#5a5751">event-tap thread</text>
+  <line x1="0" y1="198" x2="800" y2="198" stroke="#efece1" stroke-width="1.5"/>
+  <rect x="120" y="172" width="200" height="40" rx="8" fill="#fff" stroke="#e6e2d4"/>
+  <text x="220" y="197" text-anchor="middle" class="label-soft" font-size="12">key fires → resolveAction</text>
+
+  <!-- the lock cell in the middle -->
+  <rect x="470" y="104" width="240" height="64" rx="10" fill="#f4e2d6" stroke="#d97757"/>
+  <text x="590" y="130" text-anchor="middle" class="label-mono" fill="#d97757">OSAllocatedUnfairLock</text>
+  <text x="590" y="150" text-anchor="middle" class="label-faint" font-size="11">cachedFrontmostBundleID</text>
+
+  <line x1="350" y1="72" x2="470" y2="120" stroke="#5a5751" marker-end="url(#arr4)"/>
+  <text x="392" y="92" class="label-mono" font-size="10.5" fill="#4f8a5c">write</text>
+  <line x1="470" y1="150" x2="320" y2="190" stroke="#5a5751" marker-end="url(#arr4)"/>
+  <text x="372" y="182" class="label-mono" font-size="10.5" fill="#b6711c">read</text>
+</svg>
+<div class="caption"><b>Figure 5.</b> The hot path never touches AppKit. A few-millisecond lag right after an app switch is acceptable: at worst one keystroke uses the previous app's scope.</div>
+</div>
+
+<!-- ╔══ §7 ════════════════════════════════════════════════════════════╗ -->
+<h2>7 · Locked semantics &amp; edge cases</h2>
+
+<table>
+  <thead><tr><th>Case</th><th>Decision</th></tr></thead>
+  <tbody>
+    <tr><td>Conflict within a group</td><td>Pure config order; first matching binding wins. UI supports drag-reorder, persisted verbatim. No specificity scoring.</td></tr>
+    <tr><td>No binding matches, no default</td><td>No-op — swallow the chord (user claimed this key). <strong>Divergence:</strong> today <code>handleCapsRemap</code> returns <code>false</code> and lets the key through when a matched mapping resolves to no action; this must be deliberately changed to swallow. <span class="pill warn">implement explicitly</span></td></tr>
+    <tr><td>Default <code>action_id</code> present but unresolvable (orphaned/deleted custom action)</td><td>Treat as "no applicable action" for that mapping → no-op swallow, and log a warning (matches the user's "no usable target ⇒ swallow" intent, replacing today's pass-through-on-orphan).</td></tr>
+    <tr><td>Trigger not mapped at all</td><td>Pass the key through normally (today's behavior — unchanged).</td></tr>
+    <tr><td>Default action</td><td>Lives <em>only</em> in top-level <code>action_id</code>/inline. Bindings never carry a no-<code>when</code> default.</td></tr>
+    <tr><td>Binding with empty/missing <code>when</code></td><td>Invalid — rejected on save. The default belongs in <code>action_id</code>.</td></tr>
+    <tr><td>Unknown condition <code>type</code></td><td>Fail-closed — condition not satisfied, binding skipped. New condition types stay dormant on builds that don't understand them.</td></tr>
+    <tr><td>Overlapping app sets / include vs exclude in one group</td><td>Resolved by order. UI <em>may</em> warn on overlap but does not block.</td></tr>
+    <tr><td>Bundle-id comparison</td><td>Case-insensitive.</td></tr>
+    <tr><td>"Empty group" pruning</td><td>Remove a mapping only when it has <em>neither</em> a default <em>nor</em> bindings. Default + empty bindings = a normal global mapping; keep it.</td></tr>
+    <tr><td>Bindings, no default</td><td>Legal: "act only in these apps, no-op elsewhere." Old builds see an action-less mapping (acceptable degradation).</td></tr>
+    <tr><td>Frontmost is nil / is HyperCapslock itself</td><td><code>frontmost_app</code> conditions don't match → falls to default. Defined, not special-cased.</td></tr>
+    <tr><td>All trigger kinds</td><td>Bindings apply uniformly to <code>hyperPlusKey</code>, <code>singleTapHyper</code>, <code>doubleTapHyper</code>, and <code>doubleTapModifier</code>.</td></tr>
+    <tr><td>v1 condition surface</td><td>Engine honors both <code>include</code> and <code>exclude</code> on <code>frontmost_app</code>; UI exposes <code>include</code> only. <code>exclude</code> reserved for a fast-follow.</td></tr>
+    <tr><td>Modifier forwarding</td><td>Out of scope — Stage 2. Tracked in <a href="https://github.com/XueshiQiao/HyperCapslock/issues/5">issue #5</a>.</td></tr>
+  </tbody>
+</table>
+
+<!-- ╔══ §8 ════════════════════════════════════════════════════════════╗ -->
+<h2>8 · UI changes</h2>
+
+<p>The mapping editor grows from "pick one action" to "pick a default action + manage an ordered list of app rules." Each rule reuses the existing app picker (the <code>NSOpenPanel</code>-based <code>chooseApp</code> flow already used by the <code>open_app</code> action, which yields a <code>bundle_id</code> + display name and resolves an icon).</p>
+
+<ul>
+  <li><strong><code>AddEditMappingView</code></strong> — add a "Per-app rules" section: the existing action picker becomes the <em>default</em>; below it, an add/remove/drag-reorder list where each row = an app picker (→ <code>include</code> list) + an action picker. Validate each row has ≥1 app and a resolvable action.</li>
+  <li><strong><code>MappingsCard</code></strong> — show a per-row badge when a mapping has bindings (e.g. <code>+2 app rules</code>); keep the existing invalid-orange treatment for unresolvable actions, including those inside bindings.</li>
+  <li><strong><code>L10n.swift</code></strong> — add keys for the new labels across <code>en / zh / ja / de</code> (e.g. <code>mappings.default_action</code>, <code>mappings.app_rules</code>, <code>mappings.add_app_rule</code>, <code>mappings.applies_in</code>, overlap-warning toast).</li>
+</ul>
+
+<!-- ╔══ §9 ════════════════════════════════════════════════════════════╗ -->
+<h2>9 · Migration</h2>
+
+<p>No active migration step. Existing structured configs and the legacy 2.0 bare-list both load as entries with a default action and an empty <code>bindings</code> array. The file is rewritten with a <code>bindings</code> key only once the user actually adds an app rule — until then it stays byte-identical to today's output.</p>
+
+<!-- ╔══ §10 ═══════════════════════════════════════════════════════════╗ -->
+<h2>10 · Testing</h2>
+
+<ul>
+  <li><strong>Resolution unit tests:</strong> order priority; first-match-wins; default fallback; no-op when neither matches; pass-through when trigger unmapped; shift-fallback resolves through bindings; unknown condition type ⇒ skipped.</li>
+  <li><strong>Codable + lossless round-trip:</strong> encode/decode of <code>bindings</code>; case-insensitive bundle-id match; <strong>downgrade simulation</strong> — load a file with bindings using the old known-keys set, save, and assert <code>bindings</code> is preserved verbatim and no mapping is dropped.</li>
+  <li><strong>Manual:</strong> the §1 example (Finder/Safari/iTerm2) plus an app-switch latency sanity check.</li>
+  <li>Per project rule: a Codex review of the touched files (Model + Engine + UI) before declaring done.</li>
+</ul>
+
+<!-- ╔══ §11 — failure modes ═══════════════════════════════════════════╗ -->
+<h2>11 · What breaks if you drop each piece</h2>
+
+<table>
+  <thead><tr><th>Remove…</th><th>Symptom</th><th>Severity</th></tr></thead>
+  <tbody>
+    <tr><td><code>action_id</code> as the default slot (put default in bindings instead)</td><td>Old builds lose the global behavior on read and may drop data on save — the whole downgrade-safety story collapses.</td><td><span class="pill bad">HIGH</span></td></tr>
+    <tr><td>Frontmost-app cache (call NSWorkspace inline)</td><td>AppKit on the tap thread — unsafe, can stall keyboard input.</td><td><span class="pill bad">HIGH</span></td></tr>
+    <tr><td>Adding <code>"bindings"</code> to <code>mappingKnownKeys</code></td><td>Zombie data: <code>mergeUnknownKeys</code> only re-adds a key the fresh encode omitted, so when a user <em>clears</em> all app rules the fresh encode drops <code>bindings</code> and the stale preserved node is merged back in — deleted rules resurrect on next save.</td><td><span class="pill warn">MEDIUM</span></td></tr>
+    <tr><td>Fail-closed on unknown condition types</td><td>A future condition type read by an older build could fire when it shouldn't — silent wrong actions.</td><td><span class="pill warn">MEDIUM</span></td></tr>
+    <tr><td>Empty-<code>when</code> validation</td><td>An empty-<code>when</code> binding becomes an ambiguous second default; resolution order gets surprising.</td><td><span class="pill warn">MEDIUM</span></td></tr>
+    <tr><td>Case-insensitive bundle-id compare</td><td>Rules silently never match for casing variants users can't see.</td><td><span class="pill neutral">LOW</span></td></tr>
+  </tbody>
+</table>
+
+<!-- ╔══ FOOTER ════════════════════════════════════════════════════════╗ -->
+<div class="footer">
+  <span>HyperCapslock · per-app scoped mappings · 2026-05-23</span>
+  <span>base commit <code>8318ff3</code> · <code>docs/design/2026-05-23-per-app-scoped-mappings.html</code></span>
+</div>
+
+</div>
+</body>
+</html>
