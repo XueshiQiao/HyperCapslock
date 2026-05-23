@@ -78,9 +78,13 @@ final class AppState: ObservableObject {
     }
 
     func setTheme(_ mode: ThemeMode) {
-        try? config.setThemeMode(mode)
-        applyAppearance(mode)
-        objectWillChange.send()
+        do {
+            try config.setThemeMode(mode)
+            applyAppearance(mode)   // only apply the appearance we actually persisted
+            objectWillChange.send()
+        } catch {
+            FileLog.shared.error("Failed to persist theme: \(error) — keeping previous appearance.")
+        }
     }
 
     private func applyAppearance(_ mode: ThemeMode) {

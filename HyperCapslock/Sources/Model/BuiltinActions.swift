@@ -30,7 +30,9 @@ enum BuiltinActions {
 
     private static let ids: Set<String> = Set(all.map(\.id))
 
-    static func isBuiltinID(_ id: String) -> Bool { id.hasPrefix("builtin.") }
+    /// True iff `id` is a real entry in the code-defined catalog (not merely
+    /// prefixed `builtin.`), so a stray custom action can't masquerade as built-in.
+    static func isBuiltinID(_ id: String) -> Bool { ids.contains(id) }
 
     static func byID(_ id: String) -> Action? { all.first { $0.id == id } }
 

@@ -123,7 +123,9 @@ struct AddEditMappingView: View {
         case .hyperPlusKey(let k, let withShift):
             triggerSel = withShift ? "with_shift" : "plain"; key = k
         }
-        if let id = entry.actionId, ActionsRegistry.shared.action(byID: id) != nil {
+        if let id = entry.actionId {
+            // Preserve the id even if currently unresolvable, so saving an
+            // untouched (dangling) mapping doesn't silently rewrite it.
             selectedActionId = id
         } else if let inline = entry.inlineAction {
             if let builtin = BuiltinActions.matching(inline) {
