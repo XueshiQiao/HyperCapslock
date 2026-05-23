@@ -39,8 +39,8 @@ struct SettingsPage: View {
                         .frame(minWidth: 64)
                 }
                 .controlSize(.large)
-                .buttonStyle(.borderedProminent)
-                .tint(app.isRunning ? .secondary : .blue)
+                .buttonStyle(.bordered)
+                .tint(.blue)
             }
             .padding(14)
         }

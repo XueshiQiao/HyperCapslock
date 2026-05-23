@@ -46,7 +46,9 @@ struct ActionsPage: View {
         let name = action.nameKey.map { loc.t($0) } ?? action.name
         let desc = actionPresentation(action.config, loc).value
         let refCount = config.mappingsReferencing(actionId: action.id).count
-        return SettingsRow(label: name, sublabel: desc, isFirst: isFirst) {
+        // Only show the description line when it adds info (custom actions);
+        // for built-ins the name and description are identical → one line.
+        return SettingsRow(label: name, sublabel: name == desc ? nil : desc, isFirst: isFirst) {
             HStack(spacing: 10) {
                 Image(systemName: actionSymbol(action.config)).font(.system(size: 12)).foregroundColor(.accentColor)
                 if refCount > 0 {

@@ -43,7 +43,10 @@ struct ContentView: View {
             .frame(minWidth: 460, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .frame(minWidth: 720, minHeight: 560)
-        .preferredColorScheme(app.colorScheme)
+        // Appearance is driven entirely by NSApp.appearance (set in AppState.setTheme):
+        // light/dark force it, system clears it to follow the OS. We deliberately do
+        // NOT use .preferredColorScheme — combining the two left "system" in a broken
+        // half-state.
         .overlay(alignment: .bottom) {
             if let toast = app.toast { toastView(toast).padding(.bottom, 24) }
         }
