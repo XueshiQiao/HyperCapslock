@@ -1,6 +1,25 @@
-# HyperCapslock
+<h1 align="center">
+  <img src="./docs/assets/icon.png" alt="HyperCapslock" width="96" /><br/>
+  HyperCapslock
+</h1>
 
-Turn your Caps Lock into a system-wide vim-style navigation layer — without losing the original Caps Lock function.
+<p align="center">
+  <b>Turn your Caps Lock into a system-wide vim-style navigation layer — without losing the original Caps Lock function.</b>
+</p>
+
+<p align="center">
+  <b>🇺🇸 English</b> •
+  <a href="README_CN.md">🇨🇳 中文</a> •
+  <a href="README_JA.md">🇯🇵 日本語</a> •
+  <a href="README_DE.md">🇩🇪 Deutsch</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/XueshiQiao/HyperCapslock/actions/workflows/build.yml"><img src="https://github.com/XueshiQiao/HyperCapslock/actions/workflows/build.yml/badge.svg" alt="Build" /></a>
+  <a href="https://github.com/XueshiQiao/HyperCapslock/releases/latest"><img src="https://img.shields.io/github/v/release/XueshiQiao/HyperCapslock" alt="Release" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL%20v3.0-blue" alt="License" /></a>
+  <img src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple&logoColor=white" alt="macOS 14+" />
+</p>
 
 ## The Idea
 
