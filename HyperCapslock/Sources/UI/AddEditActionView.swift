@@ -8,6 +8,9 @@ struct AddEditActionView: View {
     @EnvironmentObject var loc: LocalizationManager
     @Environment(\.dismiss) private var dismiss
     let mode: ActionSheetMode
+    /// Called with the freshly created action when adding (not on edit). Lets a
+    /// caller (e.g. the mapping editor) auto-select the new action.
+    var onCreated: ((Action) -> Void)? = nil
 
     @State private var name = ""
     @State private var draft = ActionConfigDraft()
@@ -91,7 +94,9 @@ struct AddEditActionView: View {
         guard let config = draft.build() else { return }
         do {
             switch mode {
-            case .add: _ = try app.addCustomAction(name: name, config: config)
+            case .add:
+                let created = try app.addCustomAction(name: name, config: config)
+                onCreated?(created)
             case .edit(let action): try app.updateCustomAction(Action(id: action.id, name: name, config: config, isBuiltin: false))
             }
             app.showToast(loc.t("toast.action_saved"))

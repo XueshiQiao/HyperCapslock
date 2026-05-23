@@ -21,6 +21,12 @@ struct AddEditMappingView: View {
     @State private var key: UInt16?
     @State private var selectedActionId = "builtin.move_left"
     @State private var keptInlineConfig: ActionConfig?
+    /// Last real (non-sentinel) action selection, so picking "Create New Action…"
+    /// can revert the picker while the create sheet is open.
+    @State private var lastRealActionId = "builtin.move_left"
+    @State private var showCreateAction = false
+    /// UUID-suffixed so it can never equal a real action id (even a hand-edited one).
+    @State private var createActionSentinel = "__create_action__-" + UUID().uuidString
 
     private var editing: Bool { if case .edit = mode { return true }; return false }
     private var triggerNeedsKey: Bool { triggerSel == "plain" || triggerSel == "with_shift" }
@@ -60,6 +66,18 @@ struct AddEditMappingView: View {
                         if !config.customActions.isEmpty {
                             Section(loc.t("actions.custom")) { ForEach(config.customActions, id: \.id) { a in Text(a.name).tag(a.id) } }
                         }
+                        Section {
+                            Label(loc.t("mappings.create_action"), systemImage: "plus").tag(createActionSentinel)
+                        }
+                    }
+                    .onChange(of: selectedActionId) { _, newValue in
+                        if newValue == createActionSentinel {
+                            // Not a real selection: revert the picker and open the create sheet.
+                            selectedActionId = lastRealActionId
+                            showCreateAction = true
+                        } else {
+                            lastRealActionId = newValue
+                        }
                     }
                 } footer: {
                     Text(loc.t("mappings.action_hint")).font(.caption).foregroundStyle(.secondary)
@@ -79,6 +97,12 @@ struct AddEditMappingView: View {
         .frame(width: 480, height: 250)
         .navigationTitle(editing ? loc.t("mappings.edit_title") : loc.t("mappings.add_title"))
         .onAppear(perform: prefill)
+        .sheet(isPresented: $showCreateAction) {
+            AddEditActionView(mode: .add, onCreated: { created in
+                selectedActionId = created.id
+            })
+            .environmentObject(app).environmentObject(config).environmentObject(loc)
+        }
     }
 
     private func modifierTriggerLabel(_ m: ModifierKey) -> String {
@@ -133,5 +157,6 @@ struct AddEditMappingView: View {
                 selectedActionId = keepInlineSentinel
             }
         }
+        lastRealActionId = selectedActionId
     }
 }
