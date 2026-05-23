@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import SwiftUI
 import Combine
 
 /// Central UI state, bridging SwiftUI to the engine, config store, permissions,
@@ -15,7 +16,6 @@ final class AppState: ObservableObject {
     @Published var inputMonitoringGranted = false
     @Published var permissionsResolved = false   // false until first refresh completes
     @Published var autostart = false
-    @Published var isDark: Bool
     @Published var permissionsExpandedManually: Bool? = nil
     @Published var toast: ToastMessage?
 
@@ -42,17 +42,16 @@ final class AppState: ObservableObject {
     var isRunning: Bool { status == .running }
     var isPaused: Bool { status == .paused }
 
-    private init() {
-        isDark = UserDefaults.standard.object(forKey: "hc-theme") as? String != "light"
-    }
+    private init() {}
 
     // MARK: - Bootstrap
 
     func bootstrap() {
         config.load()
-        FileLog.shared.info("bootstrap: loaded \(config.mappings.count) mappings; appConfig=\(config.appConfig)")
+        FileLog.shared.info("bootstrap: \(config.mappings.count) mappings, \(config.customActions.count) custom actions; appConfig=\(config.appConfig)")
         applyHudSettings()
         applyActivationPolicy(hide: config.appConfig.hideDockIcon)
+        applyAppearance(config.appConfig.themeMode)
         autostart = LaunchAtLogin.isEnabled
         status = .running
         EngineState.shared.isPaused = false
@@ -65,11 +64,31 @@ final class AppState: ObservableObject {
         FileLog.shared.info("HUD settings applied: enabled=\(config.appConfig.showHud) duration=\(config.appConfig.hudDurationMs)ms")
     }
 
-    // MARK: - Theme
+    // MARK: - Theme (light / dark / system)
 
-    func setDark(_ dark: Bool) {
-        isDark = dark
-        UserDefaults.standard.set(dark ? "dark" : "light", forKey: "hc-theme")
+    var themeMode: ThemeMode { config.appConfig.themeMode }
+
+    /// For SwiftUI `.preferredColorScheme` — nil means follow the system.
+    var colorScheme: ColorScheme? {
+        switch config.appConfig.themeMode {
+        case .light: return .light
+        case .dark: return .dark
+        case .system: return nil
+        }
+    }
+
+    func setTheme(_ mode: ThemeMode) {
+        try? config.setThemeMode(mode)
+        applyAppearance(mode)
+        objectWillChange.send()
+    }
+
+    private func applyAppearance(_ mode: ThemeMode) {
+        switch mode {
+        case .light: NSApp.appearance = NSAppearance(named: .aqua)
+        case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
+        case .system: NSApp.appearance = nil
+        }
     }
 
     // MARK: - Service pause/resume
@@ -121,11 +140,26 @@ final class AppState: ObservableObject {
 
     // MARK: - Mapping operations (wrap ConfigStore, surface errors as messages)
 
-    func upsertMapping(trigger: Trigger, action: ActionConfig) throws {
-        try config.upsert(trigger: trigger, action: action)
+    func upsertMapping(trigger: Trigger, actionId: String?, inlineAction: ActionConfig? = nil) throws {
+        try config.upsert(trigger: trigger, actionId: actionId, inlineAction: inlineAction)
     }
 
     func removeMapping(_ trigger: Trigger) {
         config.remove(trigger: trigger)
+    }
+
+    // MARK: - Custom action operations
+
+    @discardableResult
+    func addCustomAction(name: String, config cfg: ActionConfig) throws -> Action {
+        try config.addCustomAction(name: name, config: cfg)
+    }
+
+    func updateCustomAction(_ action: Action) throws {
+        try config.updateCustomAction(action)
+    }
+
+    func removeCustomAction(id: String) throws {
+        try config.removeCustomAction(id: id)
     }
 }

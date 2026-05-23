@@ -194,13 +194,24 @@ extension Trigger: Codable {
 
 struct ActionMappingEntry: Equatable {
     var trigger: Trigger
-    var action: ActionConfig
+    /// Preferred binding: references an Action in the library (built-in or custom).
+    var actionId: String?
+    /// Legacy / unmigrated: the action stored inline. Used when `actionId` is
+    /// nil or unresolvable. Cleared on edit once an `actionId` is assigned.
+    var inlineAction: ActionConfig?
+
+    init(trigger: Trigger, actionId: String? = nil, inlineAction: ActionConfig? = nil) {
+        self.trigger = trigger
+        self.actionId = actionId
+        self.inlineAction = inlineAction
+    }
 }
 
 extension ActionMappingEntry: Codable {
     private enum CodingKeys: String, CodingKey {
         case trigger, key
         case withShift = "with_shift"
+        case actionId = "action_id"
         case action
     }
 
@@ -217,12 +228,14 @@ extension ActionMappingEntry: Codable {
             throw DecodingError.dataCorruptedError(forKey: .trigger, in: c,
                 debugDescription: "action mapping entry missing both 'trigger' and legacy 'key' fields")
         }
-        self.action = try c.decode(ActionConfig.self, forKey: .action)
+        self.actionId = try c.decodeIfPresent(String.self, forKey: .actionId)
+        self.inlineAction = try c.decodeIfPresent(ActionConfig.self, forKey: .action)
     }
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(trigger, forKey: .trigger)
-        try c.encode(action, forKey: .action)
+        try c.encodeIfPresent(actionId, forKey: .actionId)
+        try c.encodeIfPresent(inlineAction, forKey: .action)
     }
 }

@@ -1,93 +1,72 @@
 import SwiftUI
 
-struct PermissionsCard: View {
-    @EnvironmentObject var app: AppState
-    @EnvironmentObject var loc: LocalizationManager
-    @State private var expanded = false
-    @State private var didInit = false
-
+/// A labelled settings section: small uppercase header + a rounded card body.
+struct SettingsSection<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: Content
     var body: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 12) {
-                Button {
-                    expanded.toggle()
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(loc.t("perm.label").uppercased())
-                                .font(.system(size: 10, weight: .semibold)).foregroundColor(.secondary)
-                            Text(loc.t("perm.title")).font(.system(size: 13, weight: .medium))
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.down")
-                            .rotationEffect(.degrees(expanded ? 180 : 0))
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .buttonStyle(.plain)
-
-                if expanded {
-                    VStack(spacing: 8) {
-                        permissionRow(label: loc.t("perm.accessibility"), granted: app.accessibilityGranted, pane: .accessibility)
-                    }
-                    HStack {
-                        Text(loc.t("perm.macos_hint"))
-                            .font(.system(size: 11)).foregroundColor(.secondary)
-                        Spacer()
-                        Button(loc.t("perm.refresh")) {
-                            app.refreshPermissions()
-                            app.showToast(loc.t("toast.perm_refreshed"))
-                        }
-                        .controlSize(.small)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title.uppercased())
+                .font(.system(size: 11, weight: .semibold)).foregroundColor(.secondary)
+                .padding(.horizontal, 4)
+            Card { VStack(spacing: 0) { content } }
         }
-        .onAppear {
-            guard !didInit else { return }
-            didInit = true
-            expanded = !app.accessibilityGranted
-        }
-    }
-
-    private func permissionRow(label: String, granted: Bool, pane: Permissions.Pane) -> some View {
-        HStack {
-            Text(label).font(.system(size: 13))
-            Spacer()
-            if granted {
-                badge(loc.t("perm.granted"), color: .green, clickable: false)
-            } else {
-                Button {
-                    // Trigger the real system request first — for Input Monitoring
-                    // this is what registers the app in the Settings list.
-                    switch pane {
-                    case .accessibility: Permissions.promptAccessibility()
-                    case .inputMonitoring: Permissions.requestInputMonitoring()
-                    }
-                    Permissions.openPrivacyPane(pane)
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(loc.t("perm.not_granted"))
-                        Image(systemName: "arrow.right")
-                    }
-                }
-                .buttonStyle(.plain)
-                .help("\(loc.t("perm.open_settings")) — \(label)")
-                .modifier(BadgeStyle(color: .red))
-            }
-        }
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06)))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.15), lineWidth: 1))
-    }
-
-    private func badge(_ text: String, color: Color, clickable: Bool) -> some View {
-        Text(text).modifier(BadgeStyle(color: color))
     }
 }
 
-private struct BadgeStyle: ViewModifier {
+/// One row inside a settings card.
+struct SettingsRow<Trailing: View>: View {
+    let label: String
+    var sublabel: String? = nil
+    var isFirst: Bool = false
+    @ViewBuilder var trailing: Trailing
+    var body: some View {
+        VStack(spacing: 0) {
+            if !isFirst { Divider() }
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(label).font(.system(size: 13, weight: .medium))
+                    if let sublabel { Text(sublabel).font(.system(size: 11)).foregroundColor(.secondary) }
+                }
+                Spacer()
+                trailing
+            }
+            .padding(.horizontal, 14).padding(.vertical, 9)
+        }
+    }
+}
+
+/// Accessibility permission row (the only TCC gate for an active CGEventTap).
+struct PermissionsSection: View {
+    @EnvironmentObject var app: AppState
+    @EnvironmentObject var loc: LocalizationManager
+    var body: some View {
+        SettingsSection(title: loc.t("perm.label")) {
+            SettingsRow(label: loc.t("perm.accessibility"),
+                        sublabel: loc.t("perm.macos_hint"), isFirst: true) {
+                if app.accessibilityGranted {
+                    Text(loc.t("perm.granted")).modifier(BadgeStyle(color: .green))
+                } else {
+                    Button {
+                        Permissions.promptAccessibility()
+                        Permissions.openPrivacyPane(.accessibility)
+                    } label: {
+                        HStack(spacing: 4) { Text(loc.t("perm.not_granted")); Image(systemName: "arrow.right") }
+                    }
+                    .buttonStyle(.plain).modifier(BadgeStyle(color: .red))
+                }
+            }
+            SettingsRow(label: loc.t("perm.refresh_label")) {
+                Button(loc.t("perm.refresh")) {
+                    app.refreshPermissions()
+                    app.showToast(loc.t("toast.perm_refreshed"))
+                }.controlSize(.small)
+            }
+        }
+    }
+}
+
+struct BadgeStyle: ViewModifier {
     let color: Color
     func body(content: Content) -> some View {
         content

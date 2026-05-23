@@ -6,6 +6,7 @@ enum ConfigError: LocalizedError {
     case fileExists           // export target exists and overwrite not requested
     case emptyImport
     case invalidEntry(String)
+    case actionInUse(String)  // delete blocked: action referenced by mappings
     case io(String)
 
     var errorDescription: String? {
@@ -13,21 +14,30 @@ enum ConfigError: LocalizedError {
         case .fileExists: return "FILE_EXISTS"
         case .emptyImport: return "Imported file contains no mappings"
         case .invalidEntry(let m): return m
+        case .actionInUse(let m): return m
         case .io(let m): return m
         }
     }
 }
 
-/// Owns the action mappings and app config: load/save (YAML, byte-compatible
-/// with the original Rust output), defaults, normalize/dedup, import/export.
-/// `@MainActor ObservableObject` for the SwiftUI layer; mirrors every change
-/// into `MappingsRegistry` for the event-tap thread to read.
+/// Owns the action mappings, the custom-action library, and app config.
+///
+/// Config file (`action_mappings.yml`) is a structured document:
+/// `{ actions: [custom…], mappings: [...] }`. A legacy bare-list (2.0) is read
+/// as mappings-with-inline-actions. Unknown top-level keys are **preserved**
+/// across save (lossless round-trip) and never stripped, so a newer version's
+/// config survives being opened by an older build. Built-in actions live in
+/// code (`BuiltinActions`) and are never persisted.
 @MainActor
 final class ConfigStore: ObservableObject {
     static let shared = ConfigStore()
 
     @Published private(set) var mappings: [ActionMappingEntry] = []
+    @Published private(set) var customActions: [Action] = []
     @Published private(set) var appConfig = AppConfig()
+
+    /// Unknown top-level keys from the loaded document, re-emitted on save.
+    private var preservedTopLevel: [(Node, Node)] = []
 
     // MARK: Default keycodes (JavaScript keyCode values)
     private enum JS {
@@ -55,31 +65,68 @@ final class ConfigStore: ObservableObject {
     // MARK: - Load
 
     func load() {
-        loadMappings()
+        loadDocument()
         loadAppConfig()
     }
 
-    private func loadMappings() {
-        var loaded: [ActionMappingEntry] = []
-        var changed = false
+    private func loadDocument() {
+        var loadedMappings: [ActionMappingEntry] = []
+        var loadedActions: [Action] = []
+        var seededDefaults = false
 
-        if let content = try? String(contentsOf: mappingsURL, encoding: .utf8) {
+        if let content = try? String(contentsOf: mappingsURL, encoding: .utf8),
+           let node = (try? Yams.compose(yaml: content)) ?? nil {
             do {
-                loaded = try YAMLDecoder().decode([ActionMappingEntry].self, from: content)
+                try parseDocument(node, into: &loadedMappings, actions: &loadedActions)
             } catch {
                 FileLog.shared.error("action_mappings.yml parse error: \(error)")
             }
         }
 
-        if loaded.isEmpty {
-            loaded = Self.defaultMappings()
-            changed = true
+        if loadedMappings.isEmpty && loadedActions.isEmpty {
+            loadedMappings = Self.defaultMappings()
+            seededDefaults = true
         }
-        Self.normalize(&loaded)
+        Self.normalize(&loadedMappings)
 
-        mappings = loaded
-        MappingsRegistry.shared.set(loaded)
-        if changed { saveMappingsToDisk() }
+        mappings = loadedMappings
+        customActions = loadedActions
+        MappingsRegistry.shared.set(loadedMappings)
+        ActionsRegistry.shared.setCustom(loadedActions)
+        if seededDefaults { saveToDisk() }
+    }
+
+    /// Parse either the new structured doc (mapping with `actions:`/`mappings:`)
+    /// or the legacy bare-list (sequence of mapping entries). Captures unknown
+    /// top-level keys for lossless re-emit. Unrecognized entries are logged.
+    private func parseDocument(_ node: Node, into mappings: inout [ActionMappingEntry], actions: inout [Action]) throws {
+        switch node {
+        case .sequence:
+            // Legacy 2.0 format: a bare mappings list with inline actions.
+            let yaml = try Yams.serialize(node: node)
+            mappings = try YAMLDecoder().decode([ActionMappingEntry].self, from: yaml)
+            FileLog.shared.info("Loaded legacy bare-list config (\(mappings.count) mappings, no custom actions).")
+        case .mapping(let map):
+            for (key, value) in map {
+                guard let k = key.string else { continue }
+                switch k {
+                case "mappings":
+                    let yaml = try Yams.serialize(node: value)
+                    mappings = (try? YAMLDecoder().decode([ActionMappingEntry].self, from: yaml)) ?? []
+                case "actions":
+                    let yaml = try Yams.serialize(node: value)
+                    actions = (try? YAMLDecoder().decode([Action].self, from: yaml)) ?? []
+                default:
+                    // Unknown top-level key (e.g. a future version's section):
+                    // preserve it verbatim and never strip it.
+                    preservedTopLevel.append((key, value))
+                    FileLog.shared.info("Preserving unrecognized top-level config key: \(k)")
+                }
+            }
+            FileLog.shared.info("Loaded structured config: \(mappings.count) mappings, \(actions.count) custom actions, \(preservedTopLevel.count) preserved key(s).")
+        default:
+            throw ConfigError.io("Unexpected top-level YAML node")
+        }
     }
 
     private func loadAppConfig() {
@@ -91,60 +138,108 @@ final class ConfigStore: ObservableObject {
         }
     }
 
-    // MARK: - Mutations
+    // MARK: - Mapping mutations
 
-    /// Validate, upsert (replace by trigger), normalize, persist, sync registry.
-    func upsert(trigger: Trigger, action: ActionConfig) throws {
-        try Self.validate(action)
+    /// Upsert a mapping. Prefer binding by `actionId` (clears any inline action —
+    /// this is the gradual inline→id migration). Pass `inlineAction` only for
+    /// legacy/ad-hoc bindings without a library action.
+    func upsert(trigger: Trigger, actionId: String?, inlineAction: ActionConfig?) throws {
+        if actionId == nil, let inline = inlineAction {
+            try Self.validate(inline)
+        }
+        if let id = actionId, ActionsRegistry.shared.action(byID: id) == nil {
+            throw ConfigError.invalidEntry("Unknown action id: \(id)")
+        }
         var m = mappings
+        let entry = ActionMappingEntry(trigger: trigger,
+                                       actionId: actionId,
+                                       inlineAction: actionId == nil ? inlineAction : nil)
         if let idx = m.firstIndex(where: { $0.trigger == trigger }) {
-            m[idx] = ActionMappingEntry(trigger: trigger, action: action)
+            m[idx] = entry
         } else {
-            m.append(ActionMappingEntry(trigger: trigger, action: action))
+            m.append(entry)
         }
         Self.normalize(&m)
-        commit(m)
+        commitMappings(m)
     }
 
     func remove(trigger: Trigger) {
         var m = mappings
         m.removeAll { $0.trigger == trigger }
-        commit(m)
+        commitMappings(m)
     }
 
-    private func commit(_ m: [ActionMappingEntry]) {
+    private func commitMappings(_ m: [ActionMappingEntry]) {
         mappings = m
         MappingsRegistry.shared.set(m)
-        saveMappingsToDisk()
+        saveToDisk()
+    }
+
+    // MARK: - Custom action mutations
+
+    func addCustomAction(name: String, config: ActionConfig) throws -> Action {
+        try Self.validate(config)
+        let action = Action(id: UUID().uuidString, name: name.isEmpty ? "Untitled" : name,
+                            config: config, isBuiltin: false)
+        var a = customActions
+        a.append(action)
+        commitActions(a)
+        return action
+    }
+
+    func updateCustomAction(_ action: Action) throws {
+        guard !action.isBuiltin else { throw ConfigError.invalidEntry("Built-in actions can't be edited") }
+        try Self.validate(action.config)
+        var a = customActions
+        guard let idx = a.firstIndex(where: { $0.id == action.id }) else {
+            throw ConfigError.invalidEntry("Action not found")
+        }
+        a[idx] = action
+        commitActions(a)
+    }
+
+    /// Trigger labels of mappings that reference `actionId` (delete-protection).
+    func mappingsReferencing(actionId: String) -> [Trigger] {
+        mappings.filter { $0.actionId == actionId }.map(\.trigger)
+    }
+
+    func removeCustomAction(id: String) throws {
+        let refs = mappingsReferencing(actionId: id)
+        if !refs.isEmpty {
+            let labels = refs.map(Self.triggerLabel).joined(separator: ", ")
+            throw ConfigError.actionInUse(labels)
+        }
+        var a = customActions
+        a.removeAll { $0.id == id }
+        commitActions(a)
+    }
+
+    private func commitActions(_ a: [Action]) {
+        customActions = a
+        ActionsRegistry.shared.setCustom(a)
+        saveToDisk()
     }
 
     // MARK: - App config setters (persist, revert on failure)
 
-    func setHideDockIcon(_ hide: Bool) throws {
+    func setHideDockIcon(_ hide: Bool) throws { try mutateConfig { $0.hideDockIcon = hide } }
+    func setShowHud(_ show: Bool) throws { try mutateConfig { $0.showHud = show } }
+    func setHudDuration(_ ms: Int) throws { try mutateConfig { $0.hudDurationMs = min(max(ms, 300), 6000) } }
+    func setThemeMode(_ mode: ThemeMode) throws { try mutateConfig { $0.themeMode = mode } }
+
+    private func mutateConfig(_ change: (inout AppConfig) -> Void) throws {
         let prev = appConfig
-        appConfig.hideDockIcon = hide
+        change(&appConfig)
         do { try persistAppConfig() } catch { appConfig = prev; throw error }
     }
 
-    func setShowHud(_ show: Bool) throws {
-        let prev = appConfig
-        appConfig.showHud = show
-        do { try persistAppConfig() } catch { appConfig = prev; throw error }
-    }
-
-    func setHudDuration(_ ms: Int) throws {
-        let prev = appConfig
-        appConfig.hudDurationMs = min(max(ms, 300), 6000)
-        do { try persistAppConfig() } catch { appConfig = prev; throw error }
-    }
-
-    // MARK: - Import / Export
+    // MARK: - Import / Export (whole document — self-contained & portable)
 
     func export(to path: String, overwrite: Bool) throws {
         if !overwrite && FileManager.default.fileExists(atPath: path) {
             throw ConfigError.fileExists
         }
-        let content = Self.renderYAML(mappings)
+        let content = try renderDocument()
         let url = URL(fileURLWithPath: path)
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                  withIntermediateDirectories: true)
@@ -153,28 +248,51 @@ final class ConfigStore: ObservableObject {
     }
 
     @discardableResult
-    func importMappings(from path: String) throws -> Int {
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
-            throw ConfigError.io("Failed to read file")
+    func importDocument(from path: String) throws -> Int {
+        guard let content = try? String(contentsOfFile: path, encoding: .utf8),
+              let node = (try? Yams.compose(yaml: content)) ?? nil else {
+            throw ConfigError.io("Failed to read or parse file")
         }
-        var imported: [ActionMappingEntry]
-        do { imported = try YAMLDecoder().decode([ActionMappingEntry].self, from: content) }
-        catch { throw ConfigError.io("Invalid YAML: \(error.localizedDescription)") }
+        var importedMappings: [ActionMappingEntry] = []
+        var importedActions: [Action] = []
+        do { try parseDocument(node, into: &importedMappings, actions: &importedActions) }
+        catch { throw ConfigError.io("Invalid config: \(error.localizedDescription)") }
 
-        if imported.isEmpty { throw ConfigError.emptyImport }
-        for entry in imported { try Self.validate(entry.action, importing: true) }
-        Self.normalize(&imported)
-        let count = imported.count
-        commit(imported)
-        return count
+        if importedMappings.isEmpty { throw ConfigError.emptyImport }
+        for entry in importedMappings where entry.actionId == nil {
+            if let inline = entry.inlineAction { try Self.validate(inline, importing: true) }
+        }
+        Self.normalize(&importedMappings)
+
+        mappings = importedMappings
+        customActions = importedActions
+        MappingsRegistry.shared.set(importedMappings)
+        ActionsRegistry.shared.setCustom(importedActions)
+        saveToDisk()
+        return importedMappings.count
     }
 
-    // MARK: - Persistence helpers
+    // MARK: - Persistence
 
-    private func saveMappingsToDisk() {
-        let content = Self.renderYAML(mappings)
-        try? FileManager.default.createDirectory(at: appDataDir, withIntermediateDirectories: true)
-        try? content.write(to: mappingsURL, atomically: true, encoding: .utf8)
+    private func saveToDisk() {
+        do {
+            let content = try renderDocument()
+            try FileManager.default.createDirectory(at: appDataDir, withIntermediateDirectories: true)
+            try content.write(to: mappingsURL, atomically: true, encoding: .utf8)
+        } catch {
+            FileLog.shared.error("Failed to write action_mappings.yml: \(error)")
+        }
+    }
+
+    /// Serialize the structured document, preserving unknown top-level keys.
+    private func renderDocument() throws -> String {
+        let actionsNode = try (Yams.compose(yaml: try YAMLEncoder().encode(customActions)) ?? Node.sequence([]))
+        let mappingsNode = try (Yams.compose(yaml: try YAMLEncoder().encode(mappings)) ?? Node.sequence([]))
+        var pairs: [(Node, Node)] = preservedTopLevel
+        pairs.append((Node("actions"), actionsNode))
+        pairs.append((Node("mappings"), mappingsNode))
+        let doc = Node.mapping(Node.Mapping(pairs))
+        return try Yams.serialize(node: doc)
     }
 
     private func persistAppConfig() throws {
@@ -189,7 +307,7 @@ final class ConfigStore: ObservableObject {
 
     // MARK: - Validation
 
-    private static func validate(_ action: ActionConfig, importing: Bool = false) throws {
+    static func validate(_ action: ActionConfig, importing: Bool = false) throws {
         switch action {
         case .command(let c) where c.trimmingCharacters(in: .whitespaces).isEmpty:
             throw ConfigError.invalidEntry(importing ? "Imported entry has empty command" : "command cannot be empty")
@@ -216,95 +334,43 @@ final class ConfigStore: ObservableObject {
         m = deduped
     }
 
-    // MARK: - Defaults
+    // MARK: - Defaults (bind to built-in action ids; ABC/WeChat stay inline)
 
     static func defaultMappings() -> [ActionMappingEntry] {
-        func hpk(_ key: UInt16, _ action: ActionConfig) -> ActionMappingEntry {
-            ActionMappingEntry(trigger: .hyperPlusKey(key: key, withShift: false), action: action)
+        func ref(_ key: UInt16, _ actionId: String) -> ActionMappingEntry {
+            ActionMappingEntry(trigger: .hyperPlusKey(key: key, withShift: false), actionId: actionId)
         }
-        var defaults: [ActionMappingEntry] = [
-            hpk(JS.h, .directional(.left)),
-            hpk(JS.j, .directional(.down)),
-            hpk(JS.k, .directional(.up)),
-            hpk(JS.l, .directional(.right)),
-            hpk(JS.p, .directional(.wordForward)),
-            hpk(JS.y, .directional(.wordBack)),
-            hpk(JS.a, .directional(.home)),
-            hpk(JS.e, .directional(.end)),
-            hpk(JS.u, .jump(direction: .up, count: 10)),
-            hpk(JS.d, .jump(direction: .down, count: 10)),
-            hpk(JS.i, .independent(.backspace)),
-            hpk(JS.n, .independent(.insertQuotes)),
-            hpk(JS.o, .independent(.nextLine)),
+        func inline(_ key: UInt16, _ config: ActionConfig) -> ActionMappingEntry {
+            ActionMappingEntry(trigger: .hyperPlusKey(key: key, withShift: false), inlineAction: config)
+        }
+        return [
+            ref(JS.h, "builtin.move_left"),
+            ref(JS.j, "builtin.move_down"),
+            ref(JS.k, "builtin.move_up"),
+            ref(JS.l, "builtin.move_right"),
+            ref(JS.p, "builtin.word_forward"),
+            ref(JS.y, "builtin.word_back"),
+            ref(JS.a, "builtin.line_start"),
+            ref(JS.e, "builtin.line_end"),
+            ref(JS.u, "builtin.jump_up_10"),
+            ref(JS.d, "builtin.jump_down_10"),
+            ref(JS.i, "builtin.backspace"),
+            ref(JS.n, "builtin.insert_quotes"),
+            ref(JS.o, "builtin.new_line"),
+            inline(JS.abc, .inputSource(inputSourceID: abcInputSourceID)),
+            inline(JS.wechat, .inputSource(inputSourceID: wechatInputSourceID)),
         ]
-        // macOS-only input-source defaults (ABC / WeChat pinyin).
-        defaults.append(hpk(JS.abc, .inputSource(inputSourceID: abcInputSourceID)))
-        defaults.append(hpk(JS.wechat, .inputSource(inputSourceID: wechatInputSourceID)))
-        return defaults
     }
 
-    // MARK: - YAML rendering (with comments — byte-compatible with Rust output)
+    // MARK: - Helpers
 
-    private static func yamlQuote(_ value: String) -> String {
-        "'\(value.replacingOccurrences(of: "'", with: "''"))'"
-    }
-
-    static func renderYAML(_ mappings: [ActionMappingEntry]) -> String {
-        var lines: [String] = [
-            "# HyperCapslock action mappings",
-            "# trigger.kind: hyper_plus_key (Caps+Key), single_tap_hyper (Caps tapped once),",
-            "#   double_tap_hyper (Caps tapped twice), or double_tap_modifier",
-            "#   (a modifier key tapped twice)",
-            "# key uses JavaScript keyCode",
-        ]
-
-        for entry in mappings {
-            switch entry.trigger {
-            case .hyperPlusKey(let key, let withShift):
-                lines.append("- trigger:")
-                lines.append("    kind: hyper_plus_key")
-                lines.append("    key: \(key) # \(KeyCodes.name(key))")
-                lines.append("    with_shift: \(withShift)")
-            case .singleTapHyper:
-                lines.append("- trigger:")
-                lines.append("    kind: single_tap_hyper")
-            case .doubleTapHyper:
-                lines.append("- trigger:")
-                lines.append("    kind: double_tap_hyper")
-            case .doubleTapModifier(let m):
-                lines.append("- trigger:")
-                lines.append("    kind: double_tap_modifier")
-                lines.append("    modifier: \(m.rawValue)")
-            }
-
-            lines.append("  action:")
-            switch entry.action {
-            case .directional(let a):
-                lines.append("    kind: directional")
-                lines.append("    action: \(a.rawValue)")
-            case .jump(let direction, let count):
-                lines.append("    kind: jump")
-                lines.append("    direction: \(direction.rawValue)")
-                lines.append("    count: \(count)")
-            case .independent(let a):
-                lines.append("    kind: independent")
-                lines.append("    action: \(a.rawValue)")
-            case .inputSource(let id):
-                lines.append("    kind: input_source")
-                lines.append("    input_source_id: \(yamlQuote(id))")
-            case .command(let cmd):
-                lines.append("    kind: command")
-                lines.append("    command: \(yamlQuote(cmd))")
-            case .keyCombo(let targetKey, let ctrl, let alt, let cmd, let shift):
-                lines.append("    kind: key_combo")
-                lines.append("    target_key: \(targetKey) # \(KeyCodes.name(targetKey))")
-                if ctrl { lines.append("    with_ctrl: true") }
-                if alt { lines.append("    with_alt: true") }
-                if cmd { lines.append("    with_cmd: true") }
-                if shift { lines.append("    with_target_shift: true") }
-            }
+    static func triggerLabel(_ t: Trigger) -> String {
+        switch t {
+        case .singleTapHyper: return "Caps×1"
+        case .doubleTapHyper: return "Caps×2"
+        case .doubleTapModifier(let m): return "\(modifierGlyph(m))×2"
+        case .hyperPlusKey(let key, let withShift):
+            return withShift ? "Caps+Shift+\(keyCodeDisplay(key))" : "Caps+\(keyCodeDisplay(key))"
         }
-
-        return lines.joined(separator: "\n") + "\n"
     }
 }

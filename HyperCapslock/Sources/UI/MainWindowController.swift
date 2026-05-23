@@ -19,12 +19,11 @@ final class MainWindowController: NSObject, NSWindowDelegate {
 
         window = NSWindow(contentViewController: hosting)
         window.title = "HyperCapslock"
-        window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
-        window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: 666, height: 1000))
+        window.setContentSize(NSSize(width: 860, height: 620))
         window.center()
         super.init()
         window.delegate = self

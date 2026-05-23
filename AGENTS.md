@@ -12,6 +12,21 @@ format is byte-compatible, so existing users' `action_mappings.yml` /
 `project.yml` is the ONLY source of truth for project configuration. Do NOT edit
 `.pbxproj` directly. Modify `project.yml` and run `xcodegen generate`.
 
+## ⚠️ Built-in action IDs are a permanent contract
+The `builtin.*` IDs in `BuiltinActions.swift` are referenced by users' saved
+mappings (`action_id`). **Never rename or remove an existing built-in ID** — it
+orphans every mapping that references it. You may *add* new built-ins. Treat the
+existing IDs like a public API.
+
+## Config compatibility (2.0-onward)
+`action_mappings.yml` is a structured doc `{ actions:, mappings: }`; a legacy
+2.0 bare-list is read as mappings-with-inline-actions. Unknown top-level keys
+are **preserved on save** (lossless) and never stripped — a newer version's
+config must survive being opened by an older build (downgrade-test safety).
+Custom actions live in the config; built-ins live in code. Mappings reference an
+action by `action_id` (preferred) with an inline action as legacy fallback;
+editing a mapping migrates it to an id. Export writes the whole self-contained doc.
+
 ## Tech Stack
 - Swift 5 language mode, SwiftUI + AppKit, macOS 14.0+
 - XcodeGen (`project.yml`); SPM deps: **Sparkle** (auto-update), **Yams** (YAML)

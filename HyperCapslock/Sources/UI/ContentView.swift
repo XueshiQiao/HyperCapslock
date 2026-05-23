@@ -1,16 +1,11 @@
 import SwiftUI
+import AppKit
 
-enum MappingSheetMode: Identifiable {
-    case add
-    case edit(ActionMappingEntry)
-    var id: String {
-        switch self {
-        case .add: return "add"
-        case .edit(let e): return "edit-\(triggerUniqueID(e.trigger))"
-        }
-    }
+enum SidebarPage: Hashable, CaseIterable {
+    case settings, mappings, actions, about
 }
 
+/// Stable identity for a trigger (used as ForEach id and edit-sheet identity).
 func triggerUniqueID(_ t: Trigger) -> String {
     switch t {
     case .singleTapHyper: return "single_tap_hyper"
@@ -20,89 +15,39 @@ func triggerUniqueID(_ t: Trigger) -> String {
     }
 }
 
+/// App brand gradient (Design B).
+let brandGradient = LinearGradient(colors: [Color(red: 0.23, green: 0.51, blue: 0.96),
+                                            Color(red: 0.55, green: 0.36, blue: 0.96)],
+                                   startPoint: .leading, endPoint: .trailing)
+
 struct ContentView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var config: ConfigStore
     @EnvironmentObject var loc: LocalizationManager
 
-    @State private var sheet: MappingSheetMode?
+    @State private var page: SidebarPage = .settings
 
     var body: some View {
-        ZStack(alignment: .top) {
-            ScrollView {
-                VStack(spacing: 20) {
-                    header
-                    HStack(alignment: .top, spacing: 12) {
-                        StatusCard()
-                        SettingsCard()
-                    }
-                    PermissionsCard()
-                    MappingsCard(sheet: $sheet)
-                    FooterView()
+        NavigationSplitView {
+            SidebarView(page: $page)
+                .navigationSplitViewColumnWidth(min: 210, ideal: 220, max: 240)
+        } detail: {
+            ZStack {
+                switch page {
+                case .settings: SettingsPage()
+                case .mappings: MappingsPage()
+                case .actions: ActionsPage()
+                case .about: AboutPage()
                 }
-                .padding(24)
-                .padding(.top, 8)
-                .frame(maxWidth: 600)
-                .frame(maxWidth: .infinity)
             }
-
-            topRightControls
-                .padding(.top, 8)
-                .padding(.trailing, 12)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-
-            if let toast = app.toast {
-                toastView(toast)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-                    .padding(.bottom, 28)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+            .frame(minWidth: 460, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .frame(minWidth: 560, minHeight: 600)
-        .preferredColorScheme(app.isDark ? .dark : .light)
+        .frame(minWidth: 720, minHeight: 560)
+        .preferredColorScheme(app.colorScheme)
+        .overlay(alignment: .bottom) {
+            if let toast = app.toast { toastView(toast).padding(.bottom, 24) }
+        }
         .animation(.easeInOut(duration: 0.2), value: app.toast)
-        .sheet(item: $sheet) { mode in
-            AddEditMappingView(mode: mode)
-                .environmentObject(app)
-                .environmentObject(config)
-                .environmentObject(loc)
-        }
-    }
-
-    private var header: some View {
-        VStack(spacing: 6) {
-            Text("HyperCapslock")
-                .font(.system(size: 32, weight: .bold))
-                .foregroundStyle(LinearGradient(colors: [.blue, .purple], startPoint: .leading, endPoint: .trailing))
-            Text(loc.t("app.subtitle"))
-                .font(.system(size: 13))
-                .foregroundColor(.secondary)
-        }
-        .padding(.top, 12)
-    }
-
-    private var topRightControls: some View {
-        HStack(spacing: 6) {
-            Menu {
-                ForEach(AppLocale.allCases, id: \.self) { l in
-                    Button { app.loc.setLocale(l) } label: {
-                        Text("\(l.flag)  \(l.label)")
-                    }
-                }
-            } label: {
-                Text(loc.locale.flag)
-            }
-            .menuStyle(.borderlessButton)
-            .frame(width: 44)
-
-            Button {
-                app.setDark(!app.isDark)
-            } label: {
-                Image(systemName: app.isDark ? "sun.max" : "moon")
-            }
-            .buttonStyle(.borderless)
-            .help(app.isDark ? loc.t("theme.light") : loc.t("theme.dark"))
-        }
     }
 
     private func toastView(_ toast: AppState.ToastMessage) -> some View {
@@ -111,9 +56,117 @@ struct ContentView: View {
                 .foregroundColor(toast.isError ? .red : .green)
             Text(toast.text).font(.system(size: 13, weight: .medium))
         }
-        .padding(.horizontal, 20).padding(.vertical, 12)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
+        .padding(.horizontal, 18).padding(.vertical, 11)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke((toast.isError ? Color.red : Color.green).opacity(0.5), lineWidth: 1))
         .shadow(radius: 12, y: 4)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+}
+
+struct SidebarView: View {
+    @EnvironmentObject var app: AppState
+    @EnvironmentObject var loc: LocalizationManager
+    @Binding var page: SidebarPage
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            brand
+            Divider().padding(.vertical, 6)
+            navItem(.settings, loc.t("nav.settings"), "gearshape.fill")
+            navItem(.mappings, loc.t("nav.mappings"), "keyboard.fill")
+            navItem(.actions, loc.t("nav.actions"), "bolt.fill")
+            navItem(.about, loc.t("nav.about"), "info.circle.fill")
+            Spacer()
+            statusFooter
+        }
+        .padding(10)
+    }
+
+    private var brand: some View {
+        HStack(spacing: 9) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable().frame(width: 28, height: 28)
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+            VStack(alignment: .leading, spacing: 0) {
+                Text("HyperCapslock").font(.system(size: 13, weight: .bold))
+                Text("v\(app.appVersion)").font(.system(size: 10)).foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal, 6).padding(.top, 4)
+    }
+
+    private func navItem(_ p: SidebarPage, _ title: String, _ icon: String) -> some View {
+        let selected = page == p
+        return Button { page = p } label: {
+            HStack(spacing: 9) {
+                Image(systemName: icon).font(.system(size: 13))
+                    .foregroundColor(selected ? .white : .secondary)
+                    .frame(width: 18)
+                Text(title).font(.system(size: 13, weight: .medium))
+                    .foregroundColor(selected ? .white : .primary)
+                Spacer()
+            }
+            .padding(.horizontal, 9).padding(.vertical, 7)
+            .background {
+                if selected { RoundedRectangle(cornerRadius: 7).fill(brandGradient) }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var statusFooter: some View {
+        HStack(spacing: 7) {
+            StatusDot(running: app.isRunning, animate: app.isRunning)
+            Text(app.isRunning ? loc.t("status.running") : loc.t("status.paused"))
+                .font(.system(size: 11)).foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 9).padding(.vertical, 7)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 7).fill(Color.secondary.opacity(0.1)))
+    }
+}
+
+/// Status indicator with optional breathing ring (Design B).
+struct StatusDot: View {
+    let running: Bool
+    var animate: Bool = false
+    @State private var pulse = false
+    var color: Color { running ? .green : .orange }
+    var body: some View {
+        ZStack {
+            if animate {
+                Circle().fill(color).frame(width: 9, height: 9)
+                    .scaleEffect(pulse ? 2.2 : 1).opacity(pulse ? 0 : 0.6)
+                    .animation(.easeOut(duration: 1.6).repeatForever(autoreverses: false), value: pulse)
+            }
+            Circle().fill(color).frame(width: 9, height: 9)
+        }
+        .frame(width: 10, height: 10)
+        .onAppear { if animate { pulse = true } }
+    }
+}
+
+/// Shared page scaffold: gradient title + scrollable content column.
+struct PageScaffold<Content: View>: View {
+    let title: String
+    var trailing: AnyView? = nil
+    @ViewBuilder var content: Content
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    Text(title).font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(brandGradient)
+                    Spacer()
+                    if let trailing { trailing }
+                }
+                content
+            }
+            .padding(24)
+            .frame(maxWidth: 640, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 }

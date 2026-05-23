@@ -99,11 +99,11 @@ enum ActionExecutor {
             }) { return exact }
 
             if shiftHeld {
-                if let fallback = mappings.first(where: {
-                    if case .hyperPlusKey(let key, let withShift) = $0.trigger {
-                        return key == jsKeycode && withShift == false && allowShiftFallback($0.action)
-                    }
-                    return false
+                if let fallback = mappings.first(where: { entry in
+                    guard case .hyperPlusKey(let key, let withShift) = entry.trigger,
+                          key == jsKeycode, withShift == false,
+                          let cfg = ActionsRegistry.shared.resolve(entry) else { return false }
+                    return allowShiftFallback(cfg)
                 }) { return fallback }
             }
             return nil
@@ -112,13 +112,17 @@ enum ActionExecutor {
 
     static func findSingleTapAction() -> ActionConfig? {
         MappingsRegistry.shared.withMappings { m in
-            m.first { if case .singleTapHyper = $0.trigger { return true }; return false }?.action
+            guard let entry = m.first(where: { if case .singleTapHyper = $0.trigger { return true }; return false })
+            else { return nil }
+            return ActionsRegistry.shared.resolve(entry)
         }
     }
 
     static func findDoubleTapAction() -> ActionConfig? {
         MappingsRegistry.shared.withMappings { m in
-            m.first { if case .doubleTapHyper = $0.trigger { return true }; return false }?.action
+            guard let entry = m.first(where: { if case .doubleTapHyper = $0.trigger { return true }; return false })
+            else { return nil }
+            return ActionsRegistry.shared.resolve(entry)
         }
     }
 
@@ -282,15 +286,25 @@ enum ActionExecutor {
         guard let jsKeycode = KeyCodes.macToJs(keycode) else { return false }
         guard let mapping = resolveMapping(jsKeycode: jsKeycode, shiftHeld: shiftHeld) else { return false }
 
+        // Resolve the mapping to its effective action (id → action, else inline).
+        // If unresolvable (orphaned/invalid mapping), don't swallow — let the key
+        // pass through normally and log it.
+        guard let action = ActionsRegistry.shared.resolve(mapping) else {
+            if keyDown {
+                FileLog.shared.warn("Caps remap: trigger matched but action is unresolved (invalid mapping, actionId=\(mapping.actionId ?? "nil")) — passing key through.")
+            }
+            return false
+        }
+
         if keyDown {
             let trigger = shiftHeld
                 ? "Caps+Shift+\(KeyCodes.name(jsKeycode))"
                 : "Caps+\(KeyCodes.name(jsKeycode))"
-            FileLog.shared.info("Caps remap: \(trigger) -> \(describeAction(mapping.action))")
-            let (combo, caption) = hudParts(mapping.action)
+            FileLog.shared.info("Caps remap: \(trigger) -> \(describeAction(action))")
+            let (combo, caption) = hudParts(action)
             HudCenter.shared.emit(trigger: trigger, combo: combo, caption: caption)
         }
-        execute(mapping.action, keyDown: keyDown, activeModifiers: activeModifiers)
+        execute(action, keyDown: keyDown, activeModifiers: activeModifiers)
         return true
     }
 
