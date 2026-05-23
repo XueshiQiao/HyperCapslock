@@ -1,0 +1,59 @@
+import SwiftUI
+
+/// Display string for a JS keyCode in the UI (mirrors `keyCodeToDisplay` in
+/// App.tsx — arrows/symbols get glyphs, letters/digits show as-is).
+func keyCodeDisplay(_ keyCode: UInt16) -> String {
+    let special: [UInt16: String] = [
+        8: "Backspace", 9: "Tab", 13: "Enter", 27: "Esc", 32: "Space", 46: "⌦",
+        33: "PgUp", 34: "PgDn", 35: "End", 36: "Home", 37: "←", 38: "↑", 39: "→", 40: "↓",
+        112: "F1", 113: "F2", 114: "F3", 115: "F4", 116: "F5", 117: "F6",
+        118: "F7", 119: "F8", 120: "F9", 121: "F10", 122: "F11", 123: "F12",
+        186: ";", 187: "=", 188: ",", 189: "-", 190: ".", 191: "/",
+        219: "[", 220: "\\", 221: "]", 222: "'", 192: "`",
+    ]
+    if let s = special[keyCode] { return s }
+    if (keyCode >= 65 && keyCode <= 90) || (keyCode >= 48 && keyCode <= 57) {
+        return String(UnicodeScalar(UInt8(keyCode)))
+    }
+    return "Key \(keyCode)"
+}
+
+/// Glyph for a modifier key in trigger chips, e.g. "⌘L".
+func modifierGlyph(_ m: ModifierKey) -> String {
+    switch m {
+    case .leftCommand: return "⌘L"
+    case .rightCommand: return "⌘R"
+    case .leftControl: return "⌃L"
+    case .rightControl: return "⌃R"
+    case .leftOption: return "⌥L"
+    case .rightOption: return "⌥R"
+    case .leftShift: return "⇧L"
+    case .rightShift: return "⇧R"
+    case .fn: return "fn"
+    }
+}
+
+/// A keycap-styled label used across the mappings list.
+struct Kbd: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        Text(text)
+            .font(.system(size: 13, design: .monospaced))
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .frame(minWidth: 32)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.15)))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.25), lineWidth: 1))
+    }
+}
+
+/// A rounded "card" container matching the original panel look.
+struct Card<Content: View>: View {
+    @ViewBuilder var content: Content
+    var body: some View {
+        content
+            .padding(20)
+            .background(RoundedRectangle(cornerRadius: 16).fill(Color(nsColor: .controlBackgroundColor)))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.secondary.opacity(0.18), lineWidth: 1))
+    }
+}

@@ -1,0 +1,78 @@
+name: HyperCapslock
+options:
+  bundleIdPrefix: me.xueshi
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  minimumXcodeGenVersion: "2.35"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ARCHS: "$(ARCHS_STANDARD)"
+    ONLY_ACTIVE_ARCH_Release: "NO"
+    ENABLE_HARDENED_RUNTIME: YES
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: "584KQTRF3B"
+    MARKETING_VERSION: "1.2.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.6.0"
+  Yams:
+    url: https://github.com/jpsim/Yams
+    from: "5.0.6"
+
+targets:
+  HyperCapslock:
+    type: application
+    platform: macOS
+    sources:
+      - path: HyperCapslock/Sources
+      - path: HyperCapslock/Resources/Assets.xcassets
+    info:
+      path: HyperCapslock/Resources/Info.plist
+      properties:
+        LSUIElement: false
+        CFBundleDisplayName: HyperCapslock
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        # Sparkle auto-update feed (appcast published as a GitHub Release asset).
+        SUFeedURL: https://github.com/XueshiQiao/HyperCapslock/releases/latest/download/appcast.xml
+        # EdDSA public key for verifying Sparkle updates. Regenerate with
+        # Sparkle's generate_keys; private key lives in the SPARKLE_EDDSA_KEY CI secret.
+        SUPublicEDKey: T9q4sGi3oIIqlFTMZBprpimBAIEWEN+P7yuaE1e3bCE=
+        SUEnableInstallerLauncherService: false
+        NSHumanReadableCopyright: "© 2026 Xueshi Qiao"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.xueshi.hypercapslock
+        PRODUCT_NAME: HyperCapslock
+        CODE_SIGN_ENTITLEMENTS: HyperCapslock/Resources/HyperCapslock.entitlements
+        COMBINE_HIDPI_IMAGES: true
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+    entitlements:
+      path: HyperCapslock/Resources/HyperCapslock.entitlements
+    dependencies:
+      - package: Sparkle
+      - package: Yams
+
+  HyperCapslockTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: HyperCapslockTests
+    dependencies:
+      - target: HyperCapslock
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: me.xueshi.hypercapslock.tests
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/HyperCapslock.app/Contents/MacOS/HyperCapslock

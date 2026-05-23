@@ -72,7 +72,7 @@ The app needs **Accessibility** and **Input Monitoring** permissions:
 ## Screenshot
 
 <div align="center">
-  <img src="./public/HyperCapslock.png" width="400" />
+  <img src="./docs/assets/HyperCapslock.png" width="400" />
 </div>
 
 ## Why Not Karabiner-Elements?
@@ -80,7 +80,7 @@ The app needs **Accessibility** and **Input Monitoring** permissions:
 [Karabiner-Elements](https://github.com/pqrs-org/Karabiner-Elements) is a powerful tool with 21k+ stars, and I used it for years. But for the specific use case of "Caps Lock as a navigation layer":
 
 - **Config complexity** — Karabiner requires hand-editing JSON for non-trivial remaps. HyperCapslock has a point-and-click GUI.
-- **Footprint** — Karabiner installs a kernel extension and multiple background processes. HyperCapslock is a single ~5 MB Tauri app.
+- **Footprint** — Karabiner installs a kernel extension and multiple background processes. HyperCapslock is a single lightweight native macOS app.
 - **The modifier problem** — Karabiner typically maps Caps Lock to a real modifier combo (e.g., Ctrl+Shift+Cmd+Opt). This "hyper key" approach works but can conflict with existing shortcuts. HyperCapslock maps to F18, which conflicts with nothing and naturally stacks with real modifiers.
 
 If you need Karabiner's full power (per-app rules, mouse remapping, device-specific profiles), use Karabiner. If you mainly want vim navigation everywhere with minimal setup, this might be a simpler path.
@@ -91,37 +91,41 @@ CapsLock is remapped to F18 via `hidutil` at the OS level. The app then installs
 
 When F18 is held and another key is pressed, the app swallows the original event and injects the remapped key (e.g., arrow key) into the system input stream. Injected events carry a flag to prevent feedback loops.
 
-State tracking uses lock-free atomics (`AtomicBool`, `AtomicU64`) for zero-overhead thread safety. The hook callback does minimal work — integer comparisons and early returns — to avoid introducing input lag.
+State tracking uses lock-protected runtime state (`OSAllocatedUnfairLock` / `NSLock`) for thread safety between the tap thread, timer threads, and the UI. The hook callback does minimal work — integer comparisons and early returns — to avoid introducing input lag.
 
 For the full technical deep-dive, see [how_does_it_work.md](how_does_it_work.md).
 
 ## Tech Stack
 
-- **Tauri 2** (Rust backend + React/TypeScript frontend)
-- CoreGraphics `CGEventTap` + `hidutil` for F18 remap
-- ~5 MB binary, single process
+- **Native macOS** — SwiftUI + AppKit, Swift 5 language mode, macOS 14+
+- CoreGraphics `CGEventTap` + `hidutil` for the F18 remap; IOKit for CapsLock state; Carbon TIS for input-source switching
+- [Sparkle](https://sparkle-project.org) for auto-update, [Yams](https://github.com/jpsim/Yams) for YAML config
+- Single lightweight native process
 
 ## Development
 
 ### Prerequisites
 
-- macOS 12+
-- Node.js (v16+)
-- Rust (latest stable)
+- macOS 14+
+- Xcode 16+
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)
 
 ### Setup
 
 ```bash
 git clone https://github.com/XueshiQiao/HyperCapslock.git
 cd HyperCapslock
-npm install
-npm run tauri dev
+brew install xcodegen
+xcodegen generate
+open HyperCapslock.xcodeproj   # Cmd+R to build & run
 ```
+
+`project.yml` is the source of truth for the Xcode project; run `xcodegen generate` after changing it.
 
 ### Build
 
 ```bash
-npm run tauri build
+xcodebuild -project HyperCapslock.xcodeproj -scheme HyperCapslock -configuration Release build
 ```
 
 ## Troubleshooting

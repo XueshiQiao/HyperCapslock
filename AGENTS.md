@@ -1,25 +1,67 @@
 # HyperCapslock
 
-Tauri 2 desktop app that remaps CapsLock to F18 and intercepts F18+key combos for vim-style navigation, editing, input switching, and shell commands.
+Native macOS (SwiftUI + AppKit) menu-bar app that remaps CapsLock → F18 via
+`hidutil` and intercepts F18+key combos with a `CGEventTap` for vim-style
+navigation, editing, input-source switching, key combos, and shell commands.
+
+Ported from the original Tauri 2 (Rust + React) implementation; the YAML config
+format is byte-compatible, so existing users' `action_mappings.yml` /
+`app_config.yml` load unchanged.
+
+## Single Source of Truth
+`project.yml` is the ONLY source of truth for project configuration. Do NOT edit
+`.pbxproj` directly. Modify `project.yml` and run `xcodegen generate`.
 
 ## Tech Stack
-- **Backend:** Rust (edition 2021) — Tauri 2 with `CGEventTap`/`hidutil` on macOS, `windows` crate low-level hooks on Windows
-- **Frontend:** React 19 + TypeScript, Vite, Tailwind CSS 4
-- **Platforms:** macOS 12+, Windows (partial)
-- **State:** Lock-free atomics (`AtomicBool`, `AtomicU64`) for hook callbacks; `Mutex<Option<T>>` for shared config
+- Swift 5 language mode, SwiftUI + AppKit, macOS 14.0+
+- XcodeGen (`project.yml`); SPM deps: **Sparkle** (auto-update), **Yams** (YAML)
+- No App Sandbox (incompatible with CGEventTap / hidutil / IOKit / Carbon TIS)
+- Concurrency: Swift 5 mode (NOT Swift 6 strict). The CGEventTap callback is a
+  C function pointer driving shared global state via `OSAllocatedUnfairLock` /
+  `NSLock` (`EngineState`, `MappingsRegistry`) — the same shape as the Rust
+  atomics/mutexes. Strict concurrency fights this pattern; keep Swift 5 mode.
 
 ## Structure
-- `src/` — Frontend (single `App.tsx` is the entire UI)
-- `src-tauri/src/` — Rust backend: `lib.rs` (core + Tauri commands), `hook_macos.rs`, `hook_windows.rs`
-- Config stored as YAML via `serde_yaml`, persisted to app data dir
+- `HyperCapslock/Sources/Engine/` — keyboard engine: `KeyboardHook` (CGEventTap),
+  `ActionExecutor`, `ModifierDoubleTap`, `CapsLockState` (IOKit), `InputSource`
+  (Carbon TIS), `HidUtil`, `KeyPoster`, `KeyCodes`, `EngineState`, `Constants`
+- `HyperCapslock/Sources/Model/` — `ActionModel` (Codable, serde-compatible YAML),
+  `ConfigStore`, `AppConfig`, `MappingsRegistry`
+- `HyperCapslock/Sources/UI/` — `ContentView` + cards, `AddEditMappingView`,
+  `TrayController`, `HudController`/`HudView`, `MainWindowController`, `AppDelegate`
+- `HyperCapslock/Sources/Support/` — `FileLog`, `Permissions`, `LaunchAtLogin`,
+  `UpdaterManager`, `HudCenter`
+- `HyperCapslock/Sources/Localization/L10n.swift` — en/zh/ja/de
+- Config persisted to `~/Library/Application Support/me.xueshi.hypercapslock/`
 
-## Dev Commands
+## Build & Run
 ```bash
-npm install
-npm run tauri dev    # dev with hot reload
-npm run tauri build  # production build
+brew install xcodegen
+xcodegen generate
+open HyperCapslock.xcodeproj   # Cmd+R
+# or: xcodebuild -scheme HyperCapslock -destination 'platform=macOS' build
 ```
+Requires Accessibility + Input Monitoring permissions (TCC) to install the tap.
+
+## Versioning
+- `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml`; CI overrides
+  them from the git tag + run number on release.
+- Git tags (`v*`) trigger the signed release pipeline.
+
+## CI/CD (`.github/workflows/build.yml`)
+Universal build → Developer ID sign (inside-out, incl. embedded Sparkle.framework)
+→ notarize/staple → DMG → Sparkle `sign_update` + `appcast.xml` → GitHub Release
+→ `repository-dispatch` to `XueshiQiao/homebrew_tap` and the apps gallery.
+
+### GitHub Secrets Required
+- `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD` — Developer ID signing
+- `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` (`584KQTRF3B`) — notarization
+- `SPARKLE_EDDSA_KEY` — Sparkle private EdDSA key (export: `generate_keys -x key.pem`)
+- `HOMEBREW_TAP_PAT`, `GALLERY_UPDATE_PAT` — downstream dispatch tokens
+
+The Sparkle public key (`SUPublicEDKey`) lives in `project.yml`; regenerating the
+keypair requires updating both it and the `SPARKLE_EDDSA_KEY` secret.
 
 ## Conventions
-- 2-space indentation for both Rust and TypeScript
-- Encapsulate logic into classes/structs where possible
+- 2-space indentation. Encapsulate logic into structs/enums; keep the engine's
+  global runtime state behind the lock wrappers in `EngineState`/`MappingsRegistry`.

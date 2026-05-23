@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- No App Sandbox: HyperCapslock needs a global CGEventTap, hidutil
+         remapping, IOKit CapsLock control, and Carbon TIS input-source
+         switching — all incompatible with the sandbox. Gated by the
+         Accessibility + Input Monitoring TCC permissions instead. -->
+</dict>
+</plist>
