@@ -23,12 +23,7 @@ struct AboutPage: View {
             Section(loc.t("about.links")) {
                 linkRow(asset: "GitHubLogo", title: loc.t("footer.github"), url: "https://github.com/XueshiQiao/HyperCapslock")
                 linkRow(asset: "XLogo", title: "@XueshiQiao", url: "https://x.com/XueshiQiao")
-                linkRow(systemImage: "globe", title: "xueshi.dev", url: "https://xueshi.dev")
-            }
-
-            Section {
-                Text("\(loc.t("about.license"))  ·  \(loc.t("footer.more_apps_desc")) xueshi.dev")
-                    .font(.caption).foregroundStyle(.secondary)
+                linkRow(systemImage: "globe", title: "\(loc.t("footer.more_apps_desc")) xueshi.dev", url: "https://xueshi.dev")
             }
         }
         .formStyle(.grouped)
