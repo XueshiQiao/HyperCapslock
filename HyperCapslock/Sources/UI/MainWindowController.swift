@@ -23,6 +23,7 @@ final class MainWindowController: NSObject, NSWindowDelegate {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
+        window.toolbarStyle = .unified
         window.setContentSize(NSSize(width: 860, height: 620))
         window.center()
         super.init()

@@ -85,6 +85,18 @@ struct SettingsPage: View {
         }
         .formStyle(.grouped)
         .navigationTitle(loc.t("nav.settings"))
+        .toolbar {
+            ToolbarItem {
+                Button {
+                    let wasRunning = app.isRunning
+                    app.togglePause()
+                    app.showToast(wasRunning ? loc.t("toast.service_paused") : loc.t("toast.service_resumed"))
+                } label: {
+                    Label(app.isRunning ? loc.t("status.pause") : loc.t("status.resume"),
+                          systemImage: app.isRunning ? "pause.fill" : "play.fill")
+                }
+            }
+        }
     }
 
     private var statusRow: some View {
@@ -100,13 +112,6 @@ struct SettingsPage: View {
                 }
             }
             Spacer()
-            Button {
-                let wasRunning = app.isRunning
-                app.togglePause()
-                app.showToast(wasRunning ? loc.t("toast.service_paused") : loc.t("toast.service_resumed"))
-            } label: {
-                Text(app.isRunning ? loc.t("status.pause") : loc.t("status.resume")).frame(minWidth: 56)
-            }
         }
         .padding(.vertical, 6)
     }

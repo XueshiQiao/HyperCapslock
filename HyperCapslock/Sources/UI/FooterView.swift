@@ -20,12 +20,6 @@ struct AboutPage: View {
                 .padding(.vertical, 12)
             }
 
-            Section {
-                Button { UpdaterManager.shared.checkForUpdates() } label: {
-                    Label(loc.t("update.check"), systemImage: "arrow.triangle.2.circlepath")
-                }
-            }
-
             Section(loc.t("about.links")) {
                 linkRow(asset: "GitHubLogo", title: loc.t("footer.github"), url: "https://github.com/XueshiQiao/HyperCapslock")
                 linkRow(asset: "XLogo", title: "@XueshiQiao", url: "https://x.com/XueshiQiao")
@@ -39,6 +33,13 @@ struct AboutPage: View {
         }
         .formStyle(.grouped)
         .navigationTitle(loc.t("nav.about"))
+        .toolbar {
+            ToolbarItem {
+                Button { UpdaterManager.shared.checkForUpdates() } label: {
+                    Label(loc.t("update.check"), systemImage: "arrow.triangle.2.circlepath")
+                }
+            }
+        }
     }
 
     private func linkRow(asset: String? = nil, systemImage: String? = nil, title: String, url: String) -> some View {
