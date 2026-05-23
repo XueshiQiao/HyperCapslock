@@ -14,7 +14,6 @@ permissions:
 env:
   APP_NAME: HyperCapslock
   SCHEME: HyperCapslock
-  TEAM_ID: "584KQTRF3B"
 
 jobs:
   build:
