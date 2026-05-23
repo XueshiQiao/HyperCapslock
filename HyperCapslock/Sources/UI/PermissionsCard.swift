@@ -29,7 +29,6 @@ struct PermissionsCard: View {
                 if expanded {
                     VStack(spacing: 8) {
                         permissionRow(label: loc.t("perm.accessibility"), granted: app.accessibilityGranted, pane: .accessibility)
-                        permissionRow(label: loc.t("perm.input_monitoring"), granted: app.inputMonitoringGranted, pane: .inputMonitoring)
                     }
                     HStack {
                         Text(loc.t("perm.macos_hint"))
@@ -48,7 +47,7 @@ struct PermissionsCard: View {
         .onAppear {
             guard !didInit else { return }
             didInit = true
-            expanded = !(app.accessibilityGranted && app.inputMonitoringGranted)
+            expanded = !app.accessibilityGranted
         }
     }
 
