@@ -1,5 +1,11 @@
 # macOS Implementation Notes
 
+> **Note:** This documents the *original Rust/Tauri* implementation. HyperCapslock
+> is now a native Swift (SwiftUI + AppKit) app that **faithfully reproduces this
+> design** — the architecture and algorithms below are unchanged. References to
+> `src-tauri/src/hook_macos.rs` / `lib.rs` map to the Swift sources under
+> `HyperCapslock/Sources/Engine/` and `HyperCapslock/Sources/Model/`.
+
 This document covers the macOS keyboard hook implementation in `src-tauri/src/hook_macos.rs`, including the architectural decisions, platform challenges, and solutions.
 
 ## Architecture Overview

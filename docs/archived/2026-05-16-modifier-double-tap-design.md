@@ -1,5 +1,10 @@
 # Modifier-Key Double-Tap Triggers — Design
 
+> **Note:** This documents the *original Rust/Tauri* implementation. HyperCapslock
+> is now a native Swift (SwiftUI + AppKit) app that **faithfully reproduces this
+> design**; the state machine described here lives in
+> `HyperCapslock/Sources/Engine/ModifierDoubleTap.swift`.
+
 GitHub issue: #2 — *Support double-click event mapping from Modifier Key (Fn,
 Shift, Ctrl, Alt, Command) other than the Capslock key.*
 
