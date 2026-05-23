@@ -39,13 +39,18 @@ final class HudController {
         HudCenter.shared.onShow = { [weak self] payload in
             self?.show(payload)
         }
+        FileLog.shared.info("HUD panel installed and onShow handler wired.")
     }
 
     private func show(_ payload: HudPayload) {
-        guard let panel else { return }
+        guard let panel else {
+            FileLog.shared.warn("HUD show called but panel is nil (install() not run?)")
+            return
+        }
         model.payload = payload
         reposition()
         panel.orderFrontRegardless()
+        FileLog.shared.info("HUD shown on screen at \(panel.frame.origin) for \(payload.duration)ms (trigger=\(payload.trigger))")
 
         hideWork?.cancel()
         let work = DispatchWorkItem { [weak self] in

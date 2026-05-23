@@ -32,17 +32,26 @@ final class HudCenter {
     }
 
     func emit(trigger: String, combo: String, caption: String) {
+        var skipReason: String?
         let payload: HudPayload? = {
             lock.lock(); defer { lock.unlock() }
-            guard enabled else { return nil }
+            guard enabled else { skipReason = "HUD disabled (show_hud=false)"; return nil }
             let key = "\(trigger)\u{1}\(combo)\u{1}\(caption)"
             let now = nowMillis()
-            if key == lastKey && now &- lastEmitMs < Self.throttleMs { return nil }
+            if key == lastKey && now &- lastEmitMs < Self.throttleMs {
+                skipReason = "throttled (same key within \(Self.throttleMs)ms)"
+                return nil
+            }
             lastKey = key
             lastEmitMs = now
             return HudPayload(trigger: trigger, combo: combo, caption: caption, duration: durationMs)
         }()
-        guard let payload else { return }
+        guard let payload else {
+            FileLog.shared.info("HUD emit SKIPPED: \(skipReason ?? "unknown") [trigger=\(trigger) combo=\(combo)]")
+            return
+        }
+        let hasHandler = (onShow != nil)
+        FileLog.shared.info("HUD emit → dispatch to main (onShow set=\(hasHandler)) trigger=\(trigger) combo=\(combo) caption=\(caption) dur=\(payload.duration)")
         DispatchQueue.main.async { [weak self] in
             self?.onShow?(payload)
         }

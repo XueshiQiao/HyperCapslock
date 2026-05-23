@@ -110,9 +110,14 @@ private func hcTapCallback(
     if state.capsDown {
         let keyDown = (type == .keyDown)
         let activeMods = activeModifierFlags(flags)
+        let js = KeyCodes.macToJs(keycode)
+        FileLog.shared.info("Caps HELD + key: \(keyDown ? "DOWN" : "UP") mac=\(keycode) js=\(js.map(String.init) ?? "nil") name=\(js.map(KeyCodes.name) ?? "?") mods=0x\(String(activeMods.rawValue, radix: 16))")
         if ActionExecutor.handleCapsRemap(keycode: keycode, keyDown: keyDown, activeModifiers: activeMods) {
             state.didRemap = true
+            FileLog.shared.info("Caps chord HANDLED (mac=\(keycode)) — swallowing original event.")
             return nil  // swallow the chord key
+        } else if keyDown {
+            FileLog.shared.info("Caps chord had NO mapping (mac=\(keycode) js=\(js.map(String.init) ?? "nil")) — passing through.")
         }
     }
 
@@ -161,29 +166,48 @@ final class KeyboardHook {
     }
 
     private func runTapLoop() {
-        FileLog.shared.info("macOS hook thread spawned.")
+        FileLog.shared.info("macOS hook thread spawned. AXIsProcessTrusted=\(Permissions.isAccessibilityGranted)")
         let mask: CGEventMask =
             (1 << CGEventType.keyDown.rawValue) |
             (1 << CGEventType.keyUp.rawValue) |
             (1 << CGEventType.flagsChanged.rawValue)
 
-        guard let tap = CGEvent.tapCreate(
-            tap: .cghidEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: mask,
-            callback: hcTapCallback,
-            userInfo: nil
-        ) else {
-            FileLog.shared.error("Failed to create CGEventTap. Check Accessibility/Input Monitoring permissions.")
-            return
-        }
-        eventTap = tap
+        // Retry tapCreate until it succeeds. An active tap requires Accessibility;
+        // creation fails (returns nil) until it's granted. Retrying tapCreate
+        // itself — rather than polling AXIsProcessTrusted(), which can return a
+        // stale cached value within a process — lets the tap auto-install the
+        // moment the user grants Accessibility, with no relaunch.
+        var attempt = 0
+        while true {
+            attempt += 1
+            guard let tap = CGEvent.tapCreate(
+                tap: .cghidEventTap,
+                place: .headInsertEventTap,
+                options: .defaultTap,
+                eventsOfInterest: mask,
+                callback: hcTapCallback,
+                userInfo: nil
+            ) else {
+                if attempt == 1 || attempt % 5 == 0 {
+                    FileLog.shared.warn("⏳ CGEventTap creation FAILED (attempt \(attempt)). Accessibility likely not granted yet (AXIsProcessTrusted=\(Permissions.isAccessibilityGranted)). Retrying every 1s — grant Accessibility and the tap will auto-install with NO relaunch.")
+                }
+                Thread.sleep(forTimeInterval: 1.0)
+                continue
+            }
 
-        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-        CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
-        CGEvent.tapEnable(tap: tap, enable: true)
-        FileLog.shared.info("macOS keyboard event tap installed and enabled.")
-        CFRunLoopRun()
+            eventTap = tap
+            guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) else {
+                FileLog.shared.error("CFMachPortCreateRunLoopSource returned nil; retrying in 1s.")
+                eventTap = nil
+                Thread.sleep(forTimeInterval: 1.0)
+                continue
+            }
+            CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
+            CGEvent.tapEnable(tap: tap, enable: true)
+            FileLog.shared.info("✅ macOS keyboard event tap INSTALLED and enabled (attempt \(attempt)). mappings=\(MappingsRegistry.shared.snapshot().count) isPaused=\(EngineState.shared.isPaused)")
+            CFRunLoopRun()   // blocks while the tap is alive
+            FileLog.shared.warn("CFRunLoopRun returned; tap loop will rebuild the tap.")
+            eventTap = nil
+        }
     }
 }
