@@ -168,7 +168,7 @@ struct PageScaffold<Content: View>: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                HStack {
+                HStack(alignment: .firstTextBaseline) {
                     Text(title).font(.system(size: 22, weight: .bold))
                         .foregroundStyle(brandGradient)
                     Spacer()
@@ -180,5 +180,8 @@ struct PageScaffold<Content: View>: View {
             .frame(maxWidth: 640, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        // One uniform control size for every button/toggle/picker on the page
+        // (inherited via the environment) so nothing is ad-hoc large/small.
+        .controlSize(.regular)
     }
 }

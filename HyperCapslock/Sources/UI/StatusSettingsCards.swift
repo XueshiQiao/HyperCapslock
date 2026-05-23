@@ -36,9 +36,8 @@ struct SettingsPage: View {
                     app.showToast(wasRunning ? loc.t("toast.service_paused") : loc.t("toast.service_resumed"))
                 } label: {
                     Text(app.isRunning ? loc.t("status.pause") : loc.t("status.resume"))
-                        .frame(minWidth: 64)
+                        .frame(minWidth: 60)
                 }
-                .controlSize(.large)
                 .buttonStyle(.bordered)
                 .tint(.blue)
             }

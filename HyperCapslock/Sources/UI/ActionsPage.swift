@@ -15,7 +15,7 @@ struct ActionsPage: View {
     var body: some View {
         PageScaffold(title: loc.t("nav.actions"), trailing: AnyView(
             Button { sheet = .add } label: { Label(loc.t("actions.add"), systemImage: "plus") }
-                .controlSize(.small).buttonStyle(.borderedProminent))) {
+                .buttonStyle(.borderedProminent))) {
 
             // Custom actions
             SettingsSection(title: loc.t("actions.custom")) {

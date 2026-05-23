@@ -106,10 +106,10 @@ struct MappingsPage: View {
 
     var body: some View {
         PageScaffold(title: loc.t("nav.mappings"), trailing: AnyView(
-            HStack(spacing: 7) {
-                Button { importConfig() } label: { Label(loc.t("config.import"), systemImage: "square.and.arrow.down") }.controlSize(.small)
-                Button { exportConfig() } label: { Label(loc.t("config.export"), systemImage: "square.and.arrow.up") }.controlSize(.small)
-                Button { sheet = .add } label: { Label(loc.t("mappings.add"), systemImage: "plus") }.controlSize(.small).buttonStyle(.borderedProminent)
+            HStack(spacing: 8) {
+                Button { importConfig() } label: { Label(loc.t("config.import"), systemImage: "square.and.arrow.down") }.buttonStyle(.bordered)
+                Button { exportConfig() } label: { Label(loc.t("config.export"), systemImage: "square.and.arrow.up") }.buttonStyle(.bordered)
+                Button { sheet = .add } label: { Label(loc.t("mappings.add"), systemImage: "plus") }.buttonStyle(.borderedProminent)
             })) {
             if config.mappings.isEmpty {
                 Text(loc.t("mappings.empty")).font(.system(size: 12)).italic().foregroundColor(.secondary)

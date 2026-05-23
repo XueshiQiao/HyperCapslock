@@ -60,7 +60,7 @@ struct PermissionsSection: View {
                 Button(loc.t("perm.refresh")) {
                     app.refreshPermissions()
                     app.showToast(loc.t("toast.perm_refreshed"))
-                }.controlSize(.small)
+                }.buttonStyle(.bordered)
             }
         }
     }
