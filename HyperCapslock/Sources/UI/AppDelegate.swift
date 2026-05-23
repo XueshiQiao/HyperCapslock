@@ -11,6 +11,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppState.shared.bootstrap()
         KeyboardHook.shared.start()
         HudController.shared.install()
+        #if DEBUG
+        // Debug-only diagnostic (gated to debug builds; toggle in Settings ▸ Debug).
+        // Install the HUD (wires the callback) before starting the tracker
+        // (which seeds + fires). The overlay only appears when the toggle is on.
+        FrontmostAppHud.shared.install()
+        FrontmostAppTracker.shared.start()
+        #endif
         tray = TrayController()
         MainWindowController.shared = MainWindowController()
         MainWindowController.shared?.show()

@@ -6,6 +6,10 @@ struct SettingsPage: View {
     @EnvironmentObject var config: ConfigStore
     @EnvironmentObject var loc: LocalizationManager
 
+    #if DEBUG
+    @AppStorage(FrontmostAppHud.defaultsKey) private var debugFrontmostHud = false
+    #endif
+
     var body: some View {
         Form {
             Section { statusRow }
@@ -82,6 +86,18 @@ struct SettingsPage: View {
                 }
                 .pickerStyle(.segmented)
             }
+
+            #if DEBUG
+            // Debug-only diagnostics. Compiled out of release builds entirely.
+            Section("Debug") {
+                Toggle("Show frontmost-app overlay", isOn: $debugFrontmostHud)
+                Text("Shows the active app's name + bundle id, bottom-right, for 3s on each switch.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .onChange(of: debugFrontmostHud) { _, on in
+                if !on { FrontmostAppHud.shared.hideNow() }
+            }
+            #endif
         }
         .formStyle(.grouped)
         .navigationTitle(loc.t("nav.settings"))
