@@ -136,6 +136,16 @@ final class KeyboardHook {
             FileLog.shared.info("Accessibility permission already granted.")
         }
 
+        // Input Monitoring must be *requested* (CGRequestListenEventAccess) for the
+        // app to appear in the System Settings list at all — it can't be added by
+        // hand. This prompts the first time and registers the app in the list.
+        if !Permissions.isInputMonitoringGranted {
+            FileLog.shared.warn("Input Monitoring not granted. Requesting access (registers app in the list).")
+            Permissions.requestInputMonitoring()
+        } else {
+            FileLog.shared.info("Input Monitoring permission already granted.")
+        }
+
         if !HidUtil.setupRemap() {
             FileLog.shared.warn("Could not remap CapsLock via hidutil. Caps modifier may be unreliable.")
         }
