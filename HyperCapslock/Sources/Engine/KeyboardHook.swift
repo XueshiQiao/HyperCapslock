@@ -129,21 +129,14 @@ final class KeyboardHook {
     func start() {
         FileLog.shared.info("Starting macOS keyboard hook.")
 
+        // The event tap is an ACTIVE (.defaultTap) tap, which macOS gates on
+        // Accessibility — NOT Input Monitoring (that's for .listenOnly taps).
+        // Granting Accessibility implicitly covers the keyboard tap.
         if !Permissions.isAccessibilityGranted {
             FileLog.shared.warn("Accessibility permission not granted. Prompting system dialog.")
             Permissions.promptAccessibility()
         } else {
             FileLog.shared.info("Accessibility permission already granted.")
-        }
-
-        // Input Monitoring must be *requested* (CGRequestListenEventAccess) for the
-        // app to appear in the System Settings list at all — it can't be added by
-        // hand. This prompts the first time and registers the app in the list.
-        if !Permissions.isInputMonitoringGranted {
-            FileLog.shared.warn("Input Monitoring not granted. Requesting access (registers app in the list).")
-            Permissions.requestInputMonitoring()
-        } else {
-            FileLog.shared.info("Input Monitoring permission already granted.")
         }
 
         if !HidUtil.setupRemap() {
