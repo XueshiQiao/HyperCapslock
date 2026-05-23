@@ -131,23 +131,32 @@ struct SidebarView: View {
     }
 }
 
-/// Status indicator with optional breathing ring (Design B).
+/// Status indicator. When `animate` is true it breathes (scales up/down in
+/// place); otherwise it's a solid dot. Centered scale + a fixed layout box keep
+/// it pulsing in place (no sliding).
 struct StatusDot: View {
     let running: Bool
     var animate: Bool = false
-    @State private var pulse = false
-    var color: Color { running ? .green : .orange }
+    @State private var breathe = false
+    private var color: Color { running ? .green : .orange }
+
     var body: some View {
-        ZStack {
-            if animate {
-                Circle().fill(color).frame(width: 9, height: 9)
-                    .scaleEffect(pulse ? 2.2 : 1).opacity(pulse ? 0 : 0.6)
-                    .animation(.easeOut(duration: 1.6).repeatForever(autoreverses: false), value: pulse)
+        Circle()
+            .fill(color)
+            .frame(width: 9, height: 9)
+            .scaleEffect(animate ? (breathe ? 1.0 : 0.72) : 1.0)
+            .opacity(animate ? (breathe ? 1.0 : 0.5) : 1.0)
+            .frame(width: 12, height: 12)   // fixed box so scaling never shifts neighbors
+            .onAppear {
+                guard animate else { return }
+                // Defer one runloop so the entrance layout has settled, then
+                // start ONLY the breathe animation (not the view's geometry).
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
+                        breathe = true
+                    }
+                }
             }
-            Circle().fill(color).frame(width: 9, height: 9)
-        }
-        .frame(width: 10, height: 10)
-        .onAppear { if animate { pulse = true } }
     }
 }
 
