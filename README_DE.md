@@ -85,8 +85,8 @@ Oder lade das `.dmg` von den [GitHub Releases](https://github.com/XueshiQiao/Hyp
 
 ### Berechtigungen
 
-Die App benötigt die Berechtigungen **Bedienungshilfen (Accessibility)** und **Eingabeüberwachung (Input Monitoring)**:
-`Systemeinstellungen → Datenschutz & Sicherheit → Bedienungshilfen / Eingabeüberwachung`
+Die App benötigt die Berechtigung **Bedienungshilfen (Accessibility)**:
+`Systemeinstellungen → Datenschutz & Sicherheit → Bedienungshilfen`
 
 ## Screenshot
 

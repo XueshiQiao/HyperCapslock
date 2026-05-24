@@ -85,8 +85,8 @@ brew install --cask XueshiQiao/tap/hypercapslock
 
 ### 权限
 
-应用需要 **辅助功能（Accessibility）** 和 **输入监控（Input Monitoring）** 权限：
-`系统设置 → 隐私与安全性 → 辅助功能 / 输入监控`
+应用需要 **辅助功能（Accessibility）** 权限：
+`系统设置 → 隐私与安全性 → 辅助功能`
 
 ## 截图
 

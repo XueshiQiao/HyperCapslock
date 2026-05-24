@@ -13,7 +13,6 @@ final class AppState: ObservableObject {
 
     @Published var status: ServiceStatus = .initializing
     @Published var accessibilityGranted = false
-    @Published var inputMonitoringGranted = false
     @Published var permissionsResolved = false   // false until first refresh completes
     @Published var autostart = false
     @Published var permissionsExpandedManually: Bool? = nil
@@ -138,7 +137,6 @@ final class AppState: ObservableObject {
 
     func refreshPermissions() {
         accessibilityGranted = Permissions.isAccessibilityGranted
-        inputMonitoringGranted = Permissions.isInputMonitoringGranted
         permissionsResolved = true
     }
 

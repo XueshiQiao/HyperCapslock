@@ -85,8 +85,8 @@ brew install --cask XueshiQiao/tap/hypercapslock
 
 ### 権限
 
-このアプリには **アクセシビリティ（Accessibility）** と **入力監視（Input Monitoring）** の権限が必要です。
-`システム設定 → プライバシーとセキュリティ → アクセシビリティ / 入力監視`
+このアプリには **アクセシビリティ（Accessibility）** の権限が必要です。
+`システム設定 → プライバシーとセキュリティ → アクセシビリティ`
 
 ## スクリーンショット
 

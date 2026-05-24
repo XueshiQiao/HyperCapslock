@@ -56,7 +56,9 @@ xcodegen generate
 open HyperCapslock.xcodeproj   # Cmd+R
 # or: xcodebuild -scheme HyperCapslock -destination 'platform=macOS' build
 ```
-Requires Accessibility + Input Monitoring permissions (TCC) to install the tap.
+Requires the Accessibility permission (TCC) to install the tap. (Input
+Monitoring is NOT needed — that's only for `.listenOnly` taps; this app uses an
+active `.defaultTap`, which macOS gates on Accessibility.)
 
 ## Versioning
 - `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml`; CI overrides

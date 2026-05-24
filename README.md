@@ -85,8 +85,8 @@ Or download the `.dmg` from [GitHub Releases](https://github.com/XueshiQiao/Hype
 
 ### Permissions
 
-The app needs **Accessibility** and **Input Monitoring** permissions:
-`System Settings → Privacy & Security → Accessibility / Input Monitoring`
+The app needs the **Accessibility** permission:
+`System Settings → Privacy & Security → Accessibility`
 
 ## Screenshot
 
