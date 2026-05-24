@@ -2,8 +2,8 @@ import Foundation
 import Sparkle
 
 /// Sparkle auto-update wrapper. Reads `SUFeedURL` (the appcast published as a
-/// GitHub Release asset) and `SUPublicEDKey` from Info.plist. Replaces the
-/// Tauri updater. Starts the background update checker at launch.
+/// GitHub Release asset) and `SUPublicEDKey` from Info.plist. Starts the
+/// background update checker at launch.
 @MainActor
 final class UpdaterManager: ObservableObject {
     static let shared = UpdaterManager()

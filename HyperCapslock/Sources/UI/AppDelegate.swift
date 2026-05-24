@@ -32,7 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // Dock-icon click / reopen → show the main window (mirrors Tauri Reopen).
+    // Dock-icon click / reopen → show the main window.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         MainWindowController.shared?.show()
         return true

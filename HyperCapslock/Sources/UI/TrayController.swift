@@ -1,8 +1,8 @@
 import AppKit
 import Combine
 
-/// Menu-bar status item + menu. Mirrors the Tauri tray: a disabled status line,
-/// start/stop toggle, check-for-updates, more-apps, open-window, quit. Template
+/// Menu-bar status item + menu: a disabled status line, start/stop toggle,
+/// check-for-updates, more-apps, open-window, quit. Template
 /// icon reflects running/paused; text is fully localized and refreshes on
 /// status or locale changes.
 @MainActor

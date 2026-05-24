@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Owns the single main settings window. Hosts `ContentView` via SwiftUI, and
 /// hides (rather than closes) on the red button so the app keeps running in the
-/// menu bar — matching the Tauri `prevent_close` + hide behavior.
+/// menu bar.
 @MainActor
 final class MainWindowController: NSObject, NSWindowDelegate {
     static var shared: MainWindowController?

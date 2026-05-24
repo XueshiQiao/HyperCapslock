@@ -1,8 +1,8 @@
 import Foundation
 import ServiceManagement
 
-/// Launch-at-login via `SMAppService.mainApp` (replaces the Tauri autostart
-/// plugin). Registers the app itself as a login item.
+/// Launch-at-login via `SMAppService.mainApp`. Registers the app itself as a
+/// login item.
 enum LaunchAtLogin {
     static var isEnabled: Bool {
         SMAppService.mainApp.status == .enabled
