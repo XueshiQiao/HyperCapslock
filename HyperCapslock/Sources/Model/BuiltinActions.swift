@@ -26,6 +26,7 @@ enum BuiltinActions {
         a("builtin.insert_quotes",    "action.insert_quotes", .independent(.insertQuotes)),
         a("builtin.toggle_caps_lock", "action.toggle_caps_lock", .independent(.toggleCapsLock)),
         a("builtin.switch_input_source", "action.switch_input_source", .independent(.switchInputSource)),
+        a("builtin.noop",             "action.noop",          .independent(.noop)),
     ]
 
     private static let ids: Set<String> = Set(all.map(\.id))

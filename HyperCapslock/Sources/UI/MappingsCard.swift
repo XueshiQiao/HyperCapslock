@@ -57,6 +57,7 @@ func actionSymbol(_ config: ActionConfig) -> String {
         case .backspace: return "delete.left"; case .nextLine: return "return"
         case .insertQuotes: return "quote.opening"; case .toggleCapsLock: return "capslock"
         case .switchInputSource: return "globe"
+        case .noop: return "nosign"
         }
     case .inputSource: return "globe"
     case .command: return "terminal"

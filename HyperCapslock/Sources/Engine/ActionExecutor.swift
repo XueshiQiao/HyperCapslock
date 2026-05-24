@@ -54,6 +54,7 @@ func hudParts(_ action: ActionConfig) -> (String, String) {
             .insertQuotes: ("\u{201C}\u{201D}", "Insert Quotes"),
             .toggleCapsLock: ("\u{21EA}", "Toggle Caps Lock"),
             .switchInputSource: ("\u{2328}", "Switch Input Source"),
+            .noop: ("\u{2298}", "Do Nothing"),
         ]
         let (sym, name) = map[a]!
         return (sym, name)
@@ -90,6 +91,7 @@ enum ActionExecutor {
     static func allowShiftFallback(_ action: ActionConfig) -> Bool {
         switch action {
         case .inputSource, .command, .keyCombo, .openApp: return false
+        case .independent(.noop): return false  // a disabled key shouldn't disable its shifted variant too
         default: return true
         }
     }
@@ -191,6 +193,8 @@ enum ActionExecutor {
                 if keyDown { _ = toggleCapsLock() }
             case .switchInputSource:
                 if keyDown { InputSourceController.smartToggle() }
+            case .noop:
+                break   // intentionally does nothing (the chord is still swallowed)
             }
         case .inputSource(let id):
             if keyDown { InputSourceController.queueSwitch(toID: id) }

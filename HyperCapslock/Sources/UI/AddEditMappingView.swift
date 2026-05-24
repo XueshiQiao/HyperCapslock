@@ -233,12 +233,17 @@ struct AddEditMappingView: View {
 /// One per-app rule: an editable include-list of apps + an action, or a
 /// read-only "advanced" row for shapes the editor can't represent.
 private struct RuleRowView: View {
+    @EnvironmentObject var app: AppState
     @EnvironmentObject var config: ConfigStore
     @EnvironmentObject var loc: LocalizationManager
     @Binding var rule: BindingDraft
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
     let onDelete: () -> Void
+
+    @State private var lastRealActionId = ""
+    @State private var showCreateAction = false
+    @State private var createActionSentinel = "__create_action__-" + UUID().uuidString
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -272,6 +277,17 @@ private struct RuleRowView: View {
                     if !config.customActions.isEmpty {
                         Section(loc.t("actions.custom")) { ForEach(config.customActions, id: \.id) { a in Text(a.name).tag(a.id) } }
                     }
+                    Section {
+                        Label(loc.t("mappings.create_action"), systemImage: "plus").tag(createActionSentinel)
+                    }
+                }
+                .onChange(of: rule.actionId) { _, newValue in
+                    if newValue == createActionSentinel {
+                        rule.actionId = lastRealActionId          // revert; not a real pick
+                        showCreateAction = true
+                    } else {
+                        lastRealActionId = newValue
+                    }
                 }
             } else {
                 Label(loc.t("mappings.advanced_rule"), systemImage: "curlybraces")
@@ -279,6 +295,11 @@ private struct RuleRowView: View {
             }
         }
         .padding(.vertical, 4)
+        .onAppear { lastRealActionId = rule.actionId }
+        .sheet(isPresented: $showCreateAction) {
+            AddEditActionView(mode: .add, onCreated: { created in rule.actionId = created.id })
+                .environmentObject(app).environmentObject(config).environmentObject(loc)
+        }
     }
 
     private func appChip(_ app: AppRef) -> some View {

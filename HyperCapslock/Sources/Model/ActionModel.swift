@@ -25,6 +25,10 @@ enum IndependentActionKind: String, Codable, CaseIterable, Equatable {
     case insertQuotes = "insert_quotes"
     case toggleCapsLock = "toggle_caps_lock"
     case switchInputSource = "switch_input_source"
+    /// Does nothing (and swallows the key). Useful as a default action so a
+    /// trigger only acts via its per-app rules and is inert everywhere else,
+    /// or as a rule action to disable a key in specific apps.
+    case noop
 }
 
 enum ModifierKey: String, Codable, CaseIterable, Equatable {
