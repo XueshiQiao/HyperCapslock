@@ -117,6 +117,14 @@ struct MappingsPage: View {
         .toolbar {
             ToolbarItemGroup {
                 Button { importConfig() } label: { Image(systemName: "square.and.arrow.down") }.help(loc.t("config.import"))
+                #if DEBUG
+                // Dev-only: one-click import the RELEASE build's config. The Debug
+                // build has its own bundle id (.debug) and therefore its own config
+                // dir, so this mirrors real settings into the dev app. Compiled out
+                // of Release entirely.
+                Button { importReleaseConfig() } label: { Image(systemName: "arrow.down.doc.fill") }
+                    .help("Import release config (debug)")
+                #endif
                 Button { exportConfig() } label: { Image(systemName: "square.and.arrow.up") }.help(loc.t("config.export"))
                 Button { sheet = .add } label: { Image(systemName: "plus") }.help(loc.t("mappings.add"))
             }
@@ -181,6 +189,28 @@ struct MappingsPage: View {
             catch { app.showToast(loc.t("toast.config_export_failed"), isError: true) }
         }
     }
+
+    #if DEBUG
+    /// Dev-only: import the RELEASE build's config (`me.xueshi.hypercapslock`)
+    /// in one click. Because the Debug build runs under `…hypercapslock.debug`,
+    /// it has a separate Application Support dir; this pulls the real settings in.
+    /// macOS may prompt to allow reading another app's data the first time —
+    /// approve it. Entirely compiled out of Release builds.
+    private func importReleaseConfig() {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
+        let releaseConfig = base
+            .appendingPathComponent("me.xueshi.hypercapslock", isDirectory: true)
+            .appendingPathComponent("action_mappings.yml")
+        do {
+            let count = try config.importDocument(from: releaseConfig.path)
+            app.showToast("Imported \(count) mapping(s) from the release config")
+        } catch {
+            let msg = (error as? ConfigError)?.errorDescription ?? error.localizedDescription
+            app.showToast("Release import failed: \(msg)", isError: true)
+        }
+    }
+    #endif
 
     private func importConfig() {
         let panel = NSOpenPanel()

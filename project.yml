@@ -38,7 +38,12 @@ targets:
       path: HyperCapslock/Resources/Info.plist
       properties:
         LSUIElement: false
-        CFBundleDisplayName: HyperCapslock
+        # Both follow PRODUCT_NAME. The System Settings Privacy panes show the
+        # Launch-Services name, which resolves to the .app/executable name
+        # (PRODUCT_NAME) — NOT these Info.plist keys — so PRODUCT_NAME itself
+        # must differ per-config to make the Accessibility row read "HyperCapslock-Dev".
+        CFBundleDisplayName: $(PRODUCT_NAME)
+        CFBundleName: $(PRODUCT_NAME)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
@@ -53,10 +58,22 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: me.xueshi.hypercapslock
         PRODUCT_NAME: HyperCapslock
+        # Pin the Swift module name so the Debug product rename (HyperCapslock-Dev)
+        # doesn't rename the module — `@testable import HyperCapslock` must keep working.
+        PRODUCT_MODULE_NAME: HyperCapslock
         CODE_SIGN_ENTITLEMENTS: HyperCapslock/Resources/HyperCapslock.entitlements
         COMBINE_HIDPI_IMAGES: true
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_USER_SCRIPT_SANDBOXING: NO
+      configs:
+        # Debug is a fully distinct app — its own bundle id AND product name
+        # ("HyperCapslock-Dev.app") — so it gets its own Accessibility (TCC)
+        # entry, named "HyperCapslock-Dev", coexisting with the release build
+        # without re-authorization. (The test target's TEST_HOST is overridden
+        # to match this Debug product name.)
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: me.xueshi.hypercapslock.debug
+          PRODUCT_NAME: HyperCapslock-Dev
     entitlements:
       path: HyperCapslock/Resources/HyperCapslock.entitlements
     dependencies:
@@ -76,3 +93,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: me.xueshi.hypercapslock.tests
         BUNDLE_LOADER: $(TEST_HOST)
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/HyperCapslock.app/Contents/MacOS/HyperCapslock
+      configs:
+        # The Debug app is renamed to HyperCapslock-Dev.app, so the test host
+        # (tests run in Debug) must point there instead.
+        Debug:
+          TEST_HOST: $(BUILT_PRODUCTS_DIR)/HyperCapslock-Dev.app/Contents/MacOS/HyperCapslock-Dev
