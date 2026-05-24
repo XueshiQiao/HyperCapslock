@@ -105,11 +105,13 @@ struct SettingsPage: View {
             ToolbarItem {
                 Button {
                     let wasRunning = app.isRunning
-                    app.togglePause()
+                    withAnimation { app.togglePause() }
                     app.showToast(wasRunning ? loc.t("toast.service_paused") : loc.t("toast.service_resumed"))
                 } label: {
                     Label(app.isRunning ? loc.t("status.pause") : loc.t("status.resume"),
                           systemImage: app.isRunning ? "pause.fill" : "play.fill")
+                        // Animate the pause.fill ↔ play.fill swap.
+                        .contentTransition(.symbolEffect(.replace))
                 }
             }
         }

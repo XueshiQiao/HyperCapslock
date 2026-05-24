@@ -4,6 +4,7 @@ import AppKit
 struct AboutPage: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var loc: LocalizationManager
+    @State private var updateSpin = 0
 
     var body: some View {
         Form {
@@ -30,8 +31,17 @@ struct AboutPage: View {
         .navigationTitle(loc.t("nav.about"))
         .toolbar {
             ToolbarItem {
-                Button { UpdaterManager.shared.checkForUpdates() } label: {
-                    Label(loc.t("update.check"), systemImage: "arrow.triangle.2.circlepath")
+                Button {
+                    updateSpin += 1
+                    UpdaterManager.shared.checkForUpdates()
+                } label: {
+                    // Spin the circular-arrows symbol once per click (macOS 15+).
+                    if #available(macOS 15, *) {
+                        Label(loc.t("update.check"), systemImage: "arrow.triangle.2.circlepath")
+                            .symbolEffect(.rotate, value: updateSpin)
+                    } else {
+                        Label(loc.t("update.check"), systemImage: "arrow.triangle.2.circlepath")
+                    }
                 }
             }
         }
