@@ -1,6 +1,5 @@
 import Foundation
 import Carbon
-import CoreGraphics
 
 /// macOS input-source (keyboard layout / IME) control via Carbon TIS.
 ///
@@ -21,12 +20,9 @@ enum InputSourceController {
     // MARK: - Switch to a specific source by ID
 
     /// Select the input source with the given ID. Returns `nil` on success or an
-    /// error message string. When `useCjkvWorkaround` is true and the target is a
-    /// CJKV IME, posts a synthetic kana key afterward to force macOS to actually
-    /// commit the switch (the `TISSelectInputSource` menu-bar-updates-but-input-
-    /// doesn't bug; approach from macism).
+    /// error message string.
     @discardableResult
-    static func select(byID id: String, useCjkvWorkaround: Bool) -> String? {
+    static func select(byID id: String) -> String? {
         let filter = [kTISPropertyInputSourceID as String: id] as CFDictionary
         guard let listUM = TISCreateInputSourceList(filter, false) else {
             return "TISCreateInputSourceList returned null"
@@ -41,32 +37,7 @@ enum InputSourceController {
         if status != noErr {
             return "TISSelectInputSource failed with status \(status)"
         }
-        if useCjkvWorkaround && !isLatin(id) {
-            forceActivation()
-        }
         return nil
-    }
-
-    /// Workaround for the CJKV `TISSelectInputSource` commit bug: tap the Kana
-    /// key (keycode 104) via CGEvent to force the switch to take effect. Stamped
-    /// with the injected-event magic so our own tap ignores it.
-    private static func forceActivation() {
-        let kana: CGKeyCode = 104
-        guard let src = CGEventSource(stateID: .hidSystemState),
-              let down = CGEvent(keyboardEventSource: src, virtualKey: kana, keyDown: true),
-              let up = CGEvent(keyboardEventSource: src, virtualKey: kana, keyDown: false) else {
-            FileLog.shared.warn("force_input_source_activation: failed to create CGEvent")
-            return
-        }
-        down.setIntegerValueField(.eventSourceUserData, value: KeyPoster.injectedMagic)
-        up.setIntegerValueField(.eventSourceUserData, value: KeyPoster.injectedMagic)
-        // Post the kana down → 50ms gap → up off the calling thread, since
-        // `select` may run on the main queue and the sleep must not block it.
-        DispatchQueue.global().async {
-            down.post(tap: .cghidEventTap)
-            Thread.sleep(forTimeInterval: 0.05)
-            up.post(tap: .cghidEventTap)
-        }
     }
 
     // MARK: - Mapping switch (async to main)
@@ -74,7 +45,7 @@ enum InputSourceController {
     static func queueSwitch(toID id: String) {
         FileLog.shared.info("Queueing input source mapping switch: source_id=\(id)")
         DispatchQueue.main.async {
-            if let e = select(byID: id, useCjkvWorkaround: true) {
+            if let e = select(byID: id) {
                 FileLog.shared.warn("Input source mapping failed on main queue: source_id=\(id) error=\(e)")
             } else {
                 FileLog.shared.info("Input source mapping switched on main queue: source_id=\(id)")
@@ -166,9 +137,7 @@ enum InputSourceController {
                 return
             }
             FileLog.shared.info("Smart toggle target: \(target)")
-            // Skip the CJKV kana workaround here: the user's own just-typed key,
-            // released the moment we return, serves as the commit trigger.
-            if let e = select(byID: target, useCjkvWorkaround: false) {
+            if let e = select(byID: target) {
                 FileLog.shared.warn("Smart toggle TIS failed: \(e)")
             }
         }
