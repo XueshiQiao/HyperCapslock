@@ -78,6 +78,12 @@ final class FrontmostAppTracker {
   /// Deduped by bundle id so re-activating the same app doesn't re-fire.
   private func update(_ app: NSRunningApplication) {
     let bundleID = app.bundleIdentifier
+    // Ignore our own transient activation during a Switching-Focus input-source
+    // round-trip, so per-app mapping resolution keeps pointing at the user's app.
+    if bundleID == Bundle.main.bundleIdentifier, InputSourceFix.isSuppressingSelfActivation {
+      FileLog.shared.info("FrontmostAppTracker: ignoring self-activation during input-source focus round-trip.")
+      return
+    }
     let changed = _bundleID.withLock { current -> Bool in
       if current == bundleID { return false }
       current = bundleID

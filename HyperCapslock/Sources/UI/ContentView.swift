@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 enum SidebarPage: Hashable, CaseIterable {
-    case settings, mappings, actions, about
+    case settings, mappings, actions, inputSource, about
 }
 
 /// Stable identity for a trigger (ForEach id + edit-sheet identity).
@@ -45,6 +45,7 @@ struct ContentView: View {
                 sidebarRow(.settings, loc.t("nav.settings"), "gearshape.fill", .gray)
                 sidebarRow(.mappings, loc.t("nav.mappings"), "keyboard.fill", .blue)
                 sidebarRow(.actions, loc.t("nav.actions"), "bolt.fill", .orange)
+                sidebarRow(.inputSource, loc.t("nav.input_source"), "globe", .green)
                 sidebarRow(.about, loc.t("nav.about"), "info.circle.fill", .gray)
             }
             .listStyle(.sidebar)
@@ -57,6 +58,7 @@ struct ContentView: View {
                 case .settings: SettingsPage()
                 case .mappings: MappingsPage()
                 case .actions: ActionsPage()
+                case .inputSource: InputSourcePage()
                 case .about: AboutPage()
                 }
             }

@@ -291,6 +291,7 @@ final class ConfigStore: ObservableObject {
     func setShowHud(_ show: Bool) throws { try mutateConfig { $0.showHud = show } }
     func setHudDuration(_ ms: Int) throws { try mutateConfig { $0.hudDurationMs = min(max(ms, 300), 6000) } }
     func setThemeMode(_ mode: ThemeMode) throws { try mutateConfig { $0.themeMode = mode } }
+    func setCJKVFixStrategy(_ strategy: CJKVFixStrategy) throws { try mutateConfig { $0.cjkvFixStrategy = strategy } }
 
     private func mutateConfig(_ change: (inout AppConfig) -> Void) throws {
         let prev = appConfig

@@ -49,6 +49,7 @@ final class AppState: ObservableObject {
         config.load()
         FileLog.shared.info("bootstrap: \(config.mappings.count) mappings, \(config.customActions.count) custom actions; appConfig=\(config.appConfig)")
         applyHudSettings()
+        applyInputSourceSettings()
         applyActivationPolicy(hide: config.appConfig.hideDockIcon)
         applyAppearance(config.appConfig.themeMode)
         autostart = LaunchAtLogin.isEnabled
@@ -121,6 +122,18 @@ final class AppState: ObservableObject {
     func setHudDuration(_ ms: Int) throws {
         try config.setHudDuration(ms)
         applyHudSettings()
+    }
+
+    var cjkvFixStrategy: CJKVFixStrategy { config.appConfig.cjkvFixStrategy }
+
+    func setCJKVFixStrategy(_ strategy: CJKVFixStrategy) throws {
+        try config.setCJKVFixStrategy(strategy)
+        applyInputSourceSettings()
+    }
+
+    private func applyInputSourceSettings() {
+        InputSourceController.setFixStrategy(config.appConfig.cjkvFixStrategy)
+        FileLog.shared.info("Input-source fix strategy applied: \(config.appConfig.cjkvFixStrategy.rawValue)")
     }
 
     func toggleAutostart() throws {

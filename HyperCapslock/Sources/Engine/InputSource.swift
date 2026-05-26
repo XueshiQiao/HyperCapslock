@@ -6,9 +6,29 @@ import Carbon
 /// TIS APIs assert main-queue affinity, so the switch runs on the main queue:
 ///   • `queueSwitch(toID:)` — async to main (fire-and-forget mapping switch).
 ///
+/// When the configured `CJKVFixStrategy` is non-`.none` and the target is a CJKV
+/// IME, the switch is handled by `InputSourceFix` instead of a plain select.
+///
 /// The old `smartToggle()` (auto 中/英 flip) was removed — see `IndependentActionKind`
 /// in ActionModel.swift for why its built-in action is gone.
 enum InputSourceController {
+    // MARK: - CJKV fix strategy (set from the UI, read on the switch path)
+
+    /// Lock-guarded so the UI-thread setter and the switch read don't race.
+    /// Mirrors the `HudCenter` thread-safe-config pattern.
+    private static let _fixStrategy = NSLock()
+    private static var _fixStrategyValue: CJKVFixStrategy = .none
+
+    static func setFixStrategy(_ strategy: CJKVFixStrategy) {
+        _fixStrategy.lock(); defer { _fixStrategy.unlock() }
+        _fixStrategyValue = strategy
+    }
+
+    static func currentFixStrategy() -> CJKVFixStrategy {
+        _fixStrategy.lock(); defer { _fixStrategy.unlock() }
+        return _fixStrategyValue
+    }
+
     // MARK: - Switch to a specific source by ID
 
     /// Select the input source with the given ID. Returns `nil` on success or an
@@ -35,13 +55,10 @@ enum InputSourceController {
     // MARK: - Mapping switch (async to main)
 
     static func queueSwitch(toID id: String) {
-        FileLog.shared.info("Queueing input source mapping switch: source_id=\(id)")
+        let strategy = currentFixStrategy()
+        FileLog.shared.info("Queueing input source mapping switch: source_id=\(id) fix_strategy=\(strategy.rawValue)")
         DispatchQueue.main.async {
-            if let e = select(byID: id) {
-                FileLog.shared.warn("Input source mapping failed on main queue: source_id=\(id) error=\(e)")
-            } else {
-                FileLog.shared.info("Input source mapping switched on main queue: source_id=\(id)")
-            }
+            InputSourceFix.switchToSource(id: id, strategy: strategy)
         }
     }
 }
