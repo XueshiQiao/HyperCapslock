@@ -8,6 +8,11 @@ struct InputSourcePage: View {
     @EnvironmentObject var config: ConfigStore
     @EnvironmentObject var loc: LocalizationManager
 
+    /// Whether the system "Select previous input source" shortcut is available
+    /// (gates the Shortcut-Simulation warning). Held in state so the toolbar
+    /// Refresh button can re-check it without a relaunch.
+    @State private var shortcutAvailable = InputSourceFix.isPreviousInputSourceShortcutAvailable
+
     private var strategyBinding: Binding<CJKVFixStrategy> {
         Binding(
             get: { config.appConfig.cjkvFixStrategy },
@@ -39,8 +44,7 @@ struct InputSourcePage: View {
                 .labelsHidden()
                 .pickerStyle(.radioGroup)
 
-                if config.appConfig.cjkvFixStrategy == .shortcutSimulation
-                    && !InputSourceFix.isPreviousInputSourceShortcutAvailable {
+                if config.appConfig.cjkvFixStrategy == .shortcutSimulation && !shortcutAvailable {
                     Label(loc.t("is.shortcut_unavailable"), systemImage: "exclamationmark.triangle.fill")
                         .font(.callout).foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
@@ -53,6 +57,17 @@ struct InputSourcePage: View {
         }
         .formStyle(.grouped)
         .navigationTitle(loc.t("nav.input_source"))
+        // A toolbar item keeps this page's title bar height consistent with the
+        // others (no layout jump when navigating in), and re-checks system state.
+        .toolbar {
+            ToolbarItem {
+                Button { shortcutAvailable = InputSourceFix.isPreviousInputSourceShortcutAvailable } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .help(loc.t("is.refresh"))
+            }
+        }
+        .onAppear { shortcutAvailable = InputSourceFix.isPreviousInputSourceShortcutAvailable }
     }
 
     private func nameKey(_ s: CJKVFixStrategy) -> String {
