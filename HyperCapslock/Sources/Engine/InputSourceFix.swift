@@ -379,25 +379,29 @@ enum InputSourceFix {
         }
     }
 
-    /// Cached set of available source ids, for the cheap per-row availability
-    /// check in the mappings list. Lazily computed; call `refreshAvailableSourceIDs`
-    /// (e.g. when the relevant page appears) to pick up enable/disable changes.
-    private static var cachedAvailableIDs: Set<String>?
+    /// Cached id→source map for the mappings list (cheap across many rows and
+    /// view re-inits, and carries name + icon for display). Lazily computed; call
+    /// `refreshAvailableSourcesByID` (e.g. on page appear) to pick up changes.
+    private static var cachedSourcesByID: [String: AvailableSource]?
 
-    static func availableSourceIDs() -> Set<String> {
-        if let cached = cachedAvailableIDs { return cached }
-        let ids = Set(availableSources().map(\.id))
-        cachedAvailableIDs = ids
-        return ids
+    static func availableSourcesByID() -> [String: AvailableSource] {
+        if let cached = cachedSourcesByID { return cached }
+        let map = byID(availableSources())
+        cachedSourcesByID = map
+        return map
     }
 
-    /// Recompute from TIS and return the fresh set, so a caller can drive view
+    /// Recompute from TIS and return the fresh map, so a caller can drive view
     /// state with it (a static-cache update alone wouldn't re-render SwiftUI).
     @discardableResult
-    static func refreshAvailableSourceIDs() -> Set<String> {
-        let ids = Set(availableSources().map(\.id))
-        cachedAvailableIDs = ids
-        return ids
+    static func refreshAvailableSourcesByID() -> [String: AvailableSource] {
+        let map = byID(availableSources())
+        cachedSourcesByID = map
+        return map
+    }
+
+    private static func byID(_ sources: [AvailableSource]) -> [String: AvailableSource] {
+        Dictionary(sources.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     /// Best-effort source icon (adapted from Input Source Pro): the

@@ -22,35 +22,40 @@ private func triggerSortKey(_ t: Trigger) -> String {
     }
 }
 
-struct ActionDisplay { let text: String; let symbol: String; let invalid: Bool }
+struct ActionDisplay { let text: String; let symbol: String; let invalid: Bool; var icon: NSImage? = nil }
 
 @MainActor
 func mappingActionDisplay(_ entry: ActionMappingEntry, _ loc: LocalizationManager,
-                          availableInputSourceIDs: Set<String>) -> ActionDisplay {
+                          availableInputSources: [String: InputSourceFix.AvailableSource]) -> ActionDisplay {
     if let id = entry.actionId {
         if let action = ActionsRegistry.shared.action(byID: id) {
             let name = action.nameKey.map { loc.t($0) } ?? action.name
-            return inputSourceAware(action.config, text: name, available: availableInputSourceIDs)
+            return inputSourceAware(action.config, text: name, available: availableInputSources)
         }
         if let inline = entry.inlineAction {
-            return inputSourceAware(inline, text: actionPresentation(inline, loc).value, available: availableInputSourceIDs)
+            return inputSourceAware(inline, text: actionPresentation(inline, loc).value, available: availableInputSources)
         }
         return ActionDisplay(text: loc.t("mappings.invalid"), symbol: "exclamationmark.triangle.fill", invalid: true)
     }
     if let inline = entry.inlineAction {
-        return inputSourceAware(inline, text: actionPresentation(inline, loc).value, available: availableInputSourceIDs)
+        return inputSourceAware(inline, text: actionPresentation(inline, loc).value, available: availableInputSources)
     }
     return ActionDisplay(text: loc.t("mappings.invalid"), symbol: "exclamationmark.triangle.fill", invalid: true)
 }
 
-/// Normal action display, except an `.inputSource` whose id is not in the current
-/// `available` set is flagged (⚠️, orange) while still showing what it points to —
-/// reusing the existing invalid styling. Covers "user removed that input source".
-/// Taking the set (vs a static lookup) lets the row re-render when it refreshes.
+/// For an `.inputSource` action, show the source's localized name + real icon so
+/// the row says which input source it switches to. If that id is no longer an
+/// installed source, flag it (⚠️, orange, showing the bare id) via the existing
+/// invalid styling. Other action kinds display as given. Taking the map (vs a
+/// static lookup) lets the row re-render when availability refreshes.
 @MainActor
-func inputSourceAware(_ config: ActionConfig, text: String, available: Set<String>) -> ActionDisplay {
-    if case .inputSource(let id) = config, !available.contains(id) {
-        return ActionDisplay(text: text, symbol: "exclamationmark.triangle.fill", invalid: true)
+func inputSourceAware(_ config: ActionConfig, text: String,
+                      available: [String: InputSourceFix.AvailableSource]) -> ActionDisplay {
+    if case .inputSource(let id) = config {
+        if let src = available[id] {
+            return ActionDisplay(text: src.name, symbol: actionSymbol(config), invalid: false, icon: src.icon)
+        }
+        return ActionDisplay(text: id, symbol: "exclamationmark.triangle.fill", invalid: true)
     }
     return ActionDisplay(text: text, symbol: actionSymbol(config), invalid: false)
 }
@@ -110,9 +115,9 @@ struct MappingsPage: View {
     @EnvironmentObject var config: ConfigStore
     @EnvironmentObject var loc: LocalizationManager
     @State private var sheet: MappingSheetMode?
-    /// Enabled input-source ids, so a removed source's mapping shows ⚠️. Seeded
-    /// from the cache, refreshed on appear (which re-renders the rows).
-    @State private var availableInputSourceIDs: Set<String> = InputSourceFix.availableSourceIDs()
+    /// id→source map for input-source rows (name + icon), and to flag a removed
+    /// source with ⚠️. Seeded from the cache, refreshed on appear (re-renders rows).
+    @State private var availableInputSources: [String: InputSourceFix.AvailableSource] = InputSourceFix.availableSourcesByID()
 
     private var sorted: [ActionMappingEntry] {
         config.mappings.sorted { triggerSortKey($0.trigger) < triggerSortKey($1.trigger) }
@@ -130,8 +135,8 @@ struct MappingsPage: View {
         }
         .formStyle(.grouped)
         .navigationTitle(loc.t("nav.mappings"))
-        // Recompute which input sources are still installed so a removed one shows ⚠️.
-        .onAppear { availableInputSourceIDs = InputSourceFix.refreshAvailableSourceIDs() }
+        // Recompute installed input sources so names/icons are fresh and a removed one shows ⚠️.
+        .onAppear { availableInputSources = InputSourceFix.refreshAvailableSourcesByID() }
         .toolbar {
             ToolbarItemGroup {
                 Button { importConfig() } label: { Image(systemName: "square.and.arrow.down") }.help(loc.t("config.import"))
@@ -153,11 +158,15 @@ struct MappingsPage: View {
     }
 
     private func mappingRow(_ entry: ActionMappingEntry) -> some View {
-        let d = mappingActionDisplay(entry, loc, availableInputSourceIDs: availableInputSourceIDs)
+        let d = mappingActionDisplay(entry, loc, availableInputSources: availableInputSources)
         let bindingsInvalid = entry.bindings.contains { ActionsRegistry.shared.resolve($0) == nil }
         return LabeledContent {
             HStack(spacing: 8) {
-                Image(systemName: d.symbol).foregroundStyle(d.invalid ? .orange : .secondary)
+                if let icon = d.icon {
+                    Image(nsImage: icon).resizable().frame(width: 16, height: 16)
+                } else {
+                    Image(systemName: d.symbol).foregroundStyle(d.invalid ? .orange : .secondary)
+                }
                 Text(d.text).foregroundStyle(d.invalid ? .orange : .secondary).lineLimit(1).truncationMode(.middle)
                 if !entry.bindings.isEmpty {
                     HStack(spacing: 3) {

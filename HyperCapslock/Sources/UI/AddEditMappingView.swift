@@ -7,6 +7,9 @@ private let modifierOrder: [ModifierKey] = [
 ]
 
 private let keepInlineSentinel = "__inline__"
+/// Picker sentinel for the parameterized "Switch Input Source" action — selecting
+/// it reveals an input-source sub-picker and stores an inline `.inputSource`.
+let switchInputSourceSentinel = "__switch_input_source__"
 
 /// An editable per-app rule. `preserved` is non-nil when the rule came from a
 /// config shape the editor can't represent (exclude lists, multiple/unknown
@@ -16,6 +19,9 @@ private struct BindingDraft: Identifiable {
     let id = UUID()
     var apps: [AppRef] = []
     var actionId: String = "builtin.move_left"
+    /// Used when `actionId == switchInputSourceSentinel`: the chosen source id,
+    /// stored as an inline `.inputSource`.
+    var inlineInputSourceID = ""
     var preserved: MappingBinding?
 
     var isEditable: Bool { preserved == nil }
@@ -28,6 +34,13 @@ private struct BindingDraft: Identifiable {
            ActionsRegistry.shared.action(byID: actionId) != nil {
             self.apps = include.map { AppRef(bundleID: $0, name: appDisplayName($0)) }
             self.actionId = actionId
+        } else if case let .frontmostApp(include, exclude)? = binding.when.first,
+                  binding.when.count == 1, exclude.isEmpty, !include.isEmpty,
+                  binding.actionId == nil, case let .inputSource(srcID)? = binding.inlineAction {
+            // An inline "switch input source" rule — make it editable.
+            self.apps = include.map { AppRef(bundleID: $0, name: appDisplayName($0)) }
+            self.actionId = switchInputSourceSentinel
+            self.inlineInputSourceID = srcID
         } else {
             self.preserved = binding
         }
@@ -37,8 +50,11 @@ private struct BindingDraft: Identifiable {
 
     func toBinding() -> MappingBinding {
         if let preserved { return preserved }
-        return MappingBinding(when: [.frontmostApp(include: apps.map { $0.bundleID }, exclude: [])],
-                              actionId: actionId)
+        let when: [Condition] = [.frontmostApp(include: apps.map { $0.bundleID }, exclude: [])]
+        if actionId == switchInputSourceSentinel {
+            return MappingBinding(when: when, inlineAction: .inputSource(inputSourceID: inlineInputSourceID))
+        }
+        return MappingBinding(when: when, actionId: actionId)
     }
 }
 
@@ -64,6 +80,7 @@ struct AddEditMappingView: View {
     @State private var triggerSel = "plain"
     @State private var key: UInt16?
     @State private var selectedActionId = "builtin.move_left"
+    @State private var inlineInputSourceID = ""   // when selectedActionId == switchInputSourceSentinel
     @State private var keptInlineConfig: ActionConfig?
     @State private var lastRealActionId = "builtin.move_left"
     @State private var showCreateAction = false
@@ -98,12 +115,13 @@ struct AddEditMappingView: View {
 
                 Section {
                     Picker(loc.t("mappings.default_action"), selection: $selectedActionId) {
-                        if keptInlineConfig != nil { Text(loc.t("mappings.current_inline")).tag(keepInlineSentinel) }
+                        if let inline = keptInlineConfig { Label(loc.t("mappings.current_inline"), systemImage: actionSymbol(inline)).tag(keepInlineSentinel) }
                         Section(loc.t("actions.builtin")) {
-                            ForEach(BuiltinActions.all, id: \.id) { a in Text(a.nameKey.map { loc.t($0) } ?? a.name).tag(a.id) }
+                            ForEach(BuiltinActions.all, id: \.id) { a in Label(a.nameKey.map { loc.t($0) } ?? a.name, systemImage: actionSymbol(a.config)).tag(a.id) }
+                            Label(loc.t("mappings.switch_input_source"), systemImage: "globe").tag(switchInputSourceSentinel)
                         }
                         if !config.customActions.isEmpty {
-                            Section(loc.t("actions.custom")) { ForEach(config.customActions, id: \.id) { a in Text(a.name).tag(a.id) } }
+                            Section(loc.t("actions.custom")) { ForEach(config.customActions, id: \.id) { a in Label(a.name, systemImage: actionSymbol(a.config)).tag(a.id) } }
                         }
                         Section {
                             Label(loc.t("mappings.create_action"), systemImage: "plus").tag(createActionSentinel)
@@ -116,6 +134,9 @@ struct AddEditMappingView: View {
                         } else {
                             lastRealActionId = newValue
                         }
+                    }
+                    if selectedActionId == switchInputSourceSentinel {
+                        InputSourcePicker(title: loc.t("group.input_source"), sourceID: $inlineInputSourceID)
                     }
                 } header: {
                     Text(loc.t("mappings.default_action"))
@@ -145,7 +166,11 @@ struct AddEditMappingView: View {
             HStack {
                 Spacer()
                 Button(loc.t("update.cancel")) { dismiss() }
-                Button(loc.t("mappings.save")) { save() }.keyboardShortcut(.defaultAction).disabled(draftTrigger == nil)
+                Button(loc.t("mappings.save")) { save() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(draftTrigger == nil
+                              || (selectedActionId == switchInputSourceSentinel && inlineInputSourceID.isEmpty)
+                              || rules.contains { $0.isEditable && $0.actionId == switchInputSourceSentinel && $0.inlineInputSourceID.isEmpty })
             }
             .padding(12)
         }
@@ -194,7 +219,10 @@ struct AddEditMappingView: View {
         }
         let bindings = rules.map { $0.toBinding() }
         do {
-            if selectedActionId == keepInlineSentinel, let inline = keptInlineConfig {
+            if selectedActionId == switchInputSourceSentinel {
+                try app.upsertMapping(trigger: trigger, actionId: nil,
+                                      inlineAction: .inputSource(inputSourceID: inlineInputSourceID), bindings: bindings)
+            } else if selectedActionId == keepInlineSentinel, let inline = keptInlineConfig {
                 try app.upsertMapping(trigger: trigger, actionId: nil, inlineAction: inline, bindings: bindings)
             } else {
                 try app.upsertMapping(trigger: trigger, actionId: selectedActionId, bindings: bindings)
@@ -218,7 +246,10 @@ struct AddEditMappingView: View {
         if let id = entry.actionId {
             selectedActionId = id
         } else if let inline = entry.inlineAction {
-            if let builtin = BuiltinActions.matching(inline) {
+            if case let .inputSource(srcID) = inline {
+                selectedActionId = switchInputSourceSentinel
+                inlineInputSourceID = srcID
+            } else if let builtin = BuiltinActions.matching(inline) {
                 selectedActionId = builtin.id
             } else {
                 keptInlineConfig = inline
@@ -272,10 +303,11 @@ private struct RuleRowView: View {
                 }
                 Picker(loc.t("mappings.rule_action"), selection: $rule.actionId) {
                     Section(loc.t("actions.builtin")) {
-                        ForEach(BuiltinActions.all, id: \.id) { a in Text(a.nameKey.map { loc.t($0) } ?? a.name).tag(a.id) }
+                        ForEach(BuiltinActions.all, id: \.id) { a in Label(a.nameKey.map { loc.t($0) } ?? a.name, systemImage: actionSymbol(a.config)).tag(a.id) }
+                        Label(loc.t("mappings.switch_input_source"), systemImage: "globe").tag(switchInputSourceSentinel)
                     }
                     if !config.customActions.isEmpty {
-                        Section(loc.t("actions.custom")) { ForEach(config.customActions, id: \.id) { a in Text(a.name).tag(a.id) } }
+                        Section(loc.t("actions.custom")) { ForEach(config.customActions, id: \.id) { a in Label(a.name, systemImage: actionSymbol(a.config)).tag(a.id) } }
                     }
                     Section {
                         Label(loc.t("mappings.create_action"), systemImage: "plus").tag(createActionSentinel)
@@ -288,6 +320,9 @@ private struct RuleRowView: View {
                     } else {
                         lastRealActionId = newValue
                     }
+                }
+                if rule.actionId == switchInputSourceSentinel {
+                    InputSourcePicker(title: loc.t("group.input_source"), sourceID: $rule.inlineInputSourceID)
                 }
             } else {
                 Label(loc.t("mappings.advanced_rule"), systemImage: "curlybraces")

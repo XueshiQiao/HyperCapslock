@@ -16,7 +16,6 @@ struct AddEditActionView: View {
 
     @State private var name = ""
     @State private var draft = ActionConfigDraft()
-    @State private var availableSources: [InputSourceFix.AvailableSource] = []
 
     private var editing: Bool { if case .edit = mode { return true }; return false }
 
@@ -27,7 +26,12 @@ struct AddEditActionView: View {
                     TextField(loc.t("actions.name"), text: $name, prompt: Text(loc.t("actions.name_placeholder")))
                     Picker(loc.t("actions.type"), selection: $draft.kind) {
                         Text(loc.t("group.jump")).tag("jump")
-                        Text(loc.t("group.input_source")).tag("input_source")
+                        // Input Source actions are now created directly in the mapping
+                        // editor ("Switch Input Source"); keep this option only so an
+                        // existing custom Input Source action can still be edited.
+                        if editing, draft.kind == "input_source" {
+                            Text(loc.t("group.input_source")).tag("input_source")
+                        }
                         Text(loc.t("group.command")).tag("command")
                         Text(loc.t("group.key_combo")).tag("key_combo")
                         Text(loc.t("group.open_app")).tag("open_app")
@@ -50,21 +54,7 @@ struct AddEditActionView: View {
         }
         .frame(width: 480, height: 300)
         .navigationTitle(editing ? loc.t("actions.edit_title") : loc.t("actions.add_title"))
-        .onAppear {
-            prefill()
-            availableSources = InputSourceFix.availableSources()
-            defaultInputSourceIfNeeded()
-        }
-        .onChange(of: draft.kind) { _, _ in defaultInputSourceIfNeeded() }
-    }
-
-    /// When the Input Source type is selected with no source chosen yet, default
-    /// to the first available one so the picker has a valid selection and Save
-    /// isn't blocked on an empty value.
-    private func defaultInputSourceIfNeeded() {
-        if draft.kind == "input_source", draft.inputSourceID.isEmpty {
-            draft.inputSourceID = availableSources.first?.id ?? ""
-        }
+        .onAppear(perform: prefill)
     }
 
     @ViewBuilder private var detail: some View {
@@ -77,25 +67,7 @@ struct AddEditActionView: View {
                 TextField("", value: $draft.jumpCount, format: .number).frame(width: 70).multilineTextAlignment(.trailing)
             }
         case "input_source":
-            Picker(loc.t("group.input_source"), selection: $draft.inputSourceID) {
-                // Preserve a stored id that's no longer installed: show it as a
-                // selectable ⚠️ row so editing doesn't silently drop it.
-                if !draft.inputSourceID.isEmpty,
-                   !availableSources.contains(where: { $0.id == draft.inputSourceID }) {
-                    Label("\(draft.inputSourceID) \(loc.t("is.source_unavailable_suffix"))",
-                          systemImage: "exclamationmark.triangle.fill")
-                        .tag(draft.inputSourceID)
-                }
-                ForEach(availableSources) { src in
-                    HStack(spacing: 6) {
-                        if let icon = src.icon {
-                            Image(nsImage: icon).resizable().frame(width: 16, height: 16)
-                        }
-                        Text(src.name)
-                    }
-                    .tag(src.id)
-                }
-            }
+            InputSourcePicker(title: loc.t("group.input_source"), sourceID: $draft.inputSourceID)
         case "command":
             TextField(loc.t("group.command"), text: $draft.command, prompt: Text("open -a Calculator"))
         case "open_app":
