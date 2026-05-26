@@ -11,6 +11,43 @@ private let keepInlineSentinel = "__inline__"
 /// it reveals an input-source sub-picker and stores an inline `.inputSource`.
 let switchInputSourceSentinel = "__switch_input_source__"
 
+/// Picker sentinels for the parameterized action kinds the user can configure
+/// **inline** in the mapping editor — selecting one reveals that kind's fields
+/// (an `ActionConfigDetail`) and stores an **inline action** (never a named
+/// custom action). Each maps to an `ActionConfigDraft.kind`. Input Source reuses
+/// its pre-existing sentinel so saved configs round-trip unchanged.
+private let inlineKindSentinels: [(sentinel: String, kind: String, labelKey: String, symbol: String)] = [
+    (switchInputSourceSentinel, "input_source", "mappings.switch_input_source", "globe"),
+    ("__inline_jump__", "jump", "group.jump", "chevron.up.2"),
+    ("__inline_command__", "command", "group.command", "terminal"),
+    ("__inline_key_combo__", "key_combo", "group.key_combo", "command"),
+    ("__inline_open_app__", "open_app", "group.open_app", "arrow.up.forward.app"),
+]
+
+/// The `ActionConfigDraft.kind` an inline sentinel selects, or nil if `sentinel`
+/// isn't an inline-action sentinel (a builtin/custom id, create, or keep-inline).
+private func inlineKind(for sentinel: String) -> String? {
+    inlineKindSentinels.first { $0.sentinel == sentinel }?.kind
+}
+
+/// The inline sentinel that edits an existing `config`, or nil if the config
+/// isn't one of the inline-editable parameterized kinds (directional/independent
+/// resolve to builtins; anything else is preserved verbatim).
+private func inlineSentinel(for config: ActionConfig) -> String? {
+    var d = ActionConfigDraft()
+    d.load(config)
+    return inlineKindSentinels.first { $0.kind == d.kind }?.sentinel
+}
+
+/// True if `draft` (interpreted as `sentinel`'s kind) builds a valid action.
+/// Non-inline sentinels are always "valid" here (they don't use the draft).
+private func inlineDraftValid(_ draft: ActionConfigDraft, sentinel: String) -> Bool {
+    guard let kind = inlineKind(for: sentinel) else { return true }
+    var d = draft
+    d.kind = kind
+    return d.build() != nil
+}
+
 /// An editable per-app rule. `preserved` is non-nil when the rule came from a
 /// config shape the editor can't represent (exclude lists, multiple/unknown
 /// conditions, or an inline action) — shown read-only and round-tripped verbatim
@@ -19,9 +56,9 @@ private struct BindingDraft: Identifiable {
     let id = UUID()
     var apps: [AppRef] = []
     var actionId: String = "builtin.move_left"
-    /// Used when `actionId == switchInputSourceSentinel`: the chosen source id,
-    /// stored as an inline `.inputSource`.
-    var inlineInputSourceID = ""
+    /// Used when `actionId` is an inline-kind sentinel: the inline action's
+    /// parameters, stored as an `inlineAction` (not a named custom action).
+    var inlineDraft = ActionConfigDraft()
     var preserved: MappingBinding?
 
     var isEditable: Bool { preserved == nil }
@@ -36,11 +73,13 @@ private struct BindingDraft: Identifiable {
             self.actionId = actionId
         } else if case let .frontmostApp(include, exclude)? = binding.when.first,
                   binding.when.count == 1, exclude.isEmpty, !include.isEmpty,
-                  binding.actionId == nil, case let .inputSource(srcID)? = binding.inlineAction {
-            // An inline "switch input source" rule — make it editable.
+                  binding.actionId == nil, let inline = binding.inlineAction,
+                  let sentinel = inlineSentinel(for: inline) {
+            // An inline parameterized rule (input source / jump / command /
+            // key combo / open app) — make it editable via its draft.
             self.apps = include.map { AppRef(bundleID: $0, name: appDisplayName($0)) }
-            self.actionId = switchInputSourceSentinel
-            self.inlineInputSourceID = srcID
+            self.actionId = sentinel
+            self.inlineDraft.load(inline)
         } else {
             self.preserved = binding
         }
@@ -51,8 +90,15 @@ private struct BindingDraft: Identifiable {
     func toBinding() -> MappingBinding {
         if let preserved { return preserved }
         let when: [Condition] = [.frontmostApp(include: apps.map { $0.bundleID }, exclude: [])]
-        if actionId == switchInputSourceSentinel {
-            return MappingBinding(when: when, inlineAction: .inputSource(inputSourceID: inlineInputSourceID))
+        if let kind = inlineKind(for: actionId) {
+            var d = inlineDraft
+            d.kind = kind
+            if let cfg = d.build() { return MappingBinding(when: when, inlineAction: cfg) }
+            // Incomplete inline draft. Unreachable via the UI (Save is disabled
+            // when any inline rule is invalid), but never emit the sentinel as a
+            // real action_id — assert in debug, degrade to a safe default action.
+            assertionFailure("toBinding() called with an incomplete inline draft for \(actionId)")
+            return MappingBinding(when: when, actionId: "builtin.move_left")
         }
         return MappingBinding(when: when, actionId: actionId)
     }
@@ -80,7 +126,7 @@ struct AddEditMappingView: View {
     @State private var triggerSel = "plain"
     @State private var key: UInt16?
     @State private var selectedActionId = "builtin.move_left"
-    @State private var inlineInputSourceID = ""   // when selectedActionId == switchInputSourceSentinel
+    @State private var inlineDraft = ActionConfigDraft()   // when selectedActionId is an inline-kind sentinel
     @State private var keptInlineConfig: ActionConfig?
     @State private var lastRealActionId = "builtin.move_left"
     @State private var showCreateAction = false
@@ -118,7 +164,11 @@ struct AddEditMappingView: View {
                         if let inline = keptInlineConfig { Label(loc.t("mappings.current_inline"), systemImage: actionSymbol(inline)).tag(keepInlineSentinel) }
                         Section(loc.t("actions.builtin")) {
                             ForEach(BuiltinActions.all, id: \.id) { a in Label(a.nameKey.map { loc.t($0) } ?? a.name, systemImage: actionSymbol(a.config)).tag(a.id) }
-                            Label(loc.t("mappings.switch_input_source"), systemImage: "globe").tag(switchInputSourceSentinel)
+                        }
+                        Section(loc.t("mappings.inline_section")) {
+                            ForEach(inlineKindSentinels, id: \.sentinel) { s in
+                                Label(loc.t(s.labelKey), systemImage: s.symbol).tag(s.sentinel)
+                            }
                         }
                         if !config.customActions.isEmpty {
                             Section(loc.t("actions.custom")) { ForEach(config.customActions, id: \.id) { a in Label(a.name, systemImage: actionSymbol(a.config)).tag(a.id) } }
@@ -132,11 +182,12 @@ struct AddEditMappingView: View {
                             selectedActionId = lastRealActionId
                             showCreateAction = true
                         } else {
+                            if let kind = inlineKind(for: newValue) { inlineDraft.kind = kind }
                             lastRealActionId = newValue
                         }
                     }
-                    if selectedActionId == switchInputSourceSentinel {
-                        InputSourcePicker(title: loc.t("group.input_source"), sourceID: $inlineInputSourceID)
+                    if inlineKind(for: selectedActionId) != nil {
+                        ActionConfigDetail(draft: $inlineDraft)
                     }
                 } header: {
                     Text(loc.t("mappings.default_action"))
@@ -169,8 +220,8 @@ struct AddEditMappingView: View {
                 Button(loc.t("mappings.save")) { save() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(draftTrigger == nil
-                              || (selectedActionId == switchInputSourceSentinel && inlineInputSourceID.isEmpty)
-                              || rules.contains { $0.isEditable && $0.actionId == switchInputSourceSentinel && $0.inlineInputSourceID.isEmpty })
+                              || !inlineDraftValid(inlineDraft, sentinel: selectedActionId)
+                              || rules.contains { $0.isEditable && !inlineDraftValid($0.inlineDraft, sentinel: $0.actionId) })
             }
             .padding(12)
         }
@@ -219,9 +270,11 @@ struct AddEditMappingView: View {
         }
         let bindings = rules.map { $0.toBinding() }
         do {
-            if selectedActionId == switchInputSourceSentinel {
-                try app.upsertMapping(trigger: trigger, actionId: nil,
-                                      inlineAction: .inputSource(inputSourceID: inlineInputSourceID), bindings: bindings)
+            if let kind = inlineKind(for: selectedActionId) {
+                var d = inlineDraft
+                d.kind = kind
+                guard let cfg = d.build() else { return }   // guarded by the disabled Save button
+                try app.upsertMapping(trigger: trigger, actionId: nil, inlineAction: cfg, bindings: bindings)
             } else if selectedActionId == keepInlineSentinel, let inline = keptInlineConfig {
                 try app.upsertMapping(trigger: trigger, actionId: nil, inlineAction: inline, bindings: bindings)
             } else {
@@ -246,9 +299,14 @@ struct AddEditMappingView: View {
         if let id = entry.actionId {
             selectedActionId = id
         } else if let inline = entry.inlineAction {
-            if case let .inputSource(srcID) = inline {
-                selectedActionId = switchInputSourceSentinel
-                inlineInputSourceID = srcID
+            // Prefer the inline editor for parameterized kinds (jump/command/
+            // keyCombo/openApp/inputSource) so they stay editable — otherwise an
+            // inline jump matching a builtin preset (e.g. jump ×10) would snap to
+            // the fixed builtin. directional/independent have no inline sentinel,
+            // so they fall through to their builtin selection.
+            if let sentinel = inlineSentinel(for: inline) {
+                inlineDraft.load(inline)
+                selectedActionId = sentinel
             } else if let builtin = BuiltinActions.matching(inline) {
                 selectedActionId = builtin.id
             } else {
@@ -304,7 +362,11 @@ private struct RuleRowView: View {
                 Picker(loc.t("mappings.rule_action"), selection: $rule.actionId) {
                     Section(loc.t("actions.builtin")) {
                         ForEach(BuiltinActions.all, id: \.id) { a in Label(a.nameKey.map { loc.t($0) } ?? a.name, systemImage: actionSymbol(a.config)).tag(a.id) }
-                        Label(loc.t("mappings.switch_input_source"), systemImage: "globe").tag(switchInputSourceSentinel)
+                    }
+                    Section(loc.t("mappings.inline_section")) {
+                        ForEach(inlineKindSentinels, id: \.sentinel) { s in
+                            Label(loc.t(s.labelKey), systemImage: s.symbol).tag(s.sentinel)
+                        }
                     }
                     if !config.customActions.isEmpty {
                         Section(loc.t("actions.custom")) { ForEach(config.customActions, id: \.id) { a in Label(a.name, systemImage: actionSymbol(a.config)).tag(a.id) } }
@@ -318,11 +380,12 @@ private struct RuleRowView: View {
                         rule.actionId = lastRealActionId          // revert; not a real pick
                         showCreateAction = true
                     } else {
+                        if let kind = inlineKind(for: newValue) { rule.inlineDraft.kind = kind }
                         lastRealActionId = newValue
                     }
                 }
-                if rule.actionId == switchInputSourceSentinel {
-                    InputSourcePicker(title: loc.t("group.input_source"), sourceID: $rule.inlineInputSourceID)
+                if inlineKind(for: rule.actionId) != nil {
+                    ActionConfigDetail(draft: $rule.inlineDraft)
                 }
             } else {
                 Label(loc.t("mappings.advanced_rule"), systemImage: "curlybraces")

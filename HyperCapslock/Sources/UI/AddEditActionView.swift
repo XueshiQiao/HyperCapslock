@@ -36,7 +36,7 @@ struct AddEditActionView: View {
                         Text(loc.t("group.key_combo")).tag("key_combo")
                         Text(loc.t("group.open_app")).tag("open_app")
                     }
-                    detail
+                    ActionConfigDetail(draft: $draft)
                 }
             }
             .formStyle(.grouped)
@@ -55,76 +55,6 @@ struct AddEditActionView: View {
         .frame(width: 480, height: 300)
         .navigationTitle(editing ? loc.t("actions.edit_title") : loc.t("actions.add_title"))
         .onAppear(perform: prefill)
-    }
-
-    @ViewBuilder private var detail: some View {
-        switch draft.kind {
-        case "jump":
-            Picker(loc.t("group.directional"), selection: $draft.jumpDir) {
-                Text(loc.t("action.up")).tag(JumpDirection.up); Text(loc.t("action.down")).tag(JumpDirection.down)
-            }
-            LabeledContent(loc.t("actions.count")) {
-                TextField("", value: $draft.jumpCount, format: .number).frame(width: 70).multilineTextAlignment(.trailing)
-            }
-        case "input_source":
-            InputSourcePicker(title: loc.t("group.input_source"), sourceID: $draft.inputSourceID)
-        case "command":
-            TextField(loc.t("group.command"), text: $draft.command, prompt: Text("open -a Calculator"))
-        case "open_app":
-            LabeledContent(loc.t("actions.app")) {
-                HStack(spacing: 8) {
-                    if let icon = appIcon(draft.appBundleID) {
-                        Image(nsImage: icon).resizable().frame(width: 18, height: 18)
-                    }
-                    Text(draft.appName.isEmpty ? loc.t("actions.no_app") : draft.appName)
-                        .foregroundStyle(draft.appName.isEmpty ? .secondary : .primary)
-                    Button(loc.t("actions.choose_app")) { chooseApp() }
-                }
-            }
-        case "key_combo":
-            HStack {
-                Text(loc.t("group.key_combo"))
-                Spacer()
-                KeyCaptureField(jsKeyCode: $draft.targetKey, enabled: true, placeholder: loc.t("mappings.press_key"))
-                    .frame(width: 140, height: 28)
-            }
-            LabeledContent(loc.t("mappings.action")) {
-                HStack(spacing: 6) {
-                    modToggle("⌘", $draft.tCmd); modToggle("⌃", $draft.tCtrl); modToggle("⌥", $draft.tAlt); modToggle("⇧", $draft.tShift)
-                }
-            }
-        default: EmptyView()
-        }
-    }
-
-    private func modToggle(_ symbol: String, _ binding: Binding<Bool>) -> some View {
-        Button { binding.wrappedValue.toggle() } label: { Text(symbol).frame(width: 26) }
-            .buttonStyle(.bordered).tint(binding.wrappedValue ? .blue : .secondary)
-    }
-
-    /// Let the user pick any installed .app; store its bundle id (stable if the
-    /// app later moves) plus a display name for the UI/HUD.
-    private func chooseApp() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.allowedContentTypes = [.application]
-        panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        guard let bid = Bundle(url: url)?.bundleIdentifier, !bid.isEmpty else {
-            app.showToast(loc.t("toast.app_no_bundle_id"), isError: true)
-            return
-        }
-        draft.appBundleID = bid
-        let display = FileManager.default.displayName(atPath: url.path)
-        draft.appName = display.hasSuffix(".app") ? String(display.dropLast(4)) : display
-    }
-
-    private func appIcon(_ bundleID: String) -> NSImage? {
-        guard !bundleID.isEmpty,
-              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
-        return NSWorkspace.shared.icon(forFile: url.path)
     }
 
     private func prefill() {
@@ -198,5 +128,86 @@ struct ActionConfigDraft {
             return bid.isEmpty ? nil : .openApp(bundleID: bid, name: appName.isEmpty ? bid : appName)
         default: return nil
         }
+    }
+}
+
+/// The per-kind parameter form for an `ActionConfigDraft`. Rendered both by the
+/// custom-action editor (`AddEditActionView`) and inline in the mapping editor
+/// when a parameterized action (jump/command/keyCombo/openApp/inputSource) is
+/// selected directly — the chosen `kind` is fixed by the caller, this view only
+/// renders that kind's fields.
+struct ActionConfigDetail: View {
+    @EnvironmentObject var app: AppState
+    @EnvironmentObject var loc: LocalizationManager
+    @Binding var draft: ActionConfigDraft
+
+    var body: some View {
+        switch draft.kind {
+        case "jump":
+            Picker(loc.t("group.directional"), selection: $draft.jumpDir) {
+                Text(loc.t("action.up")).tag(JumpDirection.up); Text(loc.t("action.down")).tag(JumpDirection.down)
+            }
+            LabeledContent(loc.t("actions.count")) {
+                TextField("", value: $draft.jumpCount, format: .number).frame(width: 70).multilineTextAlignment(.trailing)
+            }
+        case "input_source":
+            InputSourcePicker(title: loc.t("group.input_source"), sourceID: $draft.inputSourceID)
+        case "command":
+            TextField(loc.t("group.command"), text: $draft.command, prompt: Text("open -a Calculator"))
+        case "open_app":
+            LabeledContent(loc.t("actions.app")) {
+                HStack(spacing: 8) {
+                    if let icon = appIcon(draft.appBundleID) {
+                        Image(nsImage: icon).resizable().frame(width: 18, height: 18)
+                    }
+                    Text(draft.appName.isEmpty ? loc.t("actions.no_app") : draft.appName)
+                        .foregroundStyle(draft.appName.isEmpty ? .secondary : .primary)
+                    Button(loc.t("actions.choose_app")) { chooseApp() }
+                }
+            }
+        case "key_combo":
+            HStack {
+                Text(loc.t("group.key_combo"))
+                Spacer()
+                KeyCaptureField(jsKeyCode: $draft.targetKey, enabled: true, placeholder: loc.t("mappings.press_key"))
+                    .frame(width: 140, height: 28)
+            }
+            LabeledContent(loc.t("mappings.action")) {
+                HStack(spacing: 6) {
+                    modToggle("⌘", $draft.tCmd); modToggle("⌃", $draft.tCtrl); modToggle("⌥", $draft.tAlt); modToggle("⇧", $draft.tShift)
+                }
+            }
+        default: EmptyView()
+        }
+    }
+
+    private func modToggle(_ symbol: String, _ binding: Binding<Bool>) -> some View {
+        Button { binding.wrappedValue.toggle() } label: { Text(symbol).frame(width: 26) }
+            .buttonStyle(.bordered).tint(binding.wrappedValue ? .blue : .secondary)
+    }
+
+    /// Let the user pick any installed .app; store its bundle id (stable if the
+    /// app later moves) plus a display name for the UI/HUD.
+    private func chooseApp() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.application]
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let bid = Bundle(url: url)?.bundleIdentifier, !bid.isEmpty else {
+            app.showToast(loc.t("toast.app_no_bundle_id"), isError: true)
+            return
+        }
+        draft.appBundleID = bid
+        let display = FileManager.default.displayName(atPath: url.path)
+        draft.appName = display.hasSuffix(".app") ? String(display.dropLast(4)) : display
+    }
+
+    private func appIcon(_ bundleID: String) -> NSImage? {
+        guard !bundleID.isEmpty,
+              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
+        return NSWorkspace.shared.icon(forFile: url.path)
     }
 }
