@@ -66,11 +66,12 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+          BUILD="${VERSION##*.}"   # last segment = the build number (monotonic; what Sparkle compares)
           xcodebuild -project "$APP_NAME.xcodeproj" -scheme "$SCHEME" \
             -configuration Release -destination 'platform=macOS' \
             -derivedDataPath build/dd \
             ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
-            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" \
             CODE_SIGNING_ALLOWED=NO build
           echo "APP_PATH=build/dd/Build/Products/Release/$APP_NAME.app" >> $GITHUB_ENV
 
@@ -120,6 +121,7 @@ jobs:
           SPARKLE_EDDSA_KEY: ${{ secrets.SPARKLE_EDDSA_KEY }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+          BUILD="${VERSION##*.}"   # monotonic build number; Sparkle compares this
           SIGN_UPDATE=$(find build/dd/SourcePackages/artifacts -name sign_update -type f | head -1)
           printf '%s' "$SPARKLE_EDDSA_KEY" > eddsa_priv.key
           SIG_LINE=$("$SIGN_UPDATE" "$APP_NAME.dmg" --ed-key-file eddsa_priv.key)   # → sparkle:edSignature="…" length="…"
@@ -133,7 +135,7 @@ jobs:
               <item>
                 <title>${VERSION}</title>
                 <pubDate>$(date -u +"%a, %d %b %Y %H:%M:%S +0000")</pubDate>
-                <sparkle:version>${GITHUB_RUN_NUMBER}</sparkle:version>
+                <sparkle:version>${BUILD}</sparkle:version>
                 <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
                 <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
                 <enclosure url="${DMG_URL}" ${SIG_LINE} type="application/octet-stream" />
