@@ -191,10 +191,9 @@ enum ActionExecutor {
                 }
             case .toggleCapsLock:
                 if keyDown { _ = toggleCapsLock() }
-            case .switchInputSource:
-                if keyDown { InputSourceController.smartToggle() }
-            case .noop:
-                break   // intentionally does nothing (the chord is still swallowed)
+            case .switchInputSource, .noop:
+                break   // intentionally does nothing (the chord is still swallowed).
+                        // `.switchInputSource` is a retired tombstone — see ActionModel.swift.
             }
         case .inputSource(let id):
             if keyDown { InputSourceController.queueSwitch(toID: id) }

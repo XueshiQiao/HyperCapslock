@@ -25,7 +25,10 @@ enum BuiltinActions {
         a("builtin.new_line",         "action.next_line",     .independent(.nextLine)),
         a("builtin.insert_quotes",    "action.insert_quotes", .independent(.insertQuotes)),
         a("builtin.toggle_caps_lock", "action.toggle_caps_lock", .independent(.toggleCapsLock)),
-        a("builtin.switch_input_source", "action.switch_input_source", .independent(.switchInputSource)),
+        // NOTE: `builtin.switch_input_source` (the auto 中/英 Smart Toggle) was
+        // intentionally dropped — its switching was unreliable. The matching
+        // `.switchInputSource` enum case is kept as an inert tombstone (see
+        // ActionModel.swift); not re-listing it here is what hides it from users.
         a("builtin.noop",             "action.noop",          .independent(.noop)),
     ]
 

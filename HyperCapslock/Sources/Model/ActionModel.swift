@@ -24,6 +24,13 @@ enum IndependentActionKind: String, Codable, CaseIterable, Equatable {
     case nextLine = "next_line"
     case insertQuotes = "insert_quotes"
     case toggleCapsLock = "toggle_caps_lock"
+    /// RETIRED tombstone. The auto 中/英 "Smart Toggle" was removed because its
+    /// switching was too unreliable, so its `builtin.switch_input_source` action
+    /// is no longer offered (see BuiltinActions.swift) and the executor treats it
+    /// as a no-op (see ActionExecutor.swift). The enum case itself is KEPT only so
+    /// any pre-existing config that stored it inline still decodes — deleting the
+    /// raw value would abort the whole config parse and silently drop every
+    /// mapping. Do not reuse; do not re-expose.
     case switchInputSource = "switch_input_source"
     /// Does nothing (and swallows the key). Useful as a default action so a
     /// trigger only acts via its per-app rules and is inert everywhere else,
