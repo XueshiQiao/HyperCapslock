@@ -56,7 +56,6 @@ enum InputSourceController {
 
     static func queueSwitch(toID id: String) {
         let strategy = currentFixStrategy()
-        FileLog.shared.info("Queueing input source mapping switch: source_id=\(id) fix_strategy=\(strategy.rawValue)")
         DispatchQueue.main.async {
             InputSourceFix.switchToSource(id: id, strategy: strategy)
         }

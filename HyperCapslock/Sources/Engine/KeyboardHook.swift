@@ -26,7 +26,15 @@ private func hcTapCallback(
     }
 
     // Skip our own injected events (no feedback loop / re-detection).
-    if event.getIntegerValueField(.eventSourceUserData) == KeyPoster.injectedMagic {
+    let injectedUserData = event.getIntegerValueField(.eventSourceUserData)
+    if injectedUserData == KeyPoster.injectedMagic {
+        return pass
+    }
+    // Same idea for the input-source-fix synthetic events (⌃Space / ⌘ reset),
+    // but with a distinct tag we log explicitly — positive proof the tap saw them
+    // as ours and did NOT re-enter the F18/chord/modifier-double-tap logic.
+    if injectedUserData == InputSourceFix.syntheticEventUserData {
+        FileLog.shared.info("Tap: passing through input-source-fix synthetic event (keycode=\(UInt16(event.getIntegerValueField(.keyboardEventKeycode))) type=\(type.rawValue)) — not re-processed.")
         return pass
     }
 

@@ -12,13 +12,21 @@ import CoreGraphics
 /// non-`.none` strategy. Everything else is a plain `TISSelectInputSource`.
 ///
 /// Everything here runs on the MAIN queue (TIS main-queue affinity + AppKit
-/// window). Synthetic keyboard events are stamped with `KeyPoster.injectedMagic`
-/// so our own CGEventTap passes them through untouched (see `hcTapCallback` in
-/// KeyboardHook.swift) and they reach the system input-source switcher.
+/// window). Synthetic keyboard events are stamped with `syntheticEventUserData`
+/// so our own CGEventTap recognizes, logs, and passes them through untouched
+/// (see `hcTapCallback` in KeyboardHook.swift) on their way to the system
+/// input-source switcher.
 ///
 /// Development note: this path is intentionally chatty in the log so any
 /// switching glitch can be diagnosed purely from `FileLog`.
 enum InputSourceFix {
+    /// Stamped on our synthetic shortcut/⌘ events. Deliberately DISTINCT from
+    /// `KeyPoster.injectedMagic` (which tags the high-frequency nav/edit
+    /// injections): a separate value lets the tap *positively* log that it
+    /// recognized and passed through THESE events, without flooding the log on
+    /// every Caps+key navigation. Value spells "ISFX".
+    static let syntheticEventUserData: Int64 = 0x4953_4658
+
     // MARK: - Tunables (mirror ISP timings)
 
     /// How long the invisible focus-grab window stays key.
@@ -80,7 +88,6 @@ enum InputSourceFix {
     // MARK: - Strategy: Switching Focus (temporary input window, from macism)
 
     private static func applySwitchingFocus(target: TISInputSource, id: String) {
-        FileLog.shared.info("InputSourceFix[switchingFocus]: applying for id=\(id)")
         _ = tisSelect(target, reason: "switchingFocus target")
         showFocusWindow()
 
@@ -150,11 +157,9 @@ enum InputSourceFix {
             window.orderOut(nil)
             window.close()
         }
-        if restorePreviousApp {
-            restoreFocusIfNeeded()
-        } else {
-            FileLog.shared.info("InputSourceFix[switchingFocus]: focus window torn down; previousApp preserved=\(focusWindowPreviousApp?.bundleIdentifier ?? "nil")")
-        }
+        // When not restoring, the saved previous app is intentionally preserved
+        // for the next switch (re-grab or explicit restore).
+        if restorePreviousApp { restoreFocusIfNeeded() }
     }
 
     /// If we still hold focus from a Switching-Focus grab, hand it back to the
@@ -163,10 +168,7 @@ enum InputSourceFix {
         guard let previousApp = focusWindowPreviousApp,
               previousApp.bundleIdentifier != Bundle.main.bundleIdentifier,
               NSWorkspace.shared.frontmostApplication?.bundleIdentifier == Bundle.main.bundleIdentifier
-        else {
-            FileLog.shared.info("InputSourceFix[switchingFocus]: no focus restore needed (previousApp=\(focusWindowPreviousApp?.bundleIdentifier ?? "nil") front=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "nil"))")
-            return
-        }
+        else { return }
         FileLog.shared.info("InputSourceFix[switchingFocus]: restoring focus to previousApp=\(previousApp.bundleIdentifier ?? "nil")")
         previousApp.activate(options: [])
         focusWindowPreviousApp = nil
@@ -191,11 +193,9 @@ enum InputSourceFix {
         _ = tisSelect(bounceSrc, reason: "shortcutSimulation bounce")
 
         scheduleWorkItem(after: 0.1) {
-            FileLog.shared.info("InputSourceFix[shortcutSimulation]: posting synthetic previous-input-source shortcut.")
             postKeyShortcut(shortcut)
 
             scheduleWorkItem(after: 0.1) {
-                FileLog.shared.info("InputSourceFix[shortcutSimulation]: posting synthetic lone-Command reset.")
                 postCommandReset()
 
                 scheduleWorkItem(after: 0.1) {
@@ -284,9 +284,10 @@ enum InputSourceFix {
         up.post(tap: .cghidEventTap)
     }
 
-    /// Stamp with the same magic our own tap already skips (KeyboardHook).
+    /// Stamp with our dedicated magic so the tap recognizes (and logs) it as
+    /// ours and passes it through instead of re-processing it.
     private static func stampSynthetic(_ event: CGEvent) {
-        event.setIntegerValueField(.eventSourceUserData, value: KeyPoster.injectedMagic)
+        event.setIntegerValueField(.eventSourceUserData, value: syntheticEventUserData)
     }
 
     // MARK: - TIS helpers
@@ -367,7 +368,6 @@ enum InputSourceFix {
         // Focus) or restores it explicitly via `restoreFocusIfNeeded()`.
         closeFocusWindow(restorePreviousApp: false)
         guard !pendingWorkItems.isEmpty else { return }
-        FileLog.shared.info("InputSourceFix: cancelling \(pendingWorkItems.count) pending work item(s) from a prior switch.")
         pendingWorkItems.forEach { $0.cancel() }
         pendingWorkItems.removeAll()
     }
