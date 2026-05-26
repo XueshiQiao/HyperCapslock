@@ -176,6 +176,15 @@ enum ActionExecutor {
                 for _ in 0..<count { KeyPoster.postTap(kc, flags: activeModifiers) }
             }
         case .independent(let a):
+            // Modifier-forwarding decision is per sub-action (not a blanket win):
+            //  - .backspace: FORWARD — a single keystroke; held Option/Cmd compose
+            //    cleanly (Option+Delete = delete word).
+            //  - .nextLine: NO forward — a fixed compound macro (go to line end +
+            //    Return); a stray held Cmd/Option has no coherent meaning here and
+            //    could corrupt either step.
+            //  - .insertQuotes: NO forward — emits literal text + cursor taps, not a
+            //    modified keystroke; forwarding would be meaningless / harmful.
+            //  - .toggleCapsLock / .switchInputSource / .noop: no target key.
             switch a {
             case .backspace:
                 KeyPoster.post(KeyCodes.delete, keyDown: keyDown, flags: activeModifiers)
@@ -213,7 +222,11 @@ enum ActionExecutor {
                 FileLog.shared.warn("KeyCombo: unknown JS keycode \(targetKey), cannot map to macOS")
                 return
             }
-            var flags: CGEventFlags = []
+            // Forward the user's live-held modifiers so a held Shift/Option/etc.
+            // "rides along" and composes with the configured combo (Option A:
+            // always forward for keystroke-producing actions). CGEventFlags is a
+            // set, so a modifier the combo already carries can't double-apply.
+            var flags: CGEventFlags = activeModifiers
             if ctrl { flags.insert(.maskControl) }
             if alt { flags.insert(.maskAlternate) }
             if cmd { flags.insert(.maskCommand) }
