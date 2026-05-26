@@ -345,6 +345,87 @@ enum InputSourceFix {
         return Unmanaged<CFString>.fromOpaque(ptr).takeUnretainedValue() as String
     }
 
+    private static func propertyObject(_ src: TISInputSource, _ key: CFString) -> AnyObject? {
+        guard let ptr = TISGetInputSourceProperty(src, key) else { return nil }
+        return Unmanaged<AnyObject>.fromOpaque(ptr).takeUnretainedValue()
+    }
+
+    private static func isKeyboard(_ src: TISInputSource) -> Bool {
+        propertyString(src, kTISPropertyInputSourceCategory) == (kTISCategoryKeyboardInputSource as String)
+    }
+
+    // MARK: - Discovery (for the editor picker + the unavailable-mapping warning)
+
+    /// One selectable keyboard input source the user can pick. `id` is the plain
+    /// `kTISPropertyInputSourceID` — unique per selectable source and exactly what
+    /// we store and later feed back to `TISSelectInputSource`.
+    struct AvailableSource: Identifiable {
+        let id: String
+        let name: String
+        let icon: NSImage?
+        let isCJKV: Bool
+    }
+
+    /// All currently-enabled, selectable keyboard sources, with localized name +
+    /// icon, for the editor picker. Must be called on the main thread.
+    static func availableSources() -> [AvailableSource] {
+        allSources().compactMap { src in
+            guard isKeyboard(src), isSelectable(src),
+                  let id = propertyString(src, kTISPropertyInputSourceID) else { return nil }
+            return AvailableSource(id: id,
+                                   name: propertyString(src, kTISPropertyLocalizedName) ?? id,
+                                   icon: icon(for: src),
+                                   isCJKV: isCJKV(src))
+        }
+    }
+
+    /// Cached set of available source ids, for the cheap per-row availability
+    /// check in the mappings list. Lazily computed; call `refreshAvailableSourceIDs`
+    /// (e.g. when the relevant page appears) to pick up enable/disable changes.
+    private static var cachedAvailableIDs: Set<String>?
+
+    static func availableSourceIDs() -> Set<String> {
+        if let cached = cachedAvailableIDs { return cached }
+        let ids = Set(availableSources().map(\.id))
+        cachedAvailableIDs = ids
+        return ids
+    }
+
+    /// Recompute from TIS and return the fresh set, so a caller can drive view
+    /// state with it (a static-cache update alone wouldn't re-render SwiftUI).
+    @discardableResult
+    static func refreshAvailableSourceIDs() -> Set<String> {
+        let ids = Set(availableSources().map(\.id))
+        cachedAvailableIDs = ids
+        return ids
+    }
+
+    /// Best-effort source icon (adapted from Input Source Pro): the
+    /// `kTISPropertyIconImageURL` image (trying @2x / .tiff variants), else the
+    /// containing `.app` bundle's icon. Returns nil when the source has no icon.
+    private static func icon(for src: TISInputSource) -> NSImage? {
+        guard let url = propertyObject(src, kTISPropertyIconImageURL) as? URL else { return nil }
+        for candidate in iconURLCandidates(url) {
+            if let image = NSImage(contentsOf: candidate) { return image }
+        }
+        if let base = url.baseURL, base.lastPathComponent.hasSuffix(".app") {
+            return NSWorkspace.shared.icon(forFile: base.path)
+        }
+        return nil
+    }
+
+    private static func iconURLCandidates(_ url: URL) -> [URL] {
+        var candidates: [URL] = []
+        let ext = url.pathExtension
+        if !ext.isEmpty {
+            let stem = url.deletingPathExtension().lastPathComponent
+            candidates.append(url.deletingLastPathComponent().appendingPathComponent("\(stem)@2x.\(ext)"))
+            candidates.append(url.deletingPathExtension().appendingPathExtension("tiff"))
+        }
+        candidates.append(url)
+        return candidates
+    }
+
     // MARK: - Work-item scheduling (main-queue serial; cancellable on re-entry)
 
     private static func scheduleWorkItem(after delay: TimeInterval, _ work: @escaping () -> Void) {
