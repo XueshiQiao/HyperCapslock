@@ -17,9 +17,6 @@ private func hcTapCallback(
 
     // Re-enable the tap if the system disabled it (timeout / heavy input).
     if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-        // A chord (esp. a held push-to-talk modifier) may have been mid-hold when
-        // the tap went deaf; we'll miss its key-up, so release everything now.
-        ActionExecutor.releaseAllInFlightChords()
         if KeyboardHook.shared.reenable() {
             FileLog.shared.warn("Event tap disabled by system (type=\(type.rawValue)); requested re-enable.")
         } else {
@@ -58,10 +55,6 @@ private func hcTapCallback(
             }
         } else if type == .keyUp {
             let wasDown = state.swapCapsDown(false)
-            // Caps released → release any in-flight chord now. If the chord key is
-            // still physically held, its later key-up won't be seen (capsDown is
-            // false), so without this a held modifier / key stays stuck down.
-            ActionExecutor.releaseAllInFlightChords()
             let pressedAt = state.swapCapsPressedAtMs(0)
             let held = nowMillis() &- pressedAt
             if wasDown && !state.didRemap {
@@ -144,27 +137,6 @@ final class KeyboardHook {
     static let shared = KeyboardHook()
 
     private var eventTap: CFMachPort?
-    /// The tap thread's run loop, captured once the loop is up. Set on the tap
-    /// thread before `CFRunLoopRun`, read from other threads (same plain-var
-    /// cross-thread style as `eventTap`). Used to run chord-release on the tap
-    /// thread so it serializes with chord handling.
-    private var tapRunLoop: CFRunLoop?
-
-    /// Release every in-flight chord, but **on the tap thread's run loop** so it
-    /// can't race a fresh chord key-down being processed there (which would post
-    /// a synthesized modifier down *after* the release cleared its latch, leaving
-    /// it stuck). Routed for the MainActor callers (pause); the tap-thread callers
-    /// (Caps-up, tap-disabled) already run releaseAllInFlightChords directly.
-    func releaseHeldChordsSerialized() {
-        if let rl = tapRunLoop, CFRunLoopGetCurrent() !== rl {
-            CFRunLoopPerformBlock(rl, CFRunLoopMode.commonModes.rawValue) {
-                ActionExecutor.releaseAllInFlightChords()
-            }
-            CFRunLoopWakeUp(rl)
-        } else {
-            ActionExecutor.releaseAllInFlightChords()
-        }
-    }
 
     /// Install hidutil remap + the event tap. Call once at launch.
     func start() {
@@ -239,7 +211,6 @@ final class KeyboardHook {
                 continue
             }
             CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
-            tapRunLoop = CFRunLoopGetCurrent()
             CGEvent.tapEnable(tap: tap, enable: true)
             FileLog.shared.info("✅ macOS keyboard event tap INSTALLED and enabled (attempt \(attempt)). mappings=\(MappingsRegistry.shared.snapshot().count) isPaused=\(EngineState.shared.isPaused)")
             CFRunLoopRun()   // blocks while the tap is alive
