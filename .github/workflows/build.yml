@@ -127,6 +127,11 @@ jobs:
           SIG_LINE=$("$SIGN_UPDATE" "$APP_NAME.dmg" --ed-key-file eddsa_priv.key)   # → sparkle:edSignature="…" length="…"
           rm -f eddsa_priv.key
           DMG_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${APP_NAME}.dmg"
+          # Bilingual release notes (RELEASE_NOTES.md, EN + ZH) → rendered to HTML
+          # for the Sparkle appcast <description> (the in-app updater) and embedded
+          # raw into latest.json. Empty if the file is missing.
+          NOTES_HTML=""
+          [ -f RELEASE_NOTES.md ] && NOTES_HTML=$(python3 scripts/render-release-notes.py RELEASE_NOTES.md)
           cat > appcast.xml <<XML
           <?xml version="1.0" standalone="yes"?>
           <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
@@ -138,24 +143,22 @@ jobs:
                 <sparkle:version>${BUILD}</sparkle:version>
                 <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
                 <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+                <description><![CDATA[
+          ${NOTES_HTML}
+          ]]></description>
                 <enclosure url="${DMG_URL}" ${SIG_LINE} type="application/octet-stream" />
               </item>
             </channel>
           </rss>
           XML
-          # latest.json: the manifest the Homebrew tap's generator reads
-          # (same shape as the other DMG apps in the tap) to update the cask.
-          cat > latest.json <<JSON
-          {
-            "version": "${VERSION}",
-            "notes": "",
-            "pub_date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-            "platforms": {
-              "darwin-aarch64": { "signature": "", "url": "${DMG_URL}" },
-              "darwin-x86_64": { "signature": "", "url": "${DMG_URL}" }
-            }
-          }
-          JSON
+          # latest.json: the manifest the Homebrew tap's generator reads. Built via
+          # python so the multi-line UTF-8 notes are safely JSON-escaped.
+          PUB_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" python3 - "$VERSION" "$DMG_URL" > latest.json <<'PY'
+          import json, os, re, sys
+          notes = ""
+          if os.path.exists("RELEASE_NOTES.md"): notes = re.sub(r"<!--.*?-->", "", open("RELEASE_NOTES.md", encoding="utf-8").read(), flags=re.DOTALL).strip()
+          print(json.dumps({"version": sys.argv[1], "notes": notes, "pub_date": os.environ.get("PUB_DATE", ""), "platforms": {"darwin-aarch64": {"signature": "", "url": sys.argv[2]}, "darwin-x86_64": {"signature": "", "url": sys.argv[2]}}}, ensure_ascii=False, indent=2))
+          PY
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -166,7 +169,7 @@ jobs:
             appcast.xml
             latest.json
           name: HyperCapslock ${{ github.ref_name }}
-          generate_release_notes: true
+          body_path: RELEASE_NOTES.md
 
       - name: Trigger Apps Gallery Update
         if: startsWith(github.ref, 'refs/tags/v') && success()

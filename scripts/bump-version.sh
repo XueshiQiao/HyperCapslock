@@ -37,6 +37,15 @@ if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
   exit 1
 fi
 
+# The release pipeline ships RELEASE_NOTES.md (EN + ZH) as the in-app updater
+# notes, GitHub release body, and latest.json. Nudge if it wasn't updated for
+# this release (non-blocking — you may be intentionally reshipping notes).
+last_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
+if [ -n "$last_tag" ] && git diff --quiet "$last_tag" -- RELEASE_NOTES.md 2>/dev/null; then
+  echo "⚠️  RELEASE_NOTES.md unchanged since ${last_tag} — the release will ship those same notes." >&2
+  echo "    Update it (keep BOTH the English and 更新内容 sections) before releasing if that's not intended." >&2
+fi
+
 # Update both fields (BSD/macOS sed).
 sed -i '' -E "s/^([[:space:]]*MARKETING_VERSION:).*/\1 \"${version}\"/" "$PROJECT_YML"
 sed -i '' -E "s/^([[:space:]]*CURRENT_PROJECT_VERSION:).*/\1 \"${new_build}\"/" "$PROJECT_YML"
