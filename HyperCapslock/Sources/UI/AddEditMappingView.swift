@@ -200,7 +200,7 @@ struct AddEditMappingView: View {
                         RuleRowView(rule: $rule,
                                     onMoveUp: { move(rule.id, by: -1) },
                                     onMoveDown: { move(rule.id, by: 1) },
-                                    onDelete: { rules.removeAll { $0.id == rule.id } })
+                                    onDelete: { removeRule(rule.id) })
                     }
                     Button {
                         rules.append(BindingDraft())
@@ -241,6 +241,15 @@ struct AddEditMappingView: View {
         let j = i + delta
         guard j >= 0, j < rules.count else { return }
         rules.swapAt(i, j)
+    }
+
+    /// Delete a rule on the next runloop tick. A rule row may host a `TextField`
+    /// (Command / Jump count); deleting synchronously inside the button action
+    /// races the field's commit-on-teardown, which writes back through the
+    /// `ForEach($rules)` element binding at an index the removal just made stale
+    /// → `Array` out-of-range trap. Deferring lets the commit finish first.
+    private func removeRule(_ id: UUID) {
+        DispatchQueue.main.async { rules.removeAll { $0.id == id } }
     }
 
     private func modifierTriggerLabel(_ m: ModifierKey) -> String {
