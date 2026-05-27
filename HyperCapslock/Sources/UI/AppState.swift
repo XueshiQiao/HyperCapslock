@@ -99,6 +99,14 @@ final class AppState: ObservableObject {
 
     func setPaused(_ paused: Bool) {
         EngineState.shared.isPaused = paused
+        if paused {
+            // Paused → the tap returns early, so a chord mid-hold would never see
+            // its key-up. Release everything (esp. a held push-to-talk modifier)
+            // and drop the stale Caps-held state so resume starts clean. Routed
+            // through the tap thread so it can't race a chord key-down in flight.
+            KeyboardHook.shared.releaseHeldChordsSerialized()
+            _ = EngineState.shared.swapCapsDown(false)
+        }
         status = paused ? .paused : .running
         FileLog.shared.info("[STATE] Service \(paused ? "paused" : "resumed")")
     }

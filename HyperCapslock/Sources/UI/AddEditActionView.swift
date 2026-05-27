@@ -35,6 +35,7 @@ struct AddEditActionView: View {
                         Text(loc.t("group.command")).tag("command")
                         Text(loc.t("group.key_combo")).tag("key_combo")
                         Text(loc.t("group.open_app")).tag("open_app")
+                        Text(loc.t("group.hold_modifier")).tag("hold_modifiers")
                     }
                     ActionConfigDetail(draft: $draft)
                 }
@@ -94,6 +95,7 @@ struct ActionConfigDraft {
     var tCtrl = false, tAlt = false, tCmd = false, tShift = false
     var appBundleID = ""
     var appName = ""
+    var modifiers: Set<ModifierKey> = [.leftOption]
 
     mutating func load(_ config: ActionConfig) {
         switch config {
@@ -106,6 +108,8 @@ struct ActionConfigDraft {
             kind = "key_combo"; targetKey = k; tCtrl = ctrl; tAlt = alt; tCmd = cmd; tShift = shift
         case .openApp(let bid, let name):
             kind = "open_app"; appBundleID = bid; appName = name
+        case .modifierKeys(let mods):
+            kind = "hold_modifiers"; modifiers = Set(mods)
         }
     }
 
@@ -126,9 +130,22 @@ struct ActionConfigDraft {
         case "open_app":
             let bid = appBundleID.trimmingCharacters(in: .whitespaces)
             return bid.isEmpty ? nil : .openApp(bundleID: bid, name: appName.isEmpty ? bid : appName)
+        case "hold_modifiers":
+            // Stable, de-duplicated order (the enum's declaration order).
+            let ordered = HoldModifier.choices.filter { modifiers.contains($0) }
+            return ordered.isEmpty ? nil : .modifierKeys(ordered)
         default: return nil
         }
     }
+}
+
+/// The modifiers offered by the hold-modifier action, in display order. `.fn` is
+/// excluded — synthesizing Fn is unreliable (see `KeyCodes.modifierKeyAndFlag`).
+enum HoldModifier {
+    static let choices: [ModifierKey] = [
+        .leftControl, .rightControl, .leftOption, .rightOption,
+        .leftCommand, .rightCommand, .leftShift, .rightShift,
+    ]
 }
 
 /// The per-kind parameter form for an `ActionConfigDraft`. Rendered both by the
@@ -177,6 +194,19 @@ struct ActionConfigDetail: View {
                     modToggle("⌘", $draft.tCmd); modToggle("⌃", $draft.tCtrl); modToggle("⌥", $draft.tAlt); modToggle("⇧", $draft.tShift)
                 }
             }
+        case "hold_modifiers":
+            LabeledContent(loc.t("group.hold_modifier")) {
+                HStack(spacing: 4) {
+                    ForEach(HoldModifier.choices, id: \.self) { m in
+                        let on = draft.modifiers.contains(m)
+                        Button {
+                            if on { draft.modifiers.remove(m) } else { draft.modifiers.insert(m) }
+                        } label: { Text(modifierHudLabel(m)).frame(minWidth: 28) }
+                            .buttonStyle(.bordered).tint(on ? .blue : .secondary)
+                    }
+                }
+            }
+            Text(loc.t("actions.hold_modifier_hint")).font(.caption).foregroundStyle(.secondary)
         default: EmptyView()
         }
     }

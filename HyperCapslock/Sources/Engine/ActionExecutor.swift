@@ -26,6 +26,7 @@ func describeAction(_ action: ActionConfig) -> String {
     case .inputSource(let id): return "input source \(id)"
     case .command(let cmd): return "command: \(cmd)"
     case .openApp(let bid, let name): return "open app \(name) (\(bid))"
+    case .modifierKeys(let mods): return "hold modifiers \(mods.map { $0.rawValue }.joined(separator: "+"))"
     }
 }
 
@@ -64,6 +65,8 @@ func hudParts(_ action: ActionConfig) -> (String, String) {
         return ("Shell", cmd)
     case .openApp(_, let name):
         return ("App", name)
+    case .modifierKeys(let mods):
+        return (mods.map(modifierHudLabel).joined(separator: "+"), "Hold Modifier")
     }
 }
 
@@ -90,7 +93,7 @@ enum ActionExecutor {
     /// modifier intent).
     static func allowShiftFallback(_ action: ActionConfig) -> Bool {
         switch action {
-        case .inputSource, .command, .keyCombo, .openApp: return false
+        case .inputSource, .command, .keyCombo, .openApp, .modifierKeys: return false
         case .independent(.noop): return false  // a disabled key shouldn't disable its shifted variant too
         default: return true
         }
@@ -249,6 +252,26 @@ enum ActionExecutor {
                     }
                 }
             }
+        case .modifierKeys(let mods):
+            // Hold the modifier key(s) down while the chord is held, release on
+            // key-up. Press in order accumulating flags, release in reverse —
+            // the same shape as `fireDoubleTapModifierAction`. We deliberately
+            // ignore `activeModifiers` here: the synthesized set is exactly the
+            // configured modifiers, nothing rides along. (`.fn` is filtered out.)
+            let pairs = mods.compactMap { KeyCodes.modifierKeyAndFlag($0) }
+            if keyDown {
+                var acc: CGEventFlags = []
+                for (kc, fl) in pairs {
+                    acc.formUnion(fl)
+                    KeyPoster.post(kc, keyDown: true, flags: acc)
+                }
+            } else {
+                var acc: CGEventFlags = pairs.reduce(into: []) { $0.formUnion($1.flag) }
+                for (kc, fl) in pairs.reversed() {
+                    acc.subtract(fl)
+                    KeyPoster.post(kc, keyDown: false, flags: acc)
+                }
+            }
         }
     }
 
@@ -345,6 +368,22 @@ enum ActionExecutor {
     /// down" (nil inner = swallowed, no action posted); absent means we didn't.
     private static let inFlightChord = OSAllocatedUnfairLock<[UInt16: ActionConfig?]>(initialState: [:])
 
+    /// Force-release every in-flight chord (post each latched action's key-up)
+    /// and clear the latch. Called whenever a chord can no longer be ended the
+    /// normal way — Caps released before the chord key, service paused, the event
+    /// tap disabled by the system, or app termination. Essential for
+    /// `.modifierKeys`, whose synthesized modifier is system-wide and would
+    /// otherwise stay stuck down; also fixes the latent "held arrow key sticks if
+    /// you release Caps first" bug for ordinary chords. Idempotent.
+    static func releaseAllInFlightChords() {
+        let pending = inFlightChord.withLock { latch -> [ActionConfig] in
+            let actions = latch.values.compactMap { $0 }
+            latch.removeAll()
+            return actions
+        }
+        for action in pending { execute(action, keyDown: false, activeModifiers: []) }
+    }
+
     /// Returns true if the chord was handled (and the original key should be
     /// swallowed). Logs a readable "Caps remap: <trigger> -> <action>" on keyDown.
     static func handleCapsRemap(keycode: UInt16, keyDown: Bool, activeModifiers: CGEventFlags) -> Bool {
@@ -365,7 +404,12 @@ enum ActionExecutor {
         // latched at the FIRST down so the whole hold stays consistent and the
         // eventual up pairs up — even if the app/shift/config changed mid-hold.
         if let cached = inFlightChord.withLock({ $0[jsKeycode] }) {
-            if let action = cached { execute(action, keyDown: true, activeModifiers: activeModifiers) }
+            // A held modifier is pressed once and held (real modifiers don't
+            // autorepeat); re-posting its down on every OS repeat is wrong. Other
+            // actions re-fire normally.
+            if let action = cached, !action.isHeldModifier {
+                execute(action, keyDown: true, activeModifiers: activeModifiers)
+            }
             return true   // already our chord (autorepeat) → swallow
         }
 

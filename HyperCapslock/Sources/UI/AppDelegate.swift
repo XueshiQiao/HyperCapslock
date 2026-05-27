@@ -39,7 +39,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Restore the original CapsLock mapping so Caps works after we quit.
+        // Release any chord held at quit (a synthesized push-to-talk modifier
+        // would otherwise stay stuck system-wide), then restore CapsLock.
+        ActionExecutor.releaseAllInFlightChords()
         KeyboardHook.shared.cleanup()
     }
 

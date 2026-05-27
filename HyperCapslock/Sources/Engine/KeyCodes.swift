@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 /// Keycode translation tables and display names.
 ///
@@ -28,6 +29,42 @@ enum KeyCodes {
     static let lCommand: UInt16 = 55
     static let rCommand: UInt16 = 54
     static let fn: UInt16 = 63
+
+    // Device-dependent modifier flag bits (the private NX_DEVICE*KEYMASK values).
+    // CGEventFlags exposes only the side-agnostic masks (.maskShift, …), so to
+    // synthesize a *specific* side (e.g. right Option) we OR the generic mask
+    // with the matching device bit. Apps that only read the generic mask treat
+    // both sides alike; apps that read these bits get the correct side.
+    private enum DeviceFlag {
+        static let lCtrl: UInt64    = 0x00000001
+        static let rCtrl: UInt64    = 0x00002000
+        static let lShift: UInt64   = 0x00000002
+        static let rShift: UInt64   = 0x00000004
+        static let lCommand: UInt64 = 0x00000008
+        static let rCommand: UInt64 = 0x00000010
+        static let lOption: UInt64  = 0x00000020
+        static let rOption: UInt64  = 0x00000040
+    }
+
+    /// The virtual keycode and event flags to synthesize a held modifier key.
+    /// Returns nil for `.fn` (synthesizing Fn is unreliable across keyboards /
+    /// macOS versions, so it is excluded from the hold-modifier action).
+    static func modifierKeyAndFlag(_ m: ModifierKey) -> (keycode: UInt16, flag: CGEventFlags)? {
+        func f(_ generic: CGEventFlags, _ device: UInt64) -> CGEventFlags {
+            CGEventFlags(rawValue: generic.rawValue | device)
+        }
+        switch m {
+        case .leftShift:    return (lShift,   f(.maskShift,     DeviceFlag.lShift))
+        case .rightShift:   return (rShift,   f(.maskShift,     DeviceFlag.rShift))
+        case .leftControl:  return (lCtrl,    f(.maskControl,   DeviceFlag.lCtrl))
+        case .rightControl: return (rCtrl,    f(.maskControl,   DeviceFlag.rCtrl))
+        case .leftOption:   return (lOption,  f(.maskAlternate, DeviceFlag.lOption))
+        case .rightOption:  return (rOption,  f(.maskAlternate, DeviceFlag.rOption))
+        case .leftCommand:  return (lCommand, f(.maskCommand,   DeviceFlag.lCommand))
+        case .rightCommand: return (rCommand, f(.maskCommand,   DeviceFlag.rCommand))
+        case .fn:           return nil
+        }
+    }
 
     /// JavaScript keyCode → macOS virtual keycode. Verified against the macOS
     /// SDK `Events.h` (`kVK_*`). The reverse table is kept an exact inverse.

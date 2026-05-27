@@ -22,6 +22,7 @@ private let inlineKindSentinels: [(sentinel: String, kind: String, labelKey: Str
     ("__inline_command__", "command", "group.command", "terminal"),
     ("__inline_key_combo__", "key_combo", "group.key_combo", "command"),
     ("__inline_open_app__", "open_app", "group.open_app", "arrow.up.forward.app"),
+    ("__inline_hold_modifiers__", "hold_modifiers", "group.hold_modifier", "option"),
 ]
 
 /// The `ActionConfigDraft.kind` an inline sentinel selects, or nil if `sentinel`

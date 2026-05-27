@@ -81,6 +81,7 @@ func actionSymbol(_ config: ActionConfig) -> String {
     case .command: return "terminal"
     case .keyCombo: return "command"
     case .openApp: return "arrow.up.forward.app"
+    case .modifierKeys: return "option"
     }
 }
 
@@ -107,6 +108,9 @@ func actionPresentation(_ action: ActionConfig, _ loc: LocalizationManager) -> A
         return ActionPresentation(category: loc.t("group.key_combo"), value: parts.joined(separator: "+"), symbol: actionSymbol(action))
     case .openApp(let bid, let name):
         return ActionPresentation(category: loc.t("group.open_app"), value: name.isEmpty ? bid : name, symbol: actionSymbol(action))
+    case .modifierKeys(let mods):
+        return ActionPresentation(category: loc.t("group.hold_modifier"),
+                                  value: mods.map(modifierHudLabel).joined(separator: "+"), symbol: actionSymbol(action))
     }
 }
 
