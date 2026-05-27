@@ -1,5 +1,6 @@
 import Foundation
 import Yams
+import CryptoKit
 
 /// Errors surfaced to the UI from config operations.
 enum ConfigError: LocalizedError {
@@ -41,6 +42,11 @@ final class ConfigStore: ObservableObject {
     private var preservedTopLevel: [(Node, Node)] = []
     private var preservedMappingNodes: [String: Node] = [:]
     private var preservedActionNodes: [String: Node] = [:]
+    /// Mapping/action entries this build can't decode (e.g. an action kind added
+    /// by a newer version). Skipped in memory but re-emitted verbatim on save so
+    /// an older build never drops a newer build's data (downgrade-safety).
+    private var unknownMappingNodes: [Node] = []
+    private var unknownActionNodes: [Node] = []
 
     // "bindings" is known so the fresh encode owns it: when a user clears all
     // per-app rules, the merge step must NOT resurrect a stale preserved node.
@@ -83,9 +89,16 @@ final class ConfigStore: ObservableObject {
         var loadedActions: [Action] = []
         var parseOK = true
 
+        // Read the raw bytes first so we can back them up even if they aren't
+        // valid UTF-8 / YAML (any parse-failure case must be backed up).
+        var rawData: Data?
         if fileExists {
             do {
-                let content = try String(contentsOf: mappingsURL, encoding: .utf8)
+                let data = try Data(contentsOf: mappingsURL)
+                rawData = data
+                guard let content = String(data: data, encoding: .utf8) else {
+                    throw ConfigError.io("config file is not valid UTF-8")
+                }
                 if let node = try Yams.compose(yaml: content) {
                     try parseDocument(node, into: &loadedMappings, actions: &loadedActions)
                 } else {
@@ -100,9 +113,19 @@ final class ConfigStore: ObservableObject {
             }
         }
 
+        // Any parse trouble — a hard failure OR entries we had to skip/preserve —
+        // means the in-memory view is lossy vs. the file. Snapshot the original
+        // bytes before anything can save over it. Named by content hash and
+        // skipped if that snapshot already exists, so we don't pile up a backup
+        // per launch.
+        if let rawData, !parseOK || !unknownMappingNodes.isEmpty || !unknownActionNodes.isEmpty {
+            backupConfigByHash(rawData)
+        }
+
         // Seed defaults ONLY when it's safe: file absent, or present-but-empty
         // (parsed cleanly with nothing in it). Never when parsing failed.
         let shouldSeed = parseOK && loadedMappings.isEmpty && loadedActions.isEmpty
+            && unknownMappingNodes.isEmpty && unknownActionNodes.isEmpty
         if shouldSeed {
             loadedMappings = Self.defaultMappings()
         }
@@ -128,10 +151,34 @@ final class ConfigStore: ObservableObject {
         return content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// Snapshot the on-disk config under `backups/`, named by a hash of its
+    /// content, when a parse problem made the in-memory view lossy. Idempotent:
+    /// if a snapshot for this exact content already exists we skip it, so the
+    /// same broken file doesn't spawn a new backup on every launch.
+    private func backupConfigByHash(_ data: Data) {
+        let hash = SHA256.hash(data: data).prefix(8)
+            .map { String(format: "%02x", $0) }.joined()   // 16 hex chars — ample to dedupe by content
+        let dir = mappingsURL.deletingLastPathComponent().appendingPathComponent("backups", isDirectory: true)
+        let backupURL = dir.appendingPathComponent("action_mappings-\(hash).yml")
+        guard !FileManager.default.fileExists(atPath: backupURL.path) else {
+            FileLog.shared.info("Config backup \(backupURL.lastPathComponent) already exists; skipping.")
+            return
+        }
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try data.write(to: backupURL, options: .atomic)
+            FileLog.shared.warn("Config parse issue — backed up original to backups/\(backupURL.lastPathComponent)")
+        } catch {
+            FileLog.shared.error("Failed to write config backup: \(error.localizedDescription)")
+        }
+    }
+
     private func resetPreserved() {
         preservedTopLevel = []
         preservedMappingNodes = [:]
         preservedActionNodes = [:]
+        unknownMappingNodes = []
+        unknownActionNodes = []
     }
 
     /// Parse the new structured doc or the legacy bare-list. Captures unknown
@@ -167,10 +214,18 @@ final class ConfigStore: ObservableObject {
     private func captureMappings(_ seq: Node.Sequence) throws -> [ActionMappingEntry] {
         var result: [ActionMappingEntry] = []
         for elem in seq {
-            let yaml = try Yams.serialize(node: elem)
-            let entry = try YAMLDecoder().decode(ActionMappingEntry.self, from: yaml)
-            preservedMappingNodes[triggerUniqueID(entry.trigger)] = elem
-            result.append(entry)
+            do {
+                let yaml = try Yams.serialize(node: elem)
+                let entry = try YAMLDecoder().decode(ActionMappingEntry.self, from: yaml)
+                preservedMappingNodes[triggerUniqueID(entry.trigger)] = elem
+                result.append(entry)
+            } catch {
+                // An entry this build can't represent (e.g. a newer action kind).
+                // Skip it in memory but keep the raw node so it round-trips on
+                // save — one unknown entry must not drop the whole config.
+                unknownMappingNodes.append(elem)
+                FileLog.shared.warn("Skipping unparseable mapping entry (preserved verbatim for save): \(error)")
+            }
         }
         return result
     }
@@ -178,10 +233,15 @@ final class ConfigStore: ObservableObject {
     private func captureActions(_ seq: Node.Sequence) throws -> [Action] {
         var result: [Action] = []
         for elem in seq {
-            let yaml = try Yams.serialize(node: elem)
-            let action = try YAMLDecoder().decode(Action.self, from: yaml)
-            preservedActionNodes[action.id] = elem
-            result.append(action)
+            do {
+                let yaml = try Yams.serialize(node: elem)
+                let action = try YAMLDecoder().decode(Action.self, from: yaml)
+                preservedActionNodes[action.id] = elem
+                result.append(action)
+            } catch {
+                unknownActionNodes.append(elem)
+                FileLog.shared.warn("Skipping unparseable action entry (preserved verbatim for save): \(error)")
+            }
         }
         return result
     }
@@ -378,8 +438,11 @@ final class ConfigStore: ObservableObject {
                                               preserved: preservedMappingNodes,
                                               known: Self.mappingKnownKeys)
         var pairs: [(Node, Node)] = preservedTopLevel
-        pairs.append((Node("actions"), actionsNode))
-        pairs.append((Node("mappings"), mappingsNode))
+        // Re-emit entries this build couldn't decode, verbatim, after the known
+        // ones — so a downgraded build round-trips a newer build's data instead
+        // of silently dropping it.
+        pairs.append((Node("actions"), Self.appendingNodes(actionsNode, unknownActionNodes)))
+        pairs.append((Node("mappings"), Self.appendingNodes(mappingsNode, unknownMappingNodes)))
         return try Yams.serialize(node: Node.mapping(Node.Mapping(pairs)))
     }
 
@@ -395,6 +458,13 @@ final class ConfigStore: ObservableObject {
             }
         }
         return Node.sequence(seq)
+    }
+
+    /// Append extra raw nodes (preserved undecodable entries) to a sequence node.
+    private static func appendingNodes(_ node: Node, _ extra: [Node]) -> Node {
+        guard !extra.isEmpty, case .sequence(var seq) = node else { return node }
+        seq.append(contentsOf: extra)
+        return .sequence(seq)
     }
 
     private static func mergeUnknownKeys(into fresh: Node, from original: Node, known: Set<String>) -> Node {
