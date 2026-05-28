@@ -127,11 +127,36 @@ jobs:
           SIG_LINE=$("$SIGN_UPDATE" "$APP_NAME.dmg" --ed-key-file eddsa_priv.key)   # → sparkle:edSignature="…" length="…"
           rm -f eddsa_priv.key
           DMG_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${APP_NAME}.dmg"
-          # Bilingual release notes (RELEASE_NOTES.md, EN + ZH) → rendered to HTML
-          # for the Sparkle appcast <description> (the in-app updater) and embedded
-          # raw into latest.json. Empty if the file is missing.
+          # Bilingual release notes live in the cumulative RELEASE_NOTES.html.
+          # Sparkle's appcast <description> wants the WHOLE cumulative file so
+          # users updating from a stale build see every version they missed.
+          # The current version's section is also extracted (per-version block)
+          # for the GitHub Release body and embedded into latest.json.
           NOTES_HTML=""
-          [ -f RELEASE_NOTES.md ] && NOTES_HTML=$(python3 scripts/render-release-notes.py RELEASE_NOTES.md)
+          PER_VERSION_HTML=""
+          if [ -f RELEASE_NOTES.html ]; then
+            NOTES_HTML=$(cat RELEASE_NOTES.html)
+            # Extract this version's section: start at its <h3>What's New in X></h3>,
+            # stop at the next version's "What's New in" heading. Every localized
+            # sub-block for this version (e.g. "X 更新内容") sits in between.
+            PER_VERSION_HTML=$(awk -v ver="$VERSION" '
+              /<h3>What.s New in / {
+                if (index($0, "New in " ver "</h3>") > 0) { cap = 1 }
+                else if (cap == 1) { cap = 0 }
+              }
+              cap { print }
+            ' RELEASE_NOTES.html)
+            printf '%s' "$PER_VERSION_HTML" > release_body.html
+          else
+            : > release_body.html
+          fi
+          # Gate: only use our extracted body if non-empty. Otherwise let the
+          # Release step fall back to GitHub's auto-generated notes.
+          if [ -s release_body.html ]; then
+            echo "RELEASE_BODY_READY=true" >> "$GITHUB_ENV"
+          else
+            echo "RELEASE_BODY_READY=false" >> "$GITHUB_ENV"
+          fi
           cat > appcast.xml <<XML
           <?xml version="1.0" standalone="yes"?>
           <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
@@ -151,13 +176,25 @@ jobs:
             </channel>
           </rss>
           XML
-          # latest.json: the manifest the Homebrew tap's generator reads. Built via
-          # python so the multi-line UTF-8 notes are safely JSON-escaped.
+          # latest.json: the manifest the Homebrew tap's generator + apps gallery read.
+          # The "notes" field carries this version's HTML extract (not the whole
+          # cumulative file) — small, self-contained, and matches what users see on
+          # the GitHub Release page. Built via Python so multi-line UTF-8 is safely
+          # JSON-escaped.
           PUB_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" python3 - "$VERSION" "$DMG_URL" > latest.json <<'PY'
-          import json, os, re, sys
+          import json, os, sys
           notes = ""
-          if os.path.exists("RELEASE_NOTES.md"): notes = re.sub(r"<!--.*?-->", "", open("RELEASE_NOTES.md", encoding="utf-8").read(), flags=re.DOTALL).strip()
-          print(json.dumps({"version": sys.argv[1], "notes": notes, "pub_date": os.environ.get("PUB_DATE", ""), "platforms": {"darwin-aarch64": {"signature": "", "url": sys.argv[2]}, "darwin-x86_64": {"signature": "", "url": sys.argv[2]}}}, ensure_ascii=False, indent=2))
+          if os.path.exists("release_body.html"):
+              notes = open("release_body.html", encoding="utf-8").read().strip()
+          print(json.dumps({
+              "version": sys.argv[1],
+              "notes": notes,
+              "pub_date": os.environ.get("PUB_DATE", ""),
+              "platforms": {
+                  "darwin-aarch64": {"signature": "", "url": sys.argv[2]},
+                  "darwin-x86_64":  {"signature": "", "url": sys.argv[2]},
+              },
+          }, ensure_ascii=False, indent=2))
           PY
 
       - name: Create GitHub Release
@@ -169,7 +206,11 @@ jobs:
             appcast.xml
             latest.json
           name: HyperCapslock ${{ github.ref_name }}
-          body_path: RELEASE_NOTES.md
+          # When RELEASE_NOTES.html had a section for this version (the previous
+          # step set RELEASE_BODY_READY=true), use that extracted HTML. Otherwise
+          # let GitHub auto-generate notes from commits/PRs as a fallback.
+          body_path: ${{ env.RELEASE_BODY_READY == 'true' && 'release_body.html' || '' }}
+          generate_release_notes: ${{ env.RELEASE_BODY_READY != 'true' }}
 
       - name: Trigger Apps Gallery Update
         if: startsWith(github.ref, 'refs/tags/v') && success()

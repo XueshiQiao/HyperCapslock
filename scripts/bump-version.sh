@@ -18,9 +18,14 @@ cd "$(dirname "$0")/.."
 PROJECT_YML="project.yml"
 [ -f "$PROJECT_YML" ] || { echo "error: $PROJECT_YML not found (run from repo root)" >&2; exit 1; }
 
-# Clean tree required so the release commit contains only the version bump.
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "error: working tree not clean — commit or stash first" >&2
+# Working tree must be clean EXCEPT for RELEASE_NOTES.html — uncommitted
+# edits to the notes file are expected (Phase 1 of the release skill: you
+# prepend this version's block before running this script), and the script
+# folds them into the same release commit so history stays one-commit-per-release.
+other_dirty=$(git status --porcelain -- . ':!RELEASE_NOTES.html')
+if [ -n "$other_dirty" ]; then
+  echo "error: working tree has changes other than RELEASE_NOTES.html — commit or stash first" >&2
+  echo "$other_dirty" | sed 's/^/  /' >&2
   exit 1
 fi
 
@@ -37,13 +42,19 @@ if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
   exit 1
 fi
 
-# The release pipeline ships RELEASE_NOTES.md (EN + ZH) as the in-app updater
-# notes, GitHub release body, and latest.json. Nudge if it wasn't updated for
-# this release (non-blocking — you may be intentionally reshipping notes).
-last_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
-if [ -n "$last_tag" ] && git diff --quiet "$last_tag" -- RELEASE_NOTES.md 2>/dev/null; then
-  echo "⚠️  RELEASE_NOTES.md unchanged since ${last_tag} — the release will ship those same notes." >&2
-  echo "    Update it (keep BOTH the English and 更新内容 sections) before releasing if that's not intended." >&2
+# The release pipeline ships RELEASE_NOTES.html (cumulative, EN + ZH per
+# version) as the Sparkle appcast description AND extracts this version's
+# section as the GitHub Release body. Nudge if the file has no block for the
+# new version yet — non-blocking, but the GitHub Release body will fall back
+# to auto-generated notes if the block is missing.
+notes_file="RELEASE_NOTES.html"
+heading="<h3>What's New in ${version}</h3>"
+if [ ! -f "$notes_file" ]; then
+  echo "⚠️  ${notes_file} is missing — Sparkle description will be empty and the GitHub Release will use auto-generated notes." >&2
+elif ! grep -qF "$heading" "$notes_file"; then
+  echo "⚠️  ${notes_file} has no '<h3>What's New in ${version}</h3>' block yet." >&2
+  echo "    Add a new block at the TOP (with a paired '<h3>${version} 更新内容</h3>' section)" >&2
+  echo "    before releasing, or the GitHub Release body will fall back to auto-generated notes." >&2
 fi
 
 # Update both fields (BSD/macOS sed).
@@ -52,7 +63,10 @@ sed -i '' -E "s/^([[:space:]]*CURRENT_PROJECT_VERSION:).*/\1 \"${new_build}\"/" 
 
 echo "Version → ${version}   (build ${cur_build} → ${new_build})"
 
+# Fold uncommitted RELEASE_NOTES.html edits (Phase 1's new per-version block)
+# into the release commit so history stays one-commit-per-release.
 git add "$PROJECT_YML"
+[ -f RELEASE_NOTES.html ] && git add RELEASE_NOTES.html
 git commit -m "chore(release): ${version}" >/dev/null
 git tag "$tag"
 echo "Committed + tagged ${tag}."

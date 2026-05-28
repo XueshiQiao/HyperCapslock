@@ -1,0 +1,101 @@
+<!-- Cumulative release notes for HyperCapslock.
+     - Add a NEW <h3>What's New in X.Y.Z</h3> block at the TOP each release,
+       paired with a <h3>X.Y.Z 更新内容</h3> Chinese block immediately below.
+     - Older versions stay in the file; users updating from a stale build
+       see everything they missed (Sparkle dialog shows the whole file).
+     - Format must match AnyDrag's: CI extracts the per-version section
+       by literally matching '<h3>What's New in X.Y.Z</h3>' for the GitHub
+       Release body, and embeds the WHOLE file into the Sparkle appcast
+       <description> CDATA. Don't break the heading shape.
+     - Credit contributors with a BARE @handle (not an <a> link). GitHub's
+       release-body autolinker skips handles already inside an <a>, so the
+       bare form lands them in the release's Contributors avatar list and
+       autolinks. Renders as plain text in Sparkle — acceptable. -->
+
+<h3>What's New in 26.05.101</h3>
+<ul>
+  <li><b>Inline action setup in the mapping editor</b> — pick Jump, Command, Key Combo, or Open App right from the action dropdown and configure it on the spot (new "Action Type" section), like Switch Input Source. No need to create a separate custom action first.</li>
+  <li><b>Key Combo actions now compose with held modifiers</b> — holding extra modifiers (e.g. Caps+Option+key) carries into the Key Combo, so the gesture behaves consistently across action types.</li>
+  <li><b>Fixed a crash when deleting a per-app rule.</b></li>
+  <li><b>More resilient config loading</b> — a config with an entry this build doesn't recognize now loads everything else instead of appearing empty, and is auto-backed-up (named by content hash) whenever it can't be fully parsed.</li>
+</ul>
+
+<h3>26.05.101 更新内容</h3>
+<ul>
+  <li><b>映射编辑器内联配置动作</b> — 直接从动作下拉里选择「跳转 / 命令 / 组合键 / 打开应用」并就地配置（新增"动作类型"分组），和「切换输入法」一样，无需先单独创建自定义动作。</li>
+  <li><b>组合键动作支持叠加按住的修饰键</b> — 额外按住的修饰键（如 Caps+Option+键）会一起作用到组合键上，同一手势在不同动作类型下行为一致。</li>
+  <li><b>修复删除按 App 规则时的崩溃。</b></li>
+  <li><b>配置加载更健壮</b> — 打开包含本版本不认识条目的配置时会正常加载其余内容（而非显示空列表），并在无法完整解析时自动按内容哈希备份配置。</li>
+</ul>
+
+<h3>What's New in 26.05.100</h3>
+<ul>
+  <li><b>Pipeline refinements</b> — internal release-pipeline iteration on top of 26.05.26; no user-visible behavior changes.</li>
+</ul>
+
+<h3>26.05.100 更新内容</h3>
+<ul>
+  <li><b>发布流程内部调整</b> — 在 26.05.26 基础上对发布管线进行了内部迭代，无用户可见行为变化。</li>
+</ul>
+
+<h3>What's New in 26.05.26</h3>
+<ul>
+  <li><b>Reworked input-source switching</b> — removed Smart Toggle in favor of an explicit CJKV fix method borrowed from Input Source Pro, which is more predictable for users who alternate between English and CJK input methods. (<a href="https://github.com/XueshiQiao/HyperCapslock/pull/7">#7</a>)</li>
+  <li><b>First CalVer release</b> — version scheme switched from SemVer (last was v2.1.0) to CalVer (YY.MM.build); the monotonic build-number guarantee Sparkle relies on is unchanged.</li>
+</ul>
+
+<h3>26.05.26 更新内容</h3>
+<ul>
+  <li><b>重做输入法切换</b> — 移除 Smart Toggle，改为借鉴 Input Source Pro 的显式 CJKV 修正方式，对在英文和中日韩输入法之间切换的用户更可预期。（<a href="https://github.com/XueshiQiao/HyperCapslock/pull/7">#7</a>）</li>
+  <li><b>切换到 CalVer 版本号</b> — 版本号从 SemVer（上一版 v2.1.0）改为 CalVer（YY.MM.build），Sparkle 依赖的构建号单调递增不受影响。</li>
+</ul>
+
+<h3>What's New in 2.1.0</h3>
+<ul>
+  <li><b>Stability and quality-of-life fixes</b> on top of the native macOS rewrite that shipped in 2.0.0.</li>
+</ul>
+
+<h3>2.1.0 更新内容</h3>
+<ul>
+  <li><b>稳定性与体验改进</b> —— 在 2.0.0 原生 macOS 重写版本之上进行了一系列修复与打磨。</li>
+</ul>
+
+<h3>What's New in 2.0.0</h3>
+<ul>
+  <li><b>Rewritten as a native macOS app (SwiftUI + AppKit)</b> — the original Electron/Tauri build is retired. Lower memory footprint, faster startup, and a proper menu-bar UI. (<a href="https://github.com/XueshiQiao/HyperCapslock/pull/3">#3</a>)</li>
+</ul>
+
+<h3>2.0.0 更新内容</h3>
+<ul>
+  <li><b>重写为原生 macOS 应用（SwiftUI + AppKit）</b> —— 老的 Electron/Tauri 版本退役。内存占用更低、启动更快、菜单栏交互更规范。（<a href="https://github.com/XueshiQiao/HyperCapslock/pull/3">#3</a>）</li>
+</ul>
+
+<h3>Earlier releases (v1.0.0 – v1.2.0)</h3>
+<ul>
+  <li><b>Pre-rewrite iterations</b> — final polish on the Electron/Tauri-based HyperCapslock before the v2.0.0 native rewrite. Bug fixes, minor UX adjustments, and packaging improvements. See the individual release pages on GitHub for downloads.</li>
+</ul>
+
+<h3>更早的版本 (v1.0.0 – v1.2.0)</h3>
+<ul>
+  <li><b>重写前的迭代</b> —— 在 v2.0.0 原生重写之前，Electron/Tauri 版本的最后打磨阶段：bug 修复、细节交互调整、打包改进。详细下载请见 GitHub 上的对应 release 页。</li>
+</ul>
+
+<h3>Earlier releases (v0.8.0 – v0.8.9)</h3>
+<ul>
+  <li><b>Initial public-release series</b> — feature stabilization, the first time HyperCapslock was distributed outside its prototype audience. Most bodies are placeholder; the substance was in the binaries.</li>
+</ul>
+
+<h3>更早的版本 (v0.8.0 – v0.8.9)</h3>
+<ul>
+  <li><b>首批公开版本</b> —— 功能稳定阶段，第一次面向原型用户之外的人群分发。这些版本的 release 说明大多只是占位文本，实质改动在二进制本身。</li>
+</ul>
+
+<h3>Earlier releases — Global Vim-Like Navi era (v0.1.0 – v0.6.8)</h3>
+<ul>
+  <li><b>Original prototype</b> — the project was first shipped under the name "Global Vim-Like Navi" before being renamed to HyperCapslock. These tags are kept for historical traceability; the binaries are no longer recommended for installation.</li>
+</ul>
+
+<h3>更早的版本 — Global Vim-Like Navi 阶段 (v0.1.0 – v0.6.8)</h3>
+<ul>
+  <li><b>项目原型</b> —— 项目最早以「Global Vim-Like Navi」名义发布，后改名为 HyperCapslock。这些 tag 保留以便溯源，二进制不再推荐安装。</li>
+</ul>
