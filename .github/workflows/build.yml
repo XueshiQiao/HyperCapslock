@@ -176,7 +176,7 @@ jobs:
             </channel>
           </rss>
           XML
-          # latest.json: the manifest the Homebrew tap's generator + apps gallery read.
+          # latest.json: the manifest the Homebrew tap's generator reads.
           # The "notes" field carries this version's HTML extract (not the whole
           # cumulative file) — small, self-contained, and matches what users see on
           # the GitHub Release page. Built via Python so multi-line UTF-8 is safely
@@ -211,14 +211,6 @@ jobs:
           # let GitHub auto-generate notes from commits/PRs as a fallback.
           body_path: ${{ env.RELEASE_BODY_READY == 'true' && 'release_body.html' || '' }}
           generate_release_notes: ${{ env.RELEASE_BODY_READY != 'true' }}
-
-      - name: Trigger Apps Gallery Update
-        if: startsWith(github.ref, 'refs/tags/v') && success()
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.GALLERY_UPDATE_PAT }}
-          repository: XueshiQiao/XueshiQiao.github.io
-          event-type: app_released
 
       - name: Trigger Homebrew Tap Update
         if: startsWith(github.ref, 'refs/tags/v') && success()

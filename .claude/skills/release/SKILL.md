@@ -1,12 +1,12 @@
 ---
 name: release
-description: Cut a new HyperCapslock release end-to-end — write cumulative bilingual notes, run bump-version.sh, watch CI, verify Homebrew cask + Apps Gallery cascades.
+description: Cut a new HyperCapslock release end-to-end — write cumulative bilingual notes, run bump-version.sh, watch CI, verify Homebrew cask cascade.
 disable-model-invocation: true
 ---
 
 # Release HyperCapslock
 
-End-to-end release routine. Owns the full chain from notes through Homebrew cask + Apps Gallery propagation. Treat each numbered phase as a checkpoint — show the user what you're about to do, then execute.
+End-to-end release routine. Owns the full chain from notes through Homebrew cask propagation. Treat the user to a checkpoint at each numbered phase — show what you're about to do, then execute.
 
 The release flow shares conventions with the AnyDrag project (`.claude/skills/release/SKILL.md` there): cumulative HTML release notes, bare-@mention contributor credit, `repository_dispatch` to shared tap, etc. The blueprint is documented in `XueshiQiao/macos-app-scaffold`.
 
@@ -80,7 +80,7 @@ git push origin main
 git push origin vYY.MM.<build>
 ```
 
-Tagging triggers `.github/workflows/build.yml` which: builds universal → signs (inside-out, including embedded Sparkle.framework) → notarizes → staples → DMG → signs DMG with Sparkle EdDSA → writes `appcast.xml` (embeds the WHOLE `RELEASE_NOTES.html` into `<description>` CDATA) → extracts this version's section into `release_body.html` → publishes GitHub Release with the DMG + appcast.xml + latest.json attached and the per-version HTML as the body → fires `repository_dispatch` to `XueshiQiao/homebrew_tap` (event `update_cask`) AND to `XueshiQiao/XueshiQiao.github.io` (event `app_released`).
+Tagging triggers `.github/workflows/build.yml` which: builds universal → signs (inside-out, including embedded Sparkle.framework) → notarizes → staples → DMG → signs DMG with Sparkle EdDSA → writes `appcast.xml` (embeds the WHOLE `RELEASE_NOTES.html` into `<description>` CDATA) → extracts this version's section into `release_body.html` → publishes GitHub Release with the DMG + appcast.xml + latest.json attached and the per-version HTML as the body → fires `repository_dispatch` to `XueshiQiao/homebrew_tap` (event `update_cask`).
 
 **Gotcha — tags don't follow rebase.** If origin moved while you were preparing, `git pull --rebase` must happen BEFORE the tag is created, not after. The sanity-check `[ "$(git rev-parse <tag>)" = "$(git rev-parse HEAD)" ]` catches the mismatch.
 
@@ -93,34 +93,28 @@ gh run watch "$RUN" --repo XueshiQiao/HyperCapslock --exit-status
 
 If conclusion isn't `success`, stop and report. The cascades in Phase 5 won't fire on a failed build.
 
-## Phase 5 — Verify the cascades (now automatic)
+## Phase 5 — Verify the cask cascade (now automatic)
 
-**Don't manually bump the cask or the gallery.** The release workflow's final two steps (`Trigger Homebrew Tap Update` and the gallery dispatch) fired both. Verify:
+**Don't manually bump the cask.** The release workflow's `Trigger Homebrew Tap Update` step fired the dispatch. Verify:
 
 ```bash
 # Tap regeneration of Casks/hypercapslock.rb
 gh run list --repo XueshiQiao/homebrew_tap --workflow update-casks.yml --limit 1 \
   --json status,conclusion,createdAt,displayTitle
 gh api repos/XueshiQiao/homebrew_tap/contents/Casks/hypercapslock.rb --jq '.content' | base64 -d | head -4
-
-# Gallery rebuild
-gh run list --repo XueshiQiao/XueshiQiao.github.io --workflow deploy.yml --limit 1 \
-  --json status,conclusion,event,createdAt
 ```
 
-Both should be `completed` / `success` within a few minutes after the AnyDrag/HCL CI completes.
+Should be `completed` / `success` within a few minutes after the HCL CI completes.
 
 Requirements (one-time setup, already in place on this repo):
 - `HOMEBREW_TAP_PAT` secret — PAT with `Contents: Read and write` on `XueshiQiao/homebrew_tap`.
-- `GALLERY_UPDATE_PAT` secret — PAT with `Contents: Read and write` on `XueshiQiao/XueshiQiao.github.io`.
 
-If either dispatch doesn't fire, check the workflow run log for the corresponding step; usually it's a missing/expired PAT (the step `if`-condition gates on the secret presence so the skip can be silent in old versions of the workflow — the current one prints a `::warning::`).
+If the dispatch doesn't fire, check the workflow run log; usually it's a missing/expired PAT (the step `if`-condition gates on the secret presence — the current workflow prints a `::warning::` if absent).
 
 To re-fire a missed dispatch manually:
 
 ```bash
 gh workflow run update-casks.yml --repo XueshiQiao/homebrew_tap -f app_token=hypercapslock
-# Gallery has no manual app_token form; trigger a no-op push to main if needed.
 ```
 
 Verify the public brew install actually works:
@@ -149,7 +143,6 @@ gh issue close <N> --repo XueshiQiao/HyperCapslock \
 Tell your human partner:
 - Release URL, CI run URL.
 - Tap workflow run URL + commit on `homebrew_tap`.
-- Gallery deploy run URL.
 - Issues closed with their numbers and one-line summaries.
 - Any deltas from a clean run.
 
