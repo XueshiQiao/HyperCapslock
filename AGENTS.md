@@ -1,5 +1,36 @@
 # HyperCapslock
 
+## ⚠️ Rule #0 — After any app-code change, rebuild AND relaunch the dev build (kill the old one first)
+Whenever you modify app code (anything affecting runtime behavior), the moment
+the build succeeds you MUST relaunch the latest dev build — do NOT wait to be
+asked. The user verifies behavior by interacting with the running app; the agent
+cannot test interactive behavior itself, so an un-relaunched build means the
+change is untested.
+
+**Relaunch is kill-then-open, always in this order** — a second `open` while an
+instance is already running is a no-op (the new process never takes over), so a
+stale binary keeps running and you'd be "testing" old code.
+
+**Kill EVERY HyperCapslock instance first — both Dev AND Release.** Both builds
+install the same global `CGEventTap` + hidutil CapsLock→F18 remap. If the user's
+**Release** app (`HyperCapslock.app`) is running, it already owns that global
+keyboard hook, so a freshly-launched Dev instance fights it for the same global
+state and your test is invalid/unreliable. So before launching Dev, terminate
+the Release one too — do NOT spare it.
+```bash
+# match the app BINARIES (Dev + Release), not unrelated procs whose cwd merely
+# contains "HyperCapslock" (e.g. a Codex broker) — those lack .app/Contents/MacOS/
+pkill -f "HyperCapslock(-Dev)?\.app/Contents/MacOS/HyperCapslock" 2>/dev/null
+sleep 1
+pgrep -lf "HyperCapslock.app/Contents/MacOS"   # confirm NONE remain
+open "<DerivedData>/Build/Products/Debug/HyperCapslock-Dev.app"
+sleep 1
+pgrep -lf "HyperCapslock-Dev"   # confirm exactly one fresh PID
+```
+This is standard procedure — the user should never have to ask for it. (Restart
+the user's Release app yourself only if they ask; the point is the Dev test must
+run with no competing instance.)
+
 Native macOS (SwiftUI + AppKit) menu-bar app that remaps CapsLock → F18 via
 `hidutil` and intercepts F18+key combos with a `CGEventTap` for vim-style
 navigation, editing, input-source switching, key combos, and shell commands.
