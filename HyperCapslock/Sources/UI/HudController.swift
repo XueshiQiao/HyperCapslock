@@ -16,6 +16,10 @@ final class HudController {
     private var panel: NSPanel?
     private let model = HudViewModel()
     private var hideWork: DispatchWorkItem?
+    /// True while the visible HUD is a sticky (hold-modifier) one with no
+    /// auto-hide timer. `dismissSticky()` only hides when this is set, so a
+    /// normal transient HUD is never cut short by a stray release.
+    private var currentIsSticky = false
 
     private static let windowSize = NSSize(width: 760, height: 240)
     private static let bottomOffset: CGFloat = 160
@@ -39,7 +43,10 @@ final class HudController {
         HudCenter.shared.onShow = { [weak self] payload in
             self?.show(payload)
         }
-        FileLog.shared.info("HUD panel installed and onShow handler wired.")
+        HudCenter.shared.onDismiss = { [weak self] in
+            self?.dismissSticky()
+        }
+        FileLog.shared.info("HUD panel installed and onShow/onDismiss handlers wired.")
     }
 
     private func show(_ payload: HudPayload) {
@@ -50,16 +57,40 @@ final class HudController {
         model.payload = payload
         reposition()
         panel.orderFrontRegardless()
-        FileLog.shared.info("HUD shown on screen at \(panel.frame.origin) for \(payload.duration)ms (trigger=\(payload.trigger))")
 
+        // Any show cancels a pending auto-hide. A sticky HUD (hold-modifier) then
+        // schedules NO timer and stays up until dismissSticky() fires on release;
+        // a transient HUD keeps the timed auto-hide.
         hideWork?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            self?.panel?.orderOut(nil)
-            self?.model.payload = nil
+        hideWork = nil
+        currentIsSticky = payload.sticky
+        if payload.sticky {
+            FileLog.shared.info("HUD shown (sticky, no timer) at \(panel.frame.origin) (trigger=\(payload.trigger))")
+            return
         }
+        FileLog.shared.info("HUD shown on screen at \(panel.frame.origin) for \(payload.duration)ms (trigger=\(payload.trigger))")
+        let work = DispatchWorkItem { [weak self] in self?.hide() }
         hideWork = work
         let hold = payload.duration > 0 ? payload.duration : 1350
         DispatchQueue.main.asyncAfter(deadline: .now() + Double(hold) / 1000.0, execute: work)
+    }
+
+    /// Order the panel out and clear its content. Shared by the transient
+    /// auto-hide timer and the sticky dismiss.
+    private func hide() {
+        panel?.orderOut(nil)
+        model.payload = nil
+    }
+
+    /// Hide the HUD only if the visible one is sticky (hold-modifier held).
+    /// Invoked on the main thread via `HudCenter.onDismiss` when the modifier is
+    /// released. A transient HUD (currentIsSticky == false) is left alone so a
+    /// stray release can't cut it short.
+    private func dismissSticky() {
+        guard currentIsSticky else { return }
+        currentIsSticky = false
+        hide()
+        FileLog.shared.info("HUD sticky dismissed (hold-modifier released).")
     }
 
     private func reposition() {

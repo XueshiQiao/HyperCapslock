@@ -263,6 +263,11 @@ enum ActionExecutor {
             if let (kc, flag) = KeyCodes.modifierKeyAndFlag(m) {
                 KeyPoster.post(kc, keyDown: keyDown, flags: keyDown ? flag : [])
             }
+            // Dismiss the sticky HUD exactly when the modifier is released. Every
+            // release path (normal chord key-up AND releaseAllInFlightChords)
+            // funnels through this `keyDown == false` call, so HUD visibility is
+            // perfectly aligned with how long the modifier is actually held.
+            if !keyDown { HudCenter.shared.dismiss() }
         }
     }
 
@@ -460,7 +465,10 @@ enum ActionExecutor {
         }
         FileLog.shared.info("Caps remap: \(trigger) -> \(describeAction(action))")
         let (combo, caption) = hudParts(action)
-        HudCenter.shared.emit(trigger: trigger, combo: combo, caption: caption)
+        // A hold-modifier shows a sticky HUD: it stays until the modifier is
+        // released (dismissed from execute's key-up). All other actions emit a
+        // normal transient HUD.
+        HudCenter.shared.emit(trigger: trigger, combo: combo, caption: caption, sticky: action.isHeldModifier)
         execute(action, keyDown: true, activeModifiers: activeModifiers)
         return true
     }
