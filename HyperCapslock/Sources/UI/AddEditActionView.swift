@@ -35,6 +35,7 @@ struct AddEditActionView: View {
                         Text(loc.t("group.command")).tag("command")
                         Text(loc.t("group.key_combo")).tag("key_combo")
                         Text(loc.t("group.open_app")).tag("open_app")
+                        Text(loc.t("group.hold_modifier")).tag("hold_modifier")
                     }
                     ActionConfigDetail(draft: $draft)
                 }
@@ -94,6 +95,7 @@ struct ActionConfigDraft {
     var tCtrl = false, tAlt = false, tCmd = false, tShift = false
     var appBundleID = ""
     var appName = ""
+    var modifier: ModifierKey = .leftOption
 
     mutating func load(_ config: ActionConfig) {
         switch config {
@@ -106,6 +108,8 @@ struct ActionConfigDraft {
             kind = "key_combo"; targetKey = k; tCtrl = ctrl; tAlt = alt; tCmd = cmd; tShift = shift
         case .openApp(let bid, let name):
             kind = "open_app"; appBundleID = bid; appName = name
+        case .modifierKey(let m):
+            kind = "hold_modifier"; modifier = m
         }
     }
 
@@ -126,9 +130,20 @@ struct ActionConfigDraft {
         case "open_app":
             let bid = appBundleID.trimmingCharacters(in: .whitespaces)
             return bid.isEmpty ? nil : .openApp(bundleID: bid, name: appName.isEmpty ? bid : appName)
+        case "hold_modifier":
+            return .modifierKey(modifier)
         default: return nil
         }
     }
+}
+
+/// The modifiers offered by the hold-modifier action, in display order. `.fn` is
+/// excluded — synthesizing Fn is unreliable (see `KeyCodes.modifierKeyAndFlag`).
+enum HoldModifier {
+    static let choices: [ModifierKey] = [
+        .leftControl, .rightControl, .leftOption, .rightOption,
+        .leftCommand, .rightCommand, .leftShift, .rightShift,
+    ]
 }
 
 /// The per-kind parameter form for an `ActionConfigDraft`. Rendered both by the
@@ -177,6 +192,13 @@ struct ActionConfigDetail: View {
                     modToggle("⌘", $draft.tCmd); modToggle("⌃", $draft.tCtrl); modToggle("⌥", $draft.tAlt); modToggle("⇧", $draft.tShift)
                 }
             }
+        case "hold_modifier":
+            Picker(loc.t("group.hold_modifier"), selection: $draft.modifier) {
+                ForEach(HoldModifier.choices, id: \.self) { m in
+                    Text(modifierFullLabel(m, loc)).tag(m)
+                }
+            }
+            Text(loc.t("actions.hold_modifier_hint")).font(.caption).foregroundStyle(.secondary)
         default: EmptyView()
         }
     }

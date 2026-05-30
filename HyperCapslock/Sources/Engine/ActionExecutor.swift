@@ -26,6 +26,7 @@ func describeAction(_ action: ActionConfig) -> String {
     case .inputSource(let id): return "input source \(id)"
     case .command(let cmd): return "command: \(cmd)"
     case .openApp(let bid, let name): return "open app \(name) (\(bid))"
+    case .modifierKey(let m): return "hold modifier \(m.rawValue)"
     }
 }
 
@@ -64,6 +65,8 @@ func hudParts(_ action: ActionConfig) -> (String, String) {
         return ("Shell", cmd)
     case .openApp(_, let name):
         return ("App", name)
+    case .modifierKey(let m):
+        return (modifierHudLabel(m), "Hold Modifier")
     }
 }
 
@@ -90,7 +93,7 @@ enum ActionExecutor {
     /// modifier intent).
     static func allowShiftFallback(_ action: ActionConfig) -> Bool {
         switch action {
-        case .inputSource, .command, .keyCombo, .openApp: return false
+        case .inputSource, .command, .keyCombo, .openApp, .modifierKey: return false
         case .independent(.noop): return false  // a disabled key shouldn't disable its shifted variant too
         default: return true
         }
@@ -249,6 +252,17 @@ enum ActionExecutor {
                     }
                 }
             }
+        case .modifierKey(let m):
+            // Hold the modifier down while the chord is held, release on key-up.
+            // We deliberately ignore `activeModifiers`: the synthesized state is
+            // exactly this one modifier, nothing rides along. On the down we post
+            // the modifier's own flag; on the up we post `[]` — and because only
+            // one hold-modifier chord is ever active at a time (enforced in
+            // handleCapsRemap), `[]` is the true post-release state, never a
+            // desync. `.fn` has no synthesizable keycode, so it's a no-op.
+            if let (kc, flag) = KeyCodes.modifierKeyAndFlag(m) {
+                KeyPoster.post(kc, keyDown: keyDown, flags: keyDown ? flag : [])
+            }
         }
     }
 
@@ -345,6 +359,36 @@ enum ActionExecutor {
     /// down" (nil inner = swallowed, no action posted); absent means we didn't.
     private static let inFlightChord = OSAllocatedUnfairLock<[UInt16: ActionConfig?]>(initialState: [:])
 
+    /// Force-release every in-flight chord (post each latched action's key-up)
+    /// and clear the latch. Called whenever a chord can no longer be ended the
+    /// normal way — Caps released before the chord key, service paused, the event
+    /// tap disabled by the system, or app termination. Essential for
+    /// `.modifierKey`, whose synthesized modifier is system-wide and would
+    /// otherwise stay stuck down; also fixes the latent "held arrow key sticks if
+    /// you release Caps first" bug for ordinary chords. Idempotent.
+    static func releaseAllInFlightChords() {
+        let pending = inFlightChord.withLock { latch -> [ActionConfig] in
+            let actions = latch.values.compactMap { $0 }
+            latch.removeAll()
+            return actions
+        }
+        for action in pending { execute(action, keyDown: false, activeModifiers: []) }
+    }
+
+    /// Post a key-up for every synthesizable modifier (cleared flags). Run once
+    /// at launch to recover from a prior session that crashed or was killed while
+    /// holding a `.modifierKey`: a system-wide synthesized modifier left "down"
+    /// would otherwise wedge all input until the user physically taps that key. A
+    /// key-up for a modifier that isn't actually down is a harmless no-op. `.fn`
+    /// has no synthesizable keycode and is skipped.
+    static func normalizeSyntheticModifiersAtStartup() {
+        for m in ModifierKey.allCases {
+            if let (kc, _) = KeyCodes.modifierKeyAndFlag(m) {
+                KeyPoster.post(kc, keyDown: false, flags: [])
+            }
+        }
+    }
+
     /// Returns true if the chord was handled (and the original key should be
     /// swallowed). Logs a readable "Caps remap: <trigger> -> <action>" on keyDown.
     static func handleCapsRemap(keycode: UInt16, keyDown: Bool, activeModifiers: CGEventFlags) -> Bool {
@@ -365,7 +409,12 @@ enum ActionExecutor {
         // latched at the FIRST down so the whole hold stays consistent and the
         // eventual up pairs up — even if the app/shift/config changed mid-hold.
         if let cached = inFlightChord.withLock({ $0[jsKeycode] }) {
-            if let action = cached { execute(action, keyDown: true, activeModifiers: activeModifiers) }
+            // A held modifier is pressed once and held (real modifiers don't
+            // autorepeat); re-posting its down on every OS repeat is wrong. Other
+            // actions re-fire normally.
+            if let action = cached, !action.isHeldModifier {
+                execute(action, keyDown: true, activeModifiers: activeModifiers)
+            }
             return true   // already our chord (autorepeat) → swallow
         }
 
@@ -377,7 +426,24 @@ enum ActionExecutor {
         // `dict[key] = nil` REMOVES the entry, but we need to store an explicit
         // nil meaning "we handled the down by swallowing".
         let action = effectiveAction(mapping, ctx)
-        inFlightChord.withLock { _ = $0.updateValue(action, forKey: jsKeycode) }
+        // Single hold-modifier at a time: if this chord wants to hold a modifier
+        // but another hold-modifier chord is already active, neutralize it
+        // (swallow, hold nothing) so two synthesized modifiers never fight over
+        // the system-wide flag state. The check + latch run in one locked region
+        // so a concurrent fresh press can't slip a second modifier in between.
+        let suppressedHeldModifier = inFlightChord.withLock { latch -> Bool in
+            if let a = action, a.isHeldModifier,
+               latch.values.contains(where: { $0?.isHeldModifier ?? false }) {
+                latch.updateValue(nil, forKey: jsKeycode)   // claim the chord, post nothing
+                return true
+            }
+            latch.updateValue(action, forKey: jsKeycode)
+            return false
+        }
+        if suppressedHeldModifier {
+            FileLog.shared.info("Caps remap: hold-modifier chord ignored — another modifier already held.")
+            return true
+        }
 
         let trigger = shiftHeld ? "Caps+Shift+\(KeyCodes.name(jsKeycode))" : "Caps+\(KeyCodes.name(jsKeycode))"
         guard let action else {

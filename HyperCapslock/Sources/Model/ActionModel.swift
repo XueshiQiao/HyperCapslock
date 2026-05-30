@@ -60,6 +60,12 @@ enum ActionConfig: Equatable {
     case command(String)
     case keyCombo(targetKey: UInt16, withCtrl: Bool, withAlt: Bool, withCmd: Bool, withTargetShift: Bool)
     case openApp(bundleID: String, name: String)
+    /// Hold a single modifier key down for as long as the (hold-type) trigger is
+    /// held; release it when the trigger is released. For push-to-talk apps that
+    /// listen while a modifier is pressed. Only one such modifier is ever held at
+    /// a time (a second hold-modifier chord is ignored while one is active). See
+    /// `ActionExecutor.execute`.
+    case modifierKey(ModifierKey)
 
     var kindTag: String {
         switch self {
@@ -70,7 +76,16 @@ enum ActionConfig: Equatable {
         case .command: return "command"
         case .keyCombo: return "key_combo"
         case .openApp: return "open_app"
+        case .modifierKey: return "hold_modifier"
         }
+    }
+
+    /// True for `.modifierKey`, which is held while the chord is held (no
+    /// autorepeat) rather than re-posted — see the autorepeat branch in
+    /// `ActionExecutor.handleCapsRemap`.
+    var isHeldModifier: Bool {
+        if case .modifierKey = self { return true }
+        return false
     }
 }
 
@@ -86,6 +101,7 @@ extension ActionConfig: Codable {
         case withTargetShift = "with_target_shift"
         case bundleID = "bundle_id"
         case appName = "app_name"
+        case modifier
     }
 
     init(from decoder: Decoder) throws {
@@ -113,6 +129,8 @@ extension ActionConfig: Codable {
         case "open_app":
             self = .openApp(bundleID: try c.decode(String.self, forKey: .bundleID),
                             name: try c.decodeIfPresent(String.self, forKey: .appName) ?? "")
+        case "hold_modifier":
+            self = .modifierKey(try c.decode(ModifierKey.self, forKey: .modifier))
         default:
             throw DecodingError.dataCorruptedError(forKey: .kind, in: c,
                 debugDescription: "unknown action kind: \(kind)")
@@ -143,6 +161,8 @@ extension ActionConfig: Codable {
         case .openApp(let bid, let name):
             try c.encode(bid, forKey: .bundleID)
             try c.encode(name, forKey: .appName)
+        case .modifierKey(let m):
+            try c.encode(m, forKey: .modifier)
         }
     }
 }

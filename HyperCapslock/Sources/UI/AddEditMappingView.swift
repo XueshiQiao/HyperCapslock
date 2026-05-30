@@ -22,6 +22,7 @@ private let inlineKindSentinels: [(sentinel: String, kind: String, labelKey: Str
     ("__inline_command__", "command", "group.command", "terminal"),
     ("__inline_key_combo__", "key_combo", "group.key_combo", "command"),
     ("__inline_open_app__", "open_app", "group.open_app", "arrow.up.forward.app"),
+    ("__inline_hold_modifier__", "hold_modifier", "group.hold_modifier", "option"),
 ]
 
 /// The `ActionConfigDraft.kind` an inline sentinel selects, or nil if `sentinel`
@@ -267,20 +268,7 @@ struct AddEditMappingView: View {
     /// "Double-tap Modifier" trigger is selected). Spells out the side and the
     /// modifier name alongside the glyph (e.g. "Right Cmd ⌘") so it doesn't read
     /// like a "⌘+R" combo. fn has no side and is flagged experimental.
-    private func modifierPickerLabel(_ m: ModifierKey) -> String {
-        let left = loc.t("side.left"), right = loc.t("side.right")
-        switch m {
-        case .leftCommand:  return "\(left) Cmd ⌘"
-        case .rightCommand: return "\(right) Cmd ⌘"
-        case .leftControl:  return "\(left) Ctrl ⌃"
-        case .rightControl: return "\(right) Ctrl ⌃"
-        case .leftOption:   return "\(left) Opt ⌥"
-        case .rightOption:  return "\(right) Opt ⌥"
-        case .leftShift:    return "\(left) Shift ⇧"
-        case .rightShift:   return "\(right) Shift ⇧"
-        case .fn:           return "fn (\(loc.t("trigger.experimental")))"
-        }
-    }
+    private func modifierPickerLabel(_ m: ModifierKey) -> String { modifierFullLabel(m, loc) }
 
     private var draftTrigger: Trigger? {
         switch triggerSel {

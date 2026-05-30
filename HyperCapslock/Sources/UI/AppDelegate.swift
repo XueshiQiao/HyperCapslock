@@ -39,7 +39,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Restore the original CapsLock mapping so Caps works after we quit.
+        // Release any chord held at quit (a synthesized push-to-talk modifier
+        // would otherwise stay stuck system-wide), then restore CapsLock. Pause
+        // first so the tap stops claiming new chords, then drain the release
+        // serialized onto the tap thread (waiting) so it can't race the tap's
+        // "latch then post-down outside the lock" window.
+        EngineState.shared.isPaused = true
+        KeyboardHook.shared.releaseHeldChordsSerialized(wait: true)
         KeyboardHook.shared.cleanup()
     }
 

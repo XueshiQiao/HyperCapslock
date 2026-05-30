@@ -33,6 +33,26 @@ func modifierGlyph(_ m: ModifierKey) -> String {
     }
 }
 
+/// Unambiguous modifier label spelling out side + name + glyph (e.g. "Right Cmd
+/// ⌘") so it can't be misread as a "⌘+R" combo. Used by the double-tap-modifier
+/// trigger picker and the Hold Modifier action picker so both read identically.
+/// `.fn` has no side and is flagged experimental.
+@MainActor
+func modifierFullLabel(_ m: ModifierKey, _ loc: LocalizationManager) -> String {
+    let left = loc.t("side.left"), right = loc.t("side.right")
+    switch m {
+    case .leftCommand:  return "\(left) Cmd ⌘"
+    case .rightCommand: return "\(right) Cmd ⌘"
+    case .leftControl:  return "\(left) Ctrl ⌃"
+    case .rightControl: return "\(right) Ctrl ⌃"
+    case .leftOption:   return "\(left) Opt ⌥"
+    case .rightOption:  return "\(right) Opt ⌥"
+    case .leftShift:    return "\(left) Shift ⇧"
+    case .rightShift:   return "\(right) Shift ⇧"
+    case .fn:           return "fn (\(loc.t("trigger.experimental")))"
+    }
+}
+
 /// A keycap-styled label used across the mappings list.
 struct Kbd: View {
     let text: String
