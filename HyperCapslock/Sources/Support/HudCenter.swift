@@ -1,8 +1,8 @@
 import Foundation
 
 /// How long a shown HUD stays up. The HUD's own vocabulary — it has no notion of
-/// *why* a caller wants it to persist (hold-modifier, etc.), only of the two
-/// stay-up behaviors it must implement.
+/// *why* a caller wants persistent display, only of the two stay-up behaviors it
+/// must implement.
 enum HudDuration: Equatable {
     /// Auto-hide after the given milliseconds (≤0 falls back to a default).
     case timed(ms: Int)
