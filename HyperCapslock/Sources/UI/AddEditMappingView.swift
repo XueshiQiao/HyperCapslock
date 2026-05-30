@@ -125,6 +125,7 @@ struct AddEditMappingView: View {
 
     @State private var triggerSel = "plain"
     @State private var key: UInt16?
+    @State private var dtModifier: ModifierKey = .rightCommand   // chosen in the Key row when triggerSel == "dtm"
     @State private var selectedActionId = "builtin.move_left"
     @State private var inlineDraft = ActionConfigDraft()   // when selectedActionId is an inline-kind sentinel
     @State private var keptInlineConfig: ActionConfig?
@@ -135,6 +136,7 @@ struct AddEditMappingView: View {
 
     private var editing: Bool { if case .edit = mode { return true }; return false }
     private var triggerNeedsKey: Bool { triggerSel == "plain" || triggerSel == "with_shift" }
+    private var triggerNeedsModifier: Bool { triggerSel == "dtm" }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -145,7 +147,7 @@ struct AddEditMappingView: View {
                         Text(loc.t("mappings.caps_shift")).tag("with_shift")
                         Text(loc.t("trigger.single_tap_hyper")).tag("single_tap")
                         Text(loc.t("trigger.double_tap_hyper")).tag("double_tap")
-                        ForEach(modifierOrder, id: \.self) { m in Text(modifierTriggerLabel(m)).tag("dtm:\(m.rawValue)") }
+                        Text(doubleTapModifierLabel).tag("dtm")
                     }
                     .disabled(editing)
 
@@ -156,6 +158,11 @@ struct AddEditMappingView: View {
                             KeyCaptureField(jsKeyCode: $key, enabled: !editing, placeholder: loc.t("mappings.press_key"))
                                 .frame(width: 140, height: 28)
                         }
+                    } else if triggerNeedsModifier {
+                        Picker(loc.t("mappings.key"), selection: $dtModifier) {
+                            ForEach(modifierOrder, id: \.self) { m in Text(modifierPickerLabel(m)).tag(m) }
+                        }
+                        .disabled(editing)
                     }
                 }
 
@@ -252,19 +259,35 @@ struct AddEditMappingView: View {
         DispatchQueue.main.async { rules.removeAll { $0.id == id } }
     }
 
-    private func modifierTriggerLabel(_ m: ModifierKey) -> String {
-        let base = "\(loc.t("trigger.double_tap_prefix")) \(modifierGlyph(m))"
-        return m == .fn ? "\(base) (\(loc.t("trigger.experimental")))" : base
+    /// Label for the single "Double-tap Modifier" trigger entry — the modifier
+    /// itself is chosen in the Key-row picker that appears below when selected.
+    private var doubleTapModifierLabel: String { loc.t("trigger.double_tap_modifier") }
+
+    /// Label for a modifier inside the Key-row picker (shown only when the
+    /// "Double-tap Modifier" trigger is selected). Spells out the side and the
+    /// modifier name alongside the glyph (e.g. "Right Cmd ⌘") so it doesn't read
+    /// like a "⌘+R" combo. fn has no side and is flagged experimental.
+    private func modifierPickerLabel(_ m: ModifierKey) -> String {
+        let left = loc.t("side.left"), right = loc.t("side.right")
+        switch m {
+        case .leftCommand:  return "\(left) Cmd ⌘"
+        case .rightCommand: return "\(right) Cmd ⌘"
+        case .leftControl:  return "\(left) Ctrl ⌃"
+        case .rightControl: return "\(right) Ctrl ⌃"
+        case .leftOption:   return "\(left) Opt ⌥"
+        case .rightOption:  return "\(right) Opt ⌥"
+        case .leftShift:    return "\(left) Shift ⇧"
+        case .rightShift:   return "\(right) Shift ⇧"
+        case .fn:           return "fn (\(loc.t("trigger.experimental")))"
+        }
     }
 
     private var draftTrigger: Trigger? {
         switch triggerSel {
         case "single_tap": return .singleTapHyper
         case "double_tap": return .doubleTapHyper
+        case "dtm": return .doubleTapModifier(dtModifier)
         default:
-            if triggerSel.hasPrefix("dtm:"), let m = ModifierKey(rawValue: String(triggerSel.dropFirst(4))) {
-                return .doubleTapModifier(m)
-            }
             guard let key else { return nil }
             return .hyperPlusKey(key: key, withShift: triggerSel == "with_shift")
         }
@@ -302,7 +325,7 @@ struct AddEditMappingView: View {
         switch entry.trigger {
         case .singleTapHyper: triggerSel = "single_tap"
         case .doubleTapHyper: triggerSel = "double_tap"
-        case .doubleTapModifier(let m): triggerSel = "dtm:\(m.rawValue)"
+        case .doubleTapModifier(let m): triggerSel = "dtm"; dtModifier = m
         case .hyperPlusKey(let k, let withShift): triggerSel = withShift ? "with_shift" : "plain"; key = k
         }
         if let id = entry.actionId {
