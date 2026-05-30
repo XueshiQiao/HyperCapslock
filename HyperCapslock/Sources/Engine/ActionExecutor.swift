@@ -263,7 +263,7 @@ enum ActionExecutor {
             if let (kc, flag) = KeyCodes.modifierKeyAndFlag(m) {
                 KeyPoster.post(kc, keyDown: keyDown, flags: keyDown ? flag : [])
             }
-            // Dismiss the sticky HUD exactly when the modifier is released. Every
+            // Dismiss the until-dismissed HUD exactly when the modifier is released. Every
             // release path (normal chord key-up AND releaseAllInFlightChords)
             // funnels through this `keyDown == false` call, so HUD visibility is
             // perfectly aligned with how long the modifier is actually held.
