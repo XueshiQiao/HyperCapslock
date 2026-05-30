@@ -465,10 +465,12 @@ enum ActionExecutor {
         }
         FileLog.shared.info("Caps remap: \(trigger) -> \(describeAction(action))")
         let (combo, caption) = hudParts(action)
-        // A hold-modifier shows a sticky HUD: it stays until the modifier is
-        // released (dismissed from execute's key-up). All other actions emit a
-        // normal transient HUD.
-        HudCenter.shared.emit(trigger: trigger, combo: combo, caption: caption, sticky: action.isHeldModifier)
+        // A hold-modifier keeps the HUD up for the whole hold: show it
+        // until-dismissed and dismiss on the modifier's key-up (every release
+        // path funnels through execute(.modifierKey, keyDown:false)). Every other
+        // action uses the normal timed HUD.
+        HudCenter.shared.emit(trigger: trigger, combo: combo, caption: caption,
+                              duration: action.isHeldModifier ? .untilDismissed : .timed(ms: 0))
         execute(action, keyDown: true, activeModifiers: activeModifiers)
         return true
     }

@@ -1,14 +1,22 @@
 import Foundation
 
+/// How long a shown HUD stays up. The HUD's own vocabulary — it has no notion of
+/// *why* a caller wants it to persist (hold-modifier, etc.), only of the two
+/// stay-up behaviors it must implement.
+enum HudDuration: Equatable {
+    /// Auto-hide after the given milliseconds (≤0 falls back to a default).
+    case timed(ms: Int)
+    /// Stay up with no timer until the caller invokes `HudCenter.dismiss()`.
+    case untilDismissed
+
+    var isUntilDismissed: Bool { self == .untilDismissed }
+}
+
 struct HudPayload: Equatable {
     var trigger: String
     var combo: String
     var caption: String
-    var duration: Int
-    /// When true the HUD stays on screen with NO auto-hide timer until an
-    /// explicit `dismiss()` — used by the hold-modifier action so the HUD is
-    /// visible for exactly as long as the modifier is physically held.
-    var sticky: Bool = false
+    var duration: HudDuration
 }
 
 /// Routes HUD show requests from the event-tap thread to the overlay window on
@@ -28,7 +36,8 @@ final class HudCenter {
 
     /// Set by `HudController` on the main thread; invoked on the main thread.
     var onShow: ((HudPayload) -> Void)?
-    /// Set by `HudController`; invoked on the main thread to hide a sticky HUD.
+    /// Set by `HudController`; invoked on the main thread to hide an
+    /// `.untilDismissed` HUD.
     var onDismiss: (() -> Void)?
 
     func updateSettings(enabled: Bool, durationMs: Int) {
@@ -37,40 +46,47 @@ final class HudCenter {
         self.durationMs = durationMs
     }
 
-    func emit(trigger: String, combo: String, caption: String, sticky: Bool = false) {
+    /// Show the HUD. `duration` defaults to `.timed(ms: 0)`, which resolves to the
+    /// user-configured auto-hide time; pass `.untilDismissed` for a HUD that
+    /// stays until `dismiss()`.
+    func emit(trigger: String, combo: String, caption: String, duration: HudDuration = .timed(ms: 0)) {
         var skipReason: String?
         let payload: HudPayload? = {
             lock.lock(); defer { lock.unlock() }
             guard enabled else { skipReason = "HUD disabled (show_hud=false)"; return nil }
             let key = "\(trigger)\u{1}\(combo)\u{1}\(caption)"
             let now = nowMillis()
-            // Sticky (hold-modifier) emits bypass the throttle: they fire once per
-            // physical press, never autorepeat, and re-pressing the same chord
-            // within the throttle window must still re-show the HUD.
-            if !sticky && key == lastKey && now &- lastEmitMs < Self.throttleMs {
+            // An until-dismissed HUD bypasses the throttle: it fires once per
+            // physical press (never autorepeat), and re-triggering the same key
+            // within the throttle window must still re-show it.
+            if !duration.isUntilDismissed && key == lastKey && now &- lastEmitMs < Self.throttleMs {
                 skipReason = "throttled (same key within \(Self.throttleMs)ms)"
                 return nil
             }
             lastKey = key
             lastEmitMs = now
-            return HudPayload(trigger: trigger, combo: combo, caption: caption, duration: durationMs, sticky: sticky)
+            // Resolve a 0/negative timed request to the configured default.
+            let resolved: HudDuration
+            switch duration {
+            case .timed(let ms): resolved = .timed(ms: ms > 0 ? ms : durationMs)
+            case .untilDismissed: resolved = .untilDismissed
+            }
+            return HudPayload(trigger: trigger, combo: combo, caption: caption, duration: resolved)
         }()
         guard let payload else {
             FileLog.shared.info("HUD emit SKIPPED: \(skipReason ?? "unknown") [trigger=\(trigger) combo=\(combo)]")
             return
         }
         let hasHandler = (onShow != nil)
-        FileLog.shared.info("HUD emit → dispatch to main (onShow set=\(hasHandler)) trigger=\(trigger) combo=\(combo) caption=\(caption) dur=\(payload.duration) sticky=\(payload.sticky)")
+        FileLog.shared.info("HUD emit → dispatch to main (onShow set=\(hasHandler)) trigger=\(trigger) combo=\(combo) caption=\(caption) dur=\(payload.duration)")
         DispatchQueue.main.async { [weak self] in
             self?.onShow?(payload)
         }
     }
 
-    /// Hide a currently-showing sticky HUD. Called when the hold-modifier is
-    /// released (from `ActionExecutor.execute` on the `.modifierKey` key-up,
-    /// which every release path funnels through). A no-op if the visible HUD
-    /// isn't sticky — the controller guards that — so a normal transient HUD
-    /// that happens to be on screen lives out its timer untouched.
+    /// Hide a currently-showing `.untilDismissed` HUD. The controller no-ops this
+    /// for a timed HUD, so a normal timed HUD on screen lives out its timer
+    /// untouched. (The caller decides when to dismiss; the HUD doesn't know why.)
     func dismiss() {
         DispatchQueue.main.async { [weak self] in
             self?.onDismiss?()

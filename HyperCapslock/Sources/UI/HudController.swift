@@ -16,10 +16,10 @@ final class HudController {
     private var panel: NSPanel?
     private let model = HudViewModel()
     private var hideWork: DispatchWorkItem?
-    /// True while the visible HUD is a sticky (hold-modifier) one with no
-    /// auto-hide timer. `dismissSticky()` only hides when this is set, so a
-    /// normal transient HUD is never cut short by a stray release.
-    private var currentIsSticky = false
+    /// True while the visible HUD is showing with no auto-hide timer (an
+    /// `.untilDismissed` HUD). `dismiss()` only hides when this is set, so a
+    /// timed HUD is never cut short by a stray dismiss call.
+    private var awaitingDismiss = false
 
     private static let windowSize = NSSize(width: 760, height: 240)
     private static let bottomOffset: CGFloat = 160
@@ -44,7 +44,7 @@ final class HudController {
             self?.show(payload)
         }
         HudCenter.shared.onDismiss = { [weak self] in
-            self?.dismissSticky()
+            self?.dismiss()
         }
         FileLog.shared.info("HUD panel installed and onShow/onDismiss handlers wired.")
     }
