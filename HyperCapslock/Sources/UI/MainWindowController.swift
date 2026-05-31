@@ -25,8 +25,9 @@ final class MainWindowController: NSObject, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         window.toolbarStyle = .unified
         // Wide enough for the Mappings keyboard style to show a full Magic
-        // Keyboard without scaling down; other pages just get more breathing room.
-        window.setContentSize(NSSize(width: 960, height: 640))
+        // Keyboard without scaling down or crowding the sidebar; other pages just
+        // get more breathing room.
+        window.setContentSize(NSSize(width: 990, height: 640))
         window.center()
         super.init()
         window.delegate = self

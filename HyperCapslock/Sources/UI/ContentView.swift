@@ -37,13 +37,14 @@ struct ContentView: View {
     @EnvironmentObject var config: ConfigStore
     @EnvironmentObject var loc: LocalizationManager
 
-    @State private var page: SidebarPage? = .settings
+    // Mappings is the primary screen — it opens first and sits at the top.
+    @State private var page: SidebarPage? = .mappings
 
     var body: some View {
         NavigationSplitView {
             List(selection: $page) {
-                sidebarRow(.settings, loc.t("nav.settings"), "gearshape.fill", .gray)
                 sidebarRow(.mappings, loc.t("nav.mappings"), "keyboard.fill", .blue)
+                sidebarRow(.settings, loc.t("nav.settings"), "gearshape.fill", .gray)
                 sidebarRow(.actions, loc.t("nav.actions"), "bolt.fill", .orange)
                 sidebarRow(.inputSource, loc.t("nav.input_source"), "globe", .green)
                 sidebarRow(.about, loc.t("nav.about"), "info.circle.fill", .gray)
@@ -54,7 +55,7 @@ struct ContentView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) { statusFooter }
         } detail: {
             Group {
-                switch page ?? .settings {
+                switch page ?? .mappings {
                 case .settings: SettingsPage()
                 case .mappings: MappingsPage()
                 case .actions: ActionsPage()
