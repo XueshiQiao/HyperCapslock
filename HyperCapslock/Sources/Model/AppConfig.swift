@@ -25,6 +25,10 @@ struct AppConfig: Codable, Equatable {
     var hudDurationMs: Int = 1350
     var themeMode: ThemeMode = .system
     var cjkvFixStrategy: CJKVFixStrategy = .none
+    /// Broadcast CapsLock-hold over `DistributedNotificationCenter` so AnyDrag
+    /// can arm its "hold CapsLock and drag a window" gesture. Off by default —
+    /// users who don't run AnyDrag emit zero cross-app chatter.
+    var broadcastCapsHoldForAnyDrag: Bool = false
 
     enum CodingKeys: String, CodingKey {
         case hideDockIcon = "hide_dock_icon"
@@ -32,15 +36,18 @@ struct AppConfig: Codable, Equatable {
         case hudDurationMs = "hud_duration_ms"
         case themeMode = "theme_mode"
         case cjkvFixStrategy = "cjkv_fix_strategy"
+        case broadcastCapsHoldForAnyDrag = "broadcast_caps_hold_for_anydrag"
     }
 
     init(hideDockIcon: Bool = false, showHud: Bool = false, hudDurationMs: Int = 1350,
-         themeMode: ThemeMode = .system, cjkvFixStrategy: CJKVFixStrategy = .none) {
+         themeMode: ThemeMode = .system, cjkvFixStrategy: CJKVFixStrategy = .none,
+         broadcastCapsHoldForAnyDrag: Bool = false) {
         self.hideDockIcon = hideDockIcon
         self.showHud = showHud
         self.hudDurationMs = hudDurationMs
         self.themeMode = themeMode
         self.cjkvFixStrategy = cjkvFixStrategy
+        self.broadcastCapsHoldForAnyDrag = broadcastCapsHoldForAnyDrag
     }
 
     init(from decoder: Decoder) throws {
@@ -51,5 +58,6 @@ struct AppConfig: Codable, Equatable {
         self.themeMode = try c.decodeIfPresent(ThemeMode.self, forKey: .themeMode) ?? .system
         // Tolerant: an unknown future strategy value decodes back to `.none`.
         self.cjkvFixStrategy = (try? c.decodeIfPresent(CJKVFixStrategy.self, forKey: .cjkvFixStrategy)) ?? .none
+        self.broadcastCapsHoldForAnyDrag = try c.decodeIfPresent(Bool.self, forKey: .broadcastCapsHoldForAnyDrag) ?? false
     }
 }

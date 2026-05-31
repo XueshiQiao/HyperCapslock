@@ -352,6 +352,7 @@ final class ConfigStore: ObservableObject {
     func setHudDuration(_ ms: Int) throws { try mutateConfig { $0.hudDurationMs = min(max(ms, 300), 6000) } }
     func setThemeMode(_ mode: ThemeMode) throws { try mutateConfig { $0.themeMode = mode } }
     func setCJKVFixStrategy(_ strategy: CJKVFixStrategy) throws { try mutateConfig { $0.cjkvFixStrategy = strategy } }
+    func setBroadcastCapsHoldForAnyDrag(_ on: Bool) throws { try mutateConfig { $0.broadcastCapsHoldForAnyDrag = on } }
 
     private func mutateConfig(_ change: (inout AppConfig) -> Void) throws {
         let prev = appConfig

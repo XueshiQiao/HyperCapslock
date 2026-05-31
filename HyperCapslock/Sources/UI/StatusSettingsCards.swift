@@ -73,6 +73,15 @@ struct SettingsPage: View {
                         }
                     }
                 }
+                VStack(alignment: .leading, spacing: 2) {
+                    Toggle(loc.t("settings.anydrag_caps_hold"), isOn: Binding(
+                        get: { config.appConfig.broadcastCapsHoldForAnyDrag },
+                        set: { v in
+                            do { try app.setBroadcastCapsHoldForAnyDrag(v); app.showToast(v ? loc.t("toast.anydrag_caps_hold_enabled") : loc.t("toast.anydrag_caps_hold_disabled")) }
+                            catch { app.showToast(loc.t("toast.anydrag_caps_hold_failed"), isError: true) }
+                        }))
+                    Text(loc.t("settings.anydrag_caps_hold_hint")).font(.caption).foregroundStyle(.secondary)
+                }
             }
 
             Section(loc.t("appearance.label")) {

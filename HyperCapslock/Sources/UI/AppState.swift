@@ -36,6 +36,12 @@ final class AppState: ObservableObject {
 
     let config = ConfigStore.shared
     let loc = LocalizationManager.shared
+
+    /// The AnyDrag integration plugin. Held while the setting is enabled and
+    /// registered with `CapsHoldCenter`; nil otherwise. Its existence == the
+    /// setting being on (so the ping responder is active exactly then). This is
+    /// the only AppState member that touches the AnyDrag integration.
+    private var anyDragBridge: AnyDragCapsHoldBridge?
     let appVersion: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
 
     var isRunning: Bool { status == .running }
@@ -55,6 +61,7 @@ final class AppState: ObservableObject {
         autostart = LaunchAtLogin.isEnabled
         status = .running
         EngineState.shared.isPaused = false
+        applyAnyDragIntegration(config.appConfig.broadcastCapsHoldForAnyDrag)
         refreshPermissions()
     }
 
@@ -105,7 +112,9 @@ final class AppState: ObservableObject {
             // and drop the stale Caps-held state so resume starts clean. Routed
             // through the tap thread so it can't race a chord key-down in flight.
             KeyboardHook.shared.releaseHeldChordsSerialized()
-            _ = EngineState.shared.swapCapsDown(false)
+            // End the Caps hold (clears the held state and fires its end side
+            // effect) so pausing mid-hold leaves nothing latched.
+            endCapsHold()
         }
         status = paused ? .paused : .running
         FileLog.shared.info("[STATE] Service \(paused ? "paused" : "resumed")")
@@ -137,6 +146,31 @@ final class AppState: ObservableObject {
     func setCJKVFixStrategy(_ strategy: CJKVFixStrategy) throws {
         try config.setCJKVFixStrategy(strategy)
         applyInputSourceSettings()
+    }
+
+    var broadcastCapsHoldForAnyDrag: Bool { config.appConfig.broadcastCapsHoldForAnyDrag }
+
+    func setBroadcastCapsHoldForAnyDrag(_ on: Bool) throws {
+        try config.setBroadcastCapsHoldForAnyDrag(on)
+        applyAnyDragIntegration(on)
+    }
+
+    /// Install or tear down the AnyDrag integration plugin. Installing it into
+    /// `CapsHoldCenter` both starts broadcasting the hold lifecycle and (via the
+    /// bridge) answers AnyDrag's liveness pings. The hub reconciles a mid-hold
+    /// install/remove on its own (it fires `capsHoldBegan`/`capsHoldEnded` to the
+    /// freshly added/removed plugin), so flipping this while CapsLock is held
+    /// arms/disarms AnyDrag correctly with no special-casing here.
+    private func applyAnyDragIntegration(_ on: Bool) {
+        if on {
+            guard anyDragBridge == nil else { return }
+            let bridge = AnyDragCapsHoldBridge()
+            anyDragBridge = bridge
+            CapsHoldCenter.shared.add(bridge)
+        } else if let bridge = anyDragBridge {
+            CapsHoldCenter.shared.remove(bridge)
+            anyDragBridge = nil
+        }
     }
 
     private func applyInputSourceSettings() {

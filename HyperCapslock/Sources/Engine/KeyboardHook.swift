@@ -20,6 +20,8 @@ private func hcTapCallback(
         // A chord (esp. a held push-to-talk modifier) may have been mid-hold when
         // the tap went deaf; we'll miss its key-up, so release everything now.
         ActionExecutor.releaseAllInFlightChords()
+        // The F18 key-up may likewise be missed — end the hold now.
+        endCapsHold()
         if KeyboardHook.shared.reenable() {
             FileLog.shared.warn("Event tap disabled by system (type=\(type.rawValue)); requested re-enable.")
         } else {
@@ -50,14 +52,9 @@ private func hcTapCallback(
     // F18 = physical CapsLock (remapped via hidutil) → proper KeyDown/KeyUp.
     if keycode == KeyCodes.f18 {
         if type == .keyDown {
-            let wasDown = state.swapCapsDown(true)
-            if !wasDown {
-                state.capsPressedAtMs = nowMillis()
-                state.didRemap = false
-                FileLog.shared.info("Caps(F18) down.")
-            }
+            beginCapsHold()
         } else if type == .keyUp {
-            let wasDown = state.swapCapsDown(false)
+            let wasDown = endCapsHold()
             // Caps released → release any in-flight chord now. If the chord key is
             // still physically held, its later key-up won't be seen (capsDown is
             // false), so without this a held modifier / key stays stuck down.
@@ -265,6 +262,9 @@ final class KeyboardHook {
             // callback; we'll miss any pending key-up, so force-release now (on
             // the tap thread, tap already dead → no concurrent callback to race).
             ActionExecutor.releaseAllInFlightChords()
+            // Same reasoning for a CapsLock hold — end it so a missed F18 key-up
+            // can't leave a hold latched (mirrors the tap-disabled branch).
+            endCapsHold()
             eventTap = nil
         }
     }

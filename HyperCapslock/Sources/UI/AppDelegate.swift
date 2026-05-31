@@ -45,6 +45,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // serialized onto the tap thread (waiting) so it can't race the tap's
         // "latch then post-down outside the lock" window.
         EngineState.shared.isPaused = true
+        // If CapsLock is held at quit, end the hold synchronously so nothing
+        // stays latched after we exit.
+        endCapsHold()
         KeyboardHook.shared.releaseHeldChordsSerialized(wait: true)
         KeyboardHook.shared.cleanup()
     }
