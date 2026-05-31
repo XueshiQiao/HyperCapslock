@@ -150,7 +150,9 @@ struct MappingsPage: View {
                         .help("Import release config (debug)")
                     #endif
                     Button { exportConfig() } label: { Image(systemName: "square.and.arrow.up") }.help(loc.t("config.export"))
-                    Button { sheet = .add } label: { Image(systemName: "plus") }.help(loc.t("mappings.add"))
+                    Button { sheet = .add } label: { Image(systemName: "plus") }
+                        .help(loc.t("mappings.add"))
+                        .accessibilityIdentifier("mappings.add")
                 }
             }
             .sheet(item: $sheet) { mode in

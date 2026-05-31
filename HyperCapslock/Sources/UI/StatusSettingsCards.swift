@@ -88,6 +88,7 @@ struct SettingsPage: View {
                 Picker(loc.t("settings.language"), selection: Binding(get: { loc.locale }, set: { loc.setLocale($0) })) {
                     ForEach(AppLocale.allCases, id: \.self) { l in Text("\(l.flag)  \(l.label)").tag(l) }
                 }
+                .accessibilityIdentifier("settings.language")
                 Picker(loc.t("settings.theme"), selection: Binding(get: { app.themeMode }, set: { app.setTheme($0) })) {
                     Text(loc.t("theme.light_opt")).tag(ThemeMode.light)
                     Text(loc.t("theme.dark_opt")).tag(ThemeMode.dark)

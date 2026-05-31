@@ -151,6 +151,7 @@ struct AddEditMappingView: View {
                         Text(doubleTapModifierLabel).tag("dtm")
                     }
                     .disabled(editing)
+                    .accessibilityIdentifier("mapping.trigger")
 
                     if triggerNeedsKey {
                         HStack {
@@ -227,6 +228,7 @@ struct AddEditMappingView: View {
                 Button(loc.t("update.cancel")) { dismiss() }
                 Button(loc.t("mappings.save")) { save() }
                     .keyboardShortcut(.defaultAction)
+                    .accessibilityIdentifier("mapping.save")
                     .disabled(draftTrigger == nil
                               || !inlineDraftValid(inlineDraft, sentinel: selectedActionId)
                               || rules.contains { $0.isEditable && !inlineDraftValid($0.inlineDraft, sentinel: $0.actionId) })

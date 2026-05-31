@@ -6,8 +6,11 @@ import XCTest
 /// (localized) text, which would break across en/zh/ja/de.
 final class NavigationUITests: XCTestCase {
 
-    /// (nav-id stem) for the five sidebar pages, in sidebar order.
-    private let pages = ["mappings", "settings", "actions", "input_source", "about"]
+    /// (nav-id stem) for the five sidebar pages. `mappings` is LAST, not first:
+    /// the app cold-starts on Mappings, so clicking it first would assert
+    /// `page.mappings` exists when it already did — a false green. Reaching it via
+    /// a click from `about` makes every assertion a real navigation transition.
+    private let pages = ["settings", "actions", "input_source", "about", "mappings"]
 
     override func setUpWithError() throws {
         continueAfterFailure = false
