@@ -308,14 +308,25 @@ struct AddEditMappingView: View {
         }
     }
 
-    private func prefill() {
-        guard case .edit(let entry) = mode else { return }
-        switch entry.trigger {
+    private func prefillTrigger(_ trigger: Trigger) {
+        switch trigger {
         case .singleTapHyper: triggerSel = "single_tap"
         case .doubleTapHyper: triggerSel = "double_tap"
         case .doubleTapModifier(let m): triggerSel = "dtm"; dtModifier = m
         case .hyperPlusKey(let k, let withShift): triggerSel = withShift ? "with_shift" : "plain"; key = k
         }
+    }
+
+    private func prefill() {
+        // Adding from the keyboard style: pre-fill only the trigger, leave the
+        // action at its default. The trigger remains editable (not an .edit).
+        if case .addForTrigger(let trigger) = mode {
+            prefillTrigger(trigger)
+            lastRealActionId = selectedActionId
+            return
+        }
+        guard case .edit(let entry) = mode else { return }
+        prefillTrigger(entry.trigger)
         if let id = entry.actionId {
             selectedActionId = id
         } else if let inline = entry.inlineAction {

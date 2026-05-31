@@ -218,29 +218,6 @@ struct MappingsGroupedStyleView: View {
     }
 }
 
-// MARK: - Style: Keyboard map (implemented in a later step)
+// MARK: - Style: Keyboard map
 
-struct MappingsKeyboardStyleView: View {
-    let entries: [ActionMappingEntry]
-    let availableInputSources: [String: InputSourceFix.AvailableSource]
-    let onEdit: (ActionMappingEntry) -> Void
-    let onDelete: (ActionMappingEntry) -> Void
-
-    var body: some View {
-        StylePlaceholder(symbol: "keyboard", title: "Keyboard map")
-    }
-}
-
-/// Temporary centered placeholder for styles not yet implemented.
-struct StylePlaceholder: View {
-    let symbol: String
-    let title: String
-    var body: some View {
-        VStack(spacing: 10) {
-            Image(systemName: symbol).font(.system(size: 40, weight: .light)).foregroundStyle(.tertiary)
-            Text(title).font(.title3.weight(.semibold))
-            Text("Coming soon").font(.subheadline).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
+// `MappingsKeyboardStyleView` lives in MappingsKeyboardStyle.swift.

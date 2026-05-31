@@ -4,10 +4,15 @@ import UniformTypeIdentifiers
 
 enum MappingSheetMode: Identifiable {
     case add
+    /// Add a new mapping with its trigger pre-filled (used by the keyboard style
+    /// when tapping an unmapped key). The trigger stays editable — it's a new
+    /// mapping, not an edit.
+    case addForTrigger(Trigger)
     case edit(ActionMappingEntry)
     var id: String {
         switch self {
         case .add: return "add"
+        case .addForTrigger(let t): return "add-\(triggerUniqueID(t))"
         case .edit(let e): return "edit-\(triggerUniqueID(e.trigger))"
         }
     }
@@ -165,7 +170,8 @@ struct MappingsPage: View {
                                      onEdit: { sheet = .edit($0) }, onDelete: deleteEntry)
         case .keyboard:
             MappingsKeyboardStyleView(entries: sorted, availableInputSources: availableInputSources,
-                                      onEdit: { sheet = .edit($0) }, onDelete: deleteEntry)
+                                      onEdit: { sheet = .edit($0) },
+                                      onAddTrigger: { sheet = .addForTrigger($0) })
         }
     }
 
