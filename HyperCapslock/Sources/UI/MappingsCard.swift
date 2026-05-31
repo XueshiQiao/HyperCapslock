@@ -186,7 +186,9 @@ struct MappingsPage: View {
         .pickerStyle(.segmented)
         .labelsHidden()
         .help(loc.t("mappings.style"))
-        .frame(width: 132)
+        // Size to the two segments instead of a fixed width left over from when
+        // there were three.
+        .fixedSize()
     }
 
     private func deleteEntry(_ entry: ActionMappingEntry) {
