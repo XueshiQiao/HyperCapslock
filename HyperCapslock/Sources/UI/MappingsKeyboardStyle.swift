@@ -339,27 +339,35 @@ private struct MagicKeyboardView: View {
     // MARK: hover tooltip
 
     /// Custom tooltip card shown over a hovered mapped key: trigger → action.
+    /// The action sits in its own category-tinted pill so it reads as a distinct
+    /// unit and doesn't visually merge with the connector arrow.
     private func keyTooltip(_ entry: ActionMappingEntry) -> some View {
         let d = mappingActionDisplay(entry, loc, availableInputSources: availableInputSources)
-        return HStack(spacing: 8) {
+        let accent = d.invalid ? Color.orange : (ActionsRegistry.shared.resolve(entry).map(actionCategoryColor) ?? .secondary)
+        return HStack(spacing: 9) {
             TriggerChips(trigger: entry.trigger, style: .raised)
-            Image(systemName: "arrow.right").font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
-            if let icon = d.icon {
-                Image(nsImage: icon).resizable().frame(width: 15, height: 15)
-            } else {
-                Image(systemName: d.symbol).font(.system(size: 12)).foregroundStyle(d.invalid ? .orange : .primary)
+            Image(systemName: "arrow.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(.tertiary)
+            HStack(spacing: 6) {
+                if let icon = d.icon {
+                    Image(nsImage: icon).resizable().frame(width: 15, height: 15)
+                } else {
+                    Image(systemName: d.symbol).font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(accent)
+                }
+                Text(d.text).font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(d.invalid ? .orange : .primary).lineLimit(1)
+                if !entry.bindings.isEmpty {
+                    HStack(spacing: 2) { Image(systemName: "macwindow"); Text("\(entry.bindings.count)") }
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
             }
-            Text(d.text).font(.system(size: 12, weight: .medium))
-                .foregroundStyle(d.invalid ? .orange : .primary).lineLimit(1)
-            if !entry.bindings.isEmpty {
-                HStack(spacing: 3) { Image(systemName: "macwindow"); Text("\(entry.bindings.count)") }
-                    .font(.caption2).foregroundStyle(.secondary)
-                    .padding(.leading, 2)
-            }
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .background(Capsule().fill(accent.opacity(0.14)))
+            .overlay(Capsule().strokeBorder(accent.opacity(0.32)))
         }
         .padding(.horizontal, 11).padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(.regularMaterial))
-        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Color.primary.opacity(0.12)))
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.regularMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.primary.opacity(0.12)))
         .shadow(color: .black.opacity(0.28), radius: 11, y: 5)
         .fixedSize()
     }

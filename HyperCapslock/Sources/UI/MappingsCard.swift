@@ -84,9 +84,9 @@ func actionSymbol(_ config: ActionConfig) -> String {
         }
     case .inputSource: return "globe"
     case .command: return "terminal"
-    case .keyCombo: return "command"
+    case .keyCombo: return "keyboard"
     case .openApp: return "arrow.up.forward.app"
-    case .modifierKey: return "option"
+    case .modifierKey: return "hand.tap"
     }
 }
 

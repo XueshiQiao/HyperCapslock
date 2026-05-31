@@ -20,9 +20,9 @@ private let inlineKindSentinels: [(sentinel: String, kind: String, labelKey: Str
     (switchInputSourceSentinel, "input_source", "mappings.switch_input_source", "globe"),
     ("__inline_jump__", "jump", "group.jump", "chevron.up.2"),
     ("__inline_command__", "command", "group.command", "terminal"),
-    ("__inline_key_combo__", "key_combo", "group.key_combo", "command"),
+    ("__inline_key_combo__", "key_combo", "group.key_combo", "keyboard"),
     ("__inline_open_app__", "open_app", "group.open_app", "arrow.up.forward.app"),
-    ("__inline_hold_modifier__", "hold_modifier", "group.hold_modifier", "option"),
+    ("__inline_hold_modifier__", "hold_modifier", "group.hold_modifier", "hand.tap"),
 ]
 
 /// The `ActionConfigDraft.kind` an inline sentinel selects, or nil if `sentinel`
