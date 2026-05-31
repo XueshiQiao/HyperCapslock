@@ -128,86 +128,67 @@ struct MappingsPage: View {
     }
 
     var body: some View {
-        Form {
-            if config.mappings.isEmpty {
-                Section { Text(loc.t("mappings.empty")).foregroundStyle(.secondary) }
-            } else {
-                Section {
-                    ForEach(sorted, id: \.trigger) { entry in mappingRow(entry) }
+        styledContent
+            .navigationTitle(loc.t("nav.mappings"))
+            // Recompute installed input sources so names/icons are fresh and a removed one shows ⚠️.
+            .onAppear { availableInputSources = InputSourceFix.refreshAvailableSourcesByID() }
+            .toolbar {
+                ToolbarItemGroup {
+                    styleSwitcher
+                    Button { importConfig() } label: { Image(systemName: "square.and.arrow.down") }.help(loc.t("config.import"))
+                    #if DEBUG
+                    // Dev-only: one-click import the RELEASE build's config. The Debug
+                    // build has its own bundle id (.debug) and therefore its own config
+                    // dir, so this mirrors real settings into the dev app. Compiled out
+                    // of Release entirely.
+                    Button { importReleaseConfig() } label: { Image(systemName: "arrow.down.doc.fill") }
+                        .help("Import release config (debug)")
+                    #endif
+                    Button { exportConfig() } label: { Image(systemName: "square.and.arrow.up") }.help(loc.t("config.export"))
+                    Button { sheet = .add } label: { Image(systemName: "plus") }.help(loc.t("mappings.add"))
                 }
             }
-        }
-        .formStyle(.grouped)
-        .navigationTitle(loc.t("nav.mappings"))
-        // Recompute installed input sources so names/icons are fresh and a removed one shows ⚠️.
-        .onAppear { availableInputSources = InputSourceFix.refreshAvailableSourcesByID() }
-        .toolbar {
-            ToolbarItemGroup {
-                Button { importConfig() } label: { Image(systemName: "square.and.arrow.down") }.help(loc.t("config.import"))
-                #if DEBUG
-                // Dev-only: one-click import the RELEASE build's config. The Debug
-                // build has its own bundle id (.debug) and therefore its own config
-                // dir, so this mirrors real settings into the dev app. Compiled out
-                // of Release entirely.
-                Button { importReleaseConfig() } label: { Image(systemName: "arrow.down.doc.fill") }
-                    .help("Import release config (debug)")
-                #endif
-                Button { exportConfig() } label: { Image(systemName: "square.and.arrow.up") }.help(loc.t("config.export"))
-                Button { sheet = .add } label: { Image(systemName: "plus") }.help(loc.t("mappings.add"))
+            .sheet(item: $sheet) { mode in
+                AddEditMappingView(mode: mode).environmentObject(app).environmentObject(config).environmentObject(loc)
             }
-        }
-        .sheet(item: $sheet) { mode in
-            AddEditMappingView(mode: mode).environmentObject(app).environmentObject(config).environmentObject(loc)
+    }
+
+    /// Dispatch to the sub-view for the persisted style. Each style consumes the
+    /// same `sorted` mappings + shared edit/delete actions, so they stay in sync.
+    @ViewBuilder private var styledContent: some View {
+        switch config.appConfig.mappingsViewStyle {
+        case .list:
+            MappingsListStyleView(entries: sorted, availableInputSources: availableInputSources,
+                                  onEdit: { sheet = .edit($0) }, onDelete: deleteEntry)
+        case .grouped:
+            MappingsGroupedStyleView(entries: sorted, availableInputSources: availableInputSources,
+                                     onEdit: { sheet = .edit($0) }, onDelete: deleteEntry)
+        case .keyboard:
+            MappingsKeyboardStyleView(entries: sorted, availableInputSources: availableInputSources,
+                                      onEdit: { sheet = .edit($0) }, onDelete: deleteEntry)
         }
     }
 
-    private func mappingRow(_ entry: ActionMappingEntry) -> some View {
-        let d = mappingActionDisplay(entry, loc, availableInputSources: availableInputSources)
-        let bindingsInvalid = entry.bindings.contains { ActionsRegistry.shared.resolve($0) == nil }
-        return LabeledContent {
-            HStack(spacing: 8) {
-                if let icon = d.icon {
-                    Image(nsImage: icon).resizable().frame(width: 16, height: 16)
-                } else {
-                    Image(systemName: d.symbol).foregroundStyle(d.invalid ? .orange : .secondary)
-                }
-                Text(d.text).foregroundStyle(d.invalid ? .orange : .secondary).lineLimit(1).truncationMode(.middle)
-                if !entry.bindings.isEmpty {
-                    HStack(spacing: 3) {
-                        Image(systemName: bindingsInvalid ? "exclamationmark.triangle.fill" : "macwindow")
-                        Text("\(entry.bindings.count)")
-                    }
-                    .font(.caption2)
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Capsule().fill((bindingsInvalid ? Color.orange : Color.accentColor).opacity(0.15)))
-                    .foregroundStyle(bindingsInvalid ? Color.orange : Color.accentColor)
-                    .help(bindingsInvalid ? loc.t("mappings.invalid") : loc.t("mappings.app_rules"))
-                }
-                Button { sheet = .edit(entry) } label: { Image(systemName: "pencil") }.buttonStyle(.borderless)
-                Button {
-                    app.removeMapping(entry.trigger); app.showToast(loc.t("toast.mapping_removed"))
-                } label: { Image(systemName: "trash") }.buttonStyle(.borderless)
-            }
-        } label: {
-            triggerChips(entry.trigger)
+    /// Segmented style switcher, top-right of the Mappings page. Persisting is a
+    /// pure UI preference; if it somehow fails the binding just snaps back.
+    private var styleSwitcher: some View {
+        Picker("", selection: Binding(
+            get: { config.appConfig.mappingsViewStyle },
+            set: { try? app.setMappingsViewStyle($0) }
+        )) {
+            Image(systemName: "list.bullet").tag(MappingsViewStyle.list)
+            Image(systemName: "square.stack.3d.up.fill").tag(MappingsViewStyle.grouped)
+            Image(systemName: "keyboard").tag(MappingsViewStyle.keyboard)
         }
-        .contentShape(Rectangle())
-        .onTapGesture(count: 2) { sheet = .edit(entry) }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .help(loc.t("mappings.style"))
+        .frame(width: 132)
     }
 
-    @ViewBuilder
-    private func triggerChips(_ trigger: Trigger) -> some View {
-        HStack(spacing: 5) {
-            switch trigger {
-            case .singleTapHyper: Kbd("Caps"); Text("×").foregroundColor(.secondary).font(.caption); Kbd("1")
-            case .doubleTapHyper: Kbd("Caps"); Text("×").foregroundColor(.secondary).font(.caption); Kbd("2")
-            case .doubleTapModifier(let m): Kbd(modifierGlyph(m)); Text("×").foregroundColor(.secondary).font(.caption); Kbd("2")
-            case .hyperPlusKey(let key, let withShift):
-                Kbd("Caps"); Text("+").foregroundColor(.secondary).font(.caption)
-                if withShift { Kbd("Shift"); Text("+").foregroundColor(.secondary).font(.caption) }
-                Kbd(keyCodeDisplay(key))
-            }
-        }
+    private func deleteEntry(_ entry: ActionMappingEntry) {
+        app.removeMapping(entry.trigger)
+        app.showToast(loc.t("toast.mapping_removed"))
     }
 
     private func exportConfig() {

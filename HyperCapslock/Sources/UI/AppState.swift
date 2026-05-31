@@ -173,6 +173,14 @@ final class AppState: ObservableObject {
         }
     }
 
+    var mappingsViewStyle: MappingsViewStyle { config.appConfig.mappingsViewStyle }
+
+    /// Pure presentation toggle — just persist it; the Mappings page re-renders
+    /// off the published `appConfig`. No engine/runtime side effects.
+    func setMappingsViewStyle(_ style: MappingsViewStyle) throws {
+        try config.setMappingsViewStyle(style)
+    }
+
     private func applyInputSourceSettings() {
         InputSourceController.setFixStrategy(config.appConfig.cjkvFixStrategy)
         FileLog.shared.info("Input-source fix strategy applied: \(config.appConfig.cjkvFixStrategy.rawValue)")

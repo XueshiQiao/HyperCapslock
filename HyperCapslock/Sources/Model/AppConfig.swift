@@ -5,6 +5,15 @@ enum ThemeMode: String, Codable, CaseIterable {
     case light, dark, system
 }
 
+/// How the Mappings page renders its content. Pure presentation — the mappings
+/// themselves are identical across styles. Persisted in `app_config.yml` so the
+/// chosen style survives relaunch.
+enum MappingsViewStyle: String, Codable, CaseIterable, Equatable {
+    case list      // the original flat list (one row per mapping)
+    case grouped   // sectioned by trigger category
+    case keyboard  // a visual keyboard map
+}
+
 /// Reliability workaround applied when a `Caps+key → input source` mapping
 /// targets a CJKV IME (Chinese / Japanese / Korean / Vietnamese), where a plain
 /// `TISSelectInputSource` often changes the menu-bar icon but leaves typing in
@@ -29,6 +38,7 @@ struct AppConfig: Codable, Equatable {
     /// can arm its "hold CapsLock and drag a window" gesture. Off by default —
     /// users who don't run AnyDrag emit zero cross-app chatter.
     var broadcastCapsHoldForAnyDrag: Bool = false
+    var mappingsViewStyle: MappingsViewStyle = .list
 
     enum CodingKeys: String, CodingKey {
         case hideDockIcon = "hide_dock_icon"
@@ -37,17 +47,20 @@ struct AppConfig: Codable, Equatable {
         case themeMode = "theme_mode"
         case cjkvFixStrategy = "cjkv_fix_strategy"
         case broadcastCapsHoldForAnyDrag = "broadcast_caps_hold_for_anydrag"
+        case mappingsViewStyle = "mappings_view_style"
     }
 
     init(hideDockIcon: Bool = false, showHud: Bool = false, hudDurationMs: Int = 1350,
          themeMode: ThemeMode = .system, cjkvFixStrategy: CJKVFixStrategy = .none,
-         broadcastCapsHoldForAnyDrag: Bool = false) {
+         broadcastCapsHoldForAnyDrag: Bool = false,
+         mappingsViewStyle: MappingsViewStyle = .list) {
         self.hideDockIcon = hideDockIcon
         self.showHud = showHud
         self.hudDurationMs = hudDurationMs
         self.themeMode = themeMode
         self.cjkvFixStrategy = cjkvFixStrategy
         self.broadcastCapsHoldForAnyDrag = broadcastCapsHoldForAnyDrag
+        self.mappingsViewStyle = mappingsViewStyle
     }
 
     init(from decoder: Decoder) throws {
@@ -59,5 +72,7 @@ struct AppConfig: Codable, Equatable {
         // Tolerant: an unknown future strategy value decodes back to `.none`.
         self.cjkvFixStrategy = (try? c.decodeIfPresent(CJKVFixStrategy.self, forKey: .cjkvFixStrategy)) ?? .none
         self.broadcastCapsHoldForAnyDrag = try c.decodeIfPresent(Bool.self, forKey: .broadcastCapsHoldForAnyDrag) ?? false
+        // Tolerant: an unknown future view style decodes back to `.list`.
+        self.mappingsViewStyle = (try? c.decodeIfPresent(MappingsViewStyle.self, forKey: .mappingsViewStyle)) ?? .list
     }
 }

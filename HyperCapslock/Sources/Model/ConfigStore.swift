@@ -353,6 +353,7 @@ final class ConfigStore: ObservableObject {
     func setThemeMode(_ mode: ThemeMode) throws { try mutateConfig { $0.themeMode = mode } }
     func setCJKVFixStrategy(_ strategy: CJKVFixStrategy) throws { try mutateConfig { $0.cjkvFixStrategy = strategy } }
     func setBroadcastCapsHoldForAnyDrag(_ on: Bool) throws { try mutateConfig { $0.broadcastCapsHoldForAnyDrag = on } }
+    func setMappingsViewStyle(_ style: MappingsViewStyle) throws { try mutateConfig { $0.mappingsViewStyle = style } }
 
     private func mutateConfig(_ change: (inout AppConfig) -> Void) throws {
         let prev = appConfig
