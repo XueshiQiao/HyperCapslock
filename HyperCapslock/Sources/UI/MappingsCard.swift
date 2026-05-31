@@ -171,7 +171,8 @@ struct MappingsPage: View {
         case .keyboard:
             MappingsKeyboardStyleView(entries: sorted, availableInputSources: availableInputSources,
                                       onEdit: { sheet = .edit($0) },
-                                      onAddTrigger: { sheet = .addForTrigger($0) })
+                                      onAddTrigger: { sheet = .addForTrigger($0) },
+                                      onDelete: deleteEntry)
         }
     }
 
