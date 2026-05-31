@@ -123,31 +123,36 @@ struct MappingRow: View {
     var body: some View {
         let d = mappingActionDisplay(entry, loc, availableInputSources: availableInputSources)
         let bindingsInvalid = entry.bindings.contains { ActionsRegistry.shared.resolve($0) == nil }
-        return LabeledContent {
-            HStack(spacing: 8) {
-                if let icon = d.icon {
-                    Image(nsImage: icon).resizable().frame(width: 16, height: 16)
-                } else {
-                    Image(systemName: d.symbol).foregroundStyle(d.invalid ? .orange : .secondary)
-                }
-                Text(d.text).foregroundStyle(d.invalid ? .orange : .secondary).lineLimit(1).truncationMode(.middle)
-                if !entry.bindings.isEmpty {
-                    HStack(spacing: 3) {
-                        Image(systemName: bindingsInvalid ? "exclamationmark.triangle.fill" : "macwindow")
-                        Text("\(entry.bindings.count)")
-                    }
-                    .font(.caption2)
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Capsule().fill((bindingsInvalid ? Color.orange : Color.accentColor).opacity(0.15)))
-                    .foregroundStyle(bindingsInvalid ? Color.orange : Color.accentColor)
-                    .help(bindingsInvalid ? loc.t("mappings.invalid") : loc.t("mappings.app_rules"))
-                }
-                Button(action: onEdit) { Image(systemName: "pencil") }.buttonStyle(.borderless)
-                Button(action: onDelete) { Image(systemName: "trash") }.buttonStyle(.borderless)
-            }
-        } label: {
+        // Explicit HStack (not LabeledContent) so the trigger sits left and the
+        // action sits right in EVERY context — LabeledContent only spreads that
+        // way inside a Form; elsewhere (e.g. the keyboard style's Other Triggers)
+        // it would center.
+        return HStack(spacing: 8) {
             TriggerChips(trigger: entry.trigger, style: keycapStyle)
+            Spacer(minLength: 12)
+            if let icon = d.icon {
+                Image(nsImage: icon).resizable().frame(width: 16, height: 16)
+            } else {
+                Image(systemName: d.symbol).foregroundStyle(d.invalid ? .orange : .secondary)
+            }
+            Text(d.text).foregroundStyle(d.invalid ? .orange : .secondary).lineLimit(1).truncationMode(.middle)
+            if !entry.bindings.isEmpty {
+                HStack(spacing: 3) {
+                    Image(systemName: bindingsInvalid ? "exclamationmark.triangle.fill" : "macwindow")
+                    Text("\(entry.bindings.count)")
+                }
+                .font(.caption2)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(Capsule().fill((bindingsInvalid ? Color.orange : Color.accentColor).opacity(0.15)))
+                .foregroundStyle(bindingsInvalid ? Color.orange : Color.accentColor)
+                .help(bindingsInvalid ? loc.t("mappings.invalid") : loc.t("mappings.app_rules"))
+            }
+            Button(action: onEdit) { Image(systemName: "pencil") }.buttonStyle(.borderless)
+            Button(action: onDelete) { Image(systemName: "trash") }.buttonStyle(.borderless)
         }
+        // Fill the row width so the Spacer actually spreads trigger-left /
+        // action-right — needed outside a Form (Form rows already get full width).
+        .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: onEdit)
     }

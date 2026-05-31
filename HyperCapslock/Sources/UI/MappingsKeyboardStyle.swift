@@ -118,11 +118,22 @@ private struct KbWidthKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
+/// The currently hovered mapped key.
+private struct HoverInfo: Equatable {
+    let js: UInt16
+    let entry: ActionMappingEntry
+}
+
 /// One physical key. `js` is the JS keycode it maps to (nil ⇒ not mappable, e.g.
 /// a modifier). `role` drives appearance + interactivity. `units` is the key's
 /// width in grid columns.
-private struct KKey: Identifiable {
-    let id = UUID()
+///
+/// Deliberately NOT `Identifiable` with a `UUID`: the layout is rebuilt every
+/// render, so a per-instance UUID would change each time and make `ForEach` treat
+/// every key as new — tearing down and recreating all 64 keys (and their hover
+/// tracking areas) on each hover, which spuriously re-fires `onHover` and loops
+/// into a beachball. Keys are identified by their stable grid position instead.
+private struct KKey {
     let label: String
     var js: UInt16? = nil
     var units: CGFloat = 1
@@ -140,6 +151,7 @@ private struct MagicKeyboardView: View {
     @Environment(\.colorScheme) private var scheme
 
     @State private var width: CGFloat = 720
+    @State private var hovered: HoverInfo?
 
     private let gap: CGFloat = 6
     private let bezelPad: CGFloat = 14
@@ -156,11 +168,13 @@ private struct MagicKeyboardView: View {
     var body: some View {
         VStack(spacing: 0) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                HStack(spacing: 0) { ForEach(row) { keyCell($0) } }
+                HStack(spacing: 0) {
+                    ForEach(Array(row.enumerated()), id: \.offset) { _, key in keyCell(key) }
+                }
             }
             // Bottom row: the modifier/space keys plus the inverted-T arrow cluster.
             HStack(spacing: 0) {
-                ForEach(bottomRow) { keyCell($0) }
+                ForEach(Array(bottomRow.enumerated()), id: \.offset) { _, key in keyCell(key) }
                 arrowCluster
             }
         }
@@ -170,10 +184,52 @@ private struct MagicKeyboardView: View {
                 .fill(dark ? Color(red: 0.06, green: 0.08, blue: 0.11) : Color(red: 0.80, green: 0.81, blue: 0.84))
                 .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.primary.opacity(0.10)))
         )
+        // Custom hover tooltip — instant + styled. Positioned from the known grid
+        // geometry, so there are no anchor preferences / nested GeometryReaders
+        // and therefore no layout feedback loop (which beach-balled the app).
+        .overlay { tooltipOverlay }
         .fixedSize(horizontal: true, vertical: true)
         .frame(maxWidth: .infinity)   // center the keyboard when the pane is wider
         .background(GeometryReader { g in Color.clear.preference(key: KbWidthKey.self, value: g.size.width) })
         .onPreferenceChange(KbWidthKey.self) { width = $0 }
+    }
+
+    @ViewBuilder private var tooltipOverlay: some View {
+        if let h = hovered, let rect = keyRects[h.js] {
+            keyTooltip(h.entry)
+                .fixedSize()
+                .position(tooltipPosition(rect))
+                .allowsHitTesting(false)
+        }
+    }
+
+    /// Analytic rect of each mappable key in the bezel's coordinate space (origin
+    /// at the bezel top-left, i.e. including the bezel padding). Lets the hover
+    /// tooltip position itself with zero preference/anchor machinery.
+    private var keyRects: [UInt16: CGRect] {
+        var out: [UInt16: CGRect] = [:]
+        func place(_ keys: [KKey], row: Int) {
+            var off: CGFloat = 0
+            for key in keys {
+                if key.role == .normal, let js = key.js {
+                    out[js] = CGRect(x: bezelPad + off * colW, y: bezelPad + CGFloat(row) * rowH,
+                                     width: key.units * colW, height: rowH)
+                }
+                off += key.units
+            }
+        }
+        for (i, row) in rows.enumerated() { place(row, row: i) }
+        // Bottom row: modifier/space keys, then the inverted-T arrow cluster.
+        let r = rows.count
+        place(bottomRow, row: r)
+        let bottomUnits = bottomRow.reduce(0) { $0 + $1.units }
+        let y = bezelPad + CGFloat(r) * rowH
+        out[37] = CGRect(x: bezelPad + bottomUnits * colW, y: y, width: colW, height: rowH)              // ←
+        let colX = bezelPad + (bottomUnits + 1) * colW
+        out[38] = CGRect(x: colX, y: y, width: colW, height: rowH / 2)                                   // ↑
+        out[40] = CGRect(x: colX, y: y + rowH / 2, width: colW, height: rowH / 2)                        // ↓
+        out[39] = CGRect(x: bezelPad + (bottomUnits + 2) * colW, y: y, width: colW, height: rowH)        // →
+        return out
     }
 
     // MARK: rows
@@ -230,23 +286,15 @@ private struct MagicKeyboardView: View {
             .padding(gap / 2)
             .frame(width: key.units * colW, height: rowH)
             .contentShape(Rectangle())
-            .help(info.help)
             .onTapGesture { tap(key, info) }
+            .onHover { updateHover(key, info, $0) }
     }
 
-    private struct MapInfo { var entry: ActionMappingEntry?; var cfg: ActionConfig?; var help: String }
+    private struct MapInfo { var entry: ActionMappingEntry?; var cfg: ActionConfig? }
 
     private func mapInfo(_ key: KKey) -> MapInfo {
-        guard key.role == .normal, let js = key.js, let entry = mapped[js] else { return MapInfo(help: "") }
-        let cfg = ActionsRegistry.shared.resolve(entry)
-        return MapInfo(entry: entry, cfg: cfg, help: helpText(entry))
-    }
-
-    private func helpText(_ entry: ActionMappingEntry) -> String {
-        let d = mappingActionDisplay(entry, loc, availableInputSources: availableInputSources)
-        var s = "\(ConfigStore.triggerLabel(entry.trigger))  →  \(d.text)"
-        if !entry.bindings.isEmpty { s += "   (+\(entry.bindings.count) \(loc.t("mappings.app_rules")))" }
-        return s
+        guard key.role == .normal, let js = key.js, let entry = mapped[js] else { return MapInfo() }
+        return MapInfo(entry: entry, cfg: ActionsRegistry.shared.resolve(entry))
     }
 
     private func tap(_ key: KKey, _ info: MapInfo) {
@@ -255,6 +303,15 @@ private struct MagicKeyboardView: View {
             onAddTrigger(.hyperPlusKey(key: js, withShift: layerShift))
         }
     }
+
+    /// Set/clear the hovered key. Clearing only when *this* key is the current
+    /// one makes key→key moves reliable regardless of enter/exit event order.
+    private func updateHover(_ key: KKey, _ info: MapInfo, _ hovering: Bool) {
+        guard key.role == .normal, let js = key.js, let entry = info.entry else { return }
+        if hovering { hovered = HoverInfo(js: js, entry: entry) }
+        else if hovered?.js == js { hovered = nil }
+    }
+
 
     // The inverted-T arrow cluster: ← (full height) · ↑/↓ stacked · → (full height).
     private var arrowCluster: some View {
@@ -275,8 +332,46 @@ private struct MagicKeyboardView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(gap / 2)
             .contentShape(Rectangle())
-            .help(info.help)
             .onTapGesture { tap(key, info) }
+            .onHover { updateHover(key, info, $0) }
+    }
+
+    // MARK: hover tooltip
+
+    /// Custom tooltip card shown over a hovered mapped key: trigger → action.
+    private func keyTooltip(_ entry: ActionMappingEntry) -> some View {
+        let d = mappingActionDisplay(entry, loc, availableInputSources: availableInputSources)
+        return HStack(spacing: 8) {
+            TriggerChips(trigger: entry.trigger, style: .raised)
+            Image(systemName: "arrow.right").font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
+            if let icon = d.icon {
+                Image(nsImage: icon).resizable().frame(width: 15, height: 15)
+            } else {
+                Image(systemName: d.symbol).font(.system(size: 12)).foregroundStyle(d.invalid ? .orange : .primary)
+            }
+            Text(d.text).font(.system(size: 12, weight: .medium))
+                .foregroundStyle(d.invalid ? .orange : .primary).lineLimit(1)
+            if !entry.bindings.isEmpty {
+                HStack(spacing: 3) { Image(systemName: "macwindow"); Text("\(entry.bindings.count)") }
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .padding(.leading, 2)
+            }
+        }
+        .padding(.horizontal, 11).padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(.regularMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Color.primary.opacity(0.12)))
+        .shadow(color: .black.opacity(0.28), radius: 11, y: 5)
+        .fixedSize()
+    }
+
+    /// Center the tooltip above the key, flipping below when the key is near the
+    /// top, and keep it horizontally inside the keyboard.
+    private func tooltipPosition(_ rect: CGRect) -> CGPoint {
+        let estH: CGFloat = 44, halfW: CGFloat = 130
+        let bezelWidth = rowUnits * colW + bezelPad * 2
+        let y = rect.minY > estH + 14 ? rect.minY - estH / 2 - 8 : rect.maxY + estH / 2 + 8
+        let lo = halfW + 4, hi = max(lo, bezelWidth - halfW - 4)
+        return CGPoint(x: min(max(rect.midX, lo), hi), y: y)
     }
 
     // MARK: cap visual
