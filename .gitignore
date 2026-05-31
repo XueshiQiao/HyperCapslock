@@ -20,3 +20,7 @@ xcuserdata/
 .build/
 Packages/
 Package.resolved
+
+# Claude Code runtime / transient state
+.claude/scheduled_tasks.lock
+.claude/worktrees/
