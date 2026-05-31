@@ -34,7 +34,11 @@ cur_build=$(grep -E '^[[:space:]]*CURRENT_PROJECT_VERSION:' "$PROJECT_YML" | sed
 [ -n "$cur_build" ] || { echo "error: could not read CURRENT_PROJECT_VERSION from $PROJECT_YML" >&2; exit 1; }
 
 new_build=$((cur_build + 1))
-version="$(date -u +%y.%m).${new_build}"
+# YY.MM is taken from LOCAL time, not UTC. The release is cut from the
+# maintainer's machine, so the month must match their wall clock: just past
+# midnight on Jun 1 in UTC+8 is still May 31 in UTC, and `date -u` would
+# mislabel that release 26.05 instead of 26.06. Keep this as local `date`.
+version="$(date +%y.%m).${new_build}"
 tag="v${version}"
 
 if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
