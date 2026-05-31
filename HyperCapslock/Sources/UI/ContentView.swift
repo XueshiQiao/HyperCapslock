@@ -65,12 +65,29 @@ struct ContentView: View {
             }
             // Match System Settings' taller rows (SwiftUI's grouped-Form default is tighter).
             .environment(\.defaultMinListRowHeight, 34)
+            // A leading sidebar toggle, always present on the detail side so the
+            // sidebar can be reopened after it's collapsed (NavigationSplitView
+            // doesn't provide one on its own). Merges with each page's own toolbar.
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    Button(action: toggleSidebar) { Image(systemName: "sidebar.leading") }
+                        .help(loc.t("nav.toggle_sidebar"))
+                }
+            }
         }
         .frame(minWidth: 760, minHeight: 560)
         .overlay(alignment: .bottom) {
             if let toast = app.toast { toastView(toast).padding(.bottom, 24) }
         }
         .animation(.easeInOut(duration: 0.2), value: app.toast)
+    }
+
+    /// Toggle the NavigationSplitView's sidebar by sending the AppKit
+    /// `toggleSidebar:` action up the responder chain (the SwiftUI split view is
+    /// backed by an NSSplitViewController that handles it).
+    private func toggleSidebar() {
+        NSApp.keyWindow?.firstResponder?.tryToPerform(
+            #selector(NSSplitViewController.toggleSidebar(_:)), with: nil)
     }
 
     private func sidebarRow(_ p: SidebarPage, _ title: String, _ symbol: String, _ color: Color) -> some View {
