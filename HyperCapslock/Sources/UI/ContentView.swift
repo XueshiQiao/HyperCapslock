@@ -3,6 +3,20 @@ import AppKit
 
 enum SidebarPage: Hashable, CaseIterable {
     case settings, mappings, actions, inputSource, about
+
+    /// Stable, language-independent id stem for accessibility identifiers:
+    /// `nav.<axID>` on the sidebar row, `page.<axID>` on the detail root. These
+    /// are the contract the XCUITest suite targets — never key tests off visible
+    /// (localized) text. Treat like a public API.
+    var axID: String {
+        switch self {
+        case .mappings: return "mappings"
+        case .settings: return "settings"
+        case .actions: return "actions"
+        case .inputSource: return "input_source"
+        case .about: return "about"
+        }
+    }
 }
 
 /// Stable identity for a trigger (ForEach id + edit-sheet identity).
@@ -56,11 +70,11 @@ struct ContentView: View {
         } detail: {
             Group {
                 switch page ?? .mappings {
-                case .settings: SettingsPage()
-                case .mappings: MappingsPage()
-                case .actions: ActionsPage()
-                case .inputSource: InputSourcePage()
-                case .about: AboutPage()
+                case .settings: SettingsPage().accessibilityIdentifier("page.settings")
+                case .mappings: MappingsPage().accessibilityIdentifier("page.mappings")
+                case .actions: ActionsPage().accessibilityIdentifier("page.actions")
+                case .inputSource: InputSourcePage().accessibilityIdentifier("page.input_source")
+                case .about: AboutPage().accessibilityIdentifier("page.about")
                 }
             }
             // Match System Settings' taller rows (SwiftUI's grouped-Form default is tighter).
@@ -97,6 +111,8 @@ struct ContentView: View {
         }
         .padding(.vertical, 2)
         .tag(p)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("nav.\(p.axID)")
     }
 
     private var brand: some View {

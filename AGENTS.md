@@ -113,3 +113,12 @@ keypair requires updating both it and the `SPARKLE_EDDSA_KEY` secret.
 ## Conventions
 - 2-space indentation. Encapsulate logic into structs/enums; keep the engine's
   global runtime state behind the lock wrappers in `EngineState`/`MappingsRegistry`.
+- **Accessibility identifiers are mandatory.** Every new page, section, and
+  interactive control (sidebar rows, buttons, toggles, text fields, list rows,
+  segmented controls, sheets) MUST get a stable `.accessibilityIdentifier(...)`.
+  Use namespaced, language-independent ids — dots separate namespace segments,
+  `snake_case` within a segment, all lowercase (`nav.mappings`, `page.settings`,
+  `page.input_source`, `settings.start_at_login`, `action.row.<id>`). NEVER rely
+  on visible text, which breaks across en/zh/ja/de. These ids are the contract the XCUITest UI-automation
+  suite (`HyperCapslockUITests`) targets; adding UI without them silently makes it
+  untestable. Treat a stable id like a public API for tests.
