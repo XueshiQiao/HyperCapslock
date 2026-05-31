@@ -98,3 +98,21 @@ targets:
         # (tests run in Debug) must point there instead.
         Debug:
           TEST_HOST: $(BUILT_PRODUCTS_DIR)/HyperCapslock-Dev.app/Contents/MacOS/HyperCapslock-Dev
+
+  # XCUITest (UI-automation) suite — drives the app through the accessibility
+  # tree. Launches the app with `-uitest` so it never installs the global
+  # keyboard hook / hidutil remap and uses an isolated temp config.
+  HyperCapslockUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: HyperCapslockUITests
+    dependencies:
+      - target: HyperCapslock
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: me.xueshi.hypercapslock.uitests
+        # Designates the app this UI-test bundle drives. This is the TARGET name,
+        # not the product name — it resolves to HyperCapslock-Dev.app under Debug.
+        TEST_TARGET_NAME: HyperCapslock
