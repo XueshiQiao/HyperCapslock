@@ -7,32 +7,104 @@ import AppKit
 // `MappingsPage` (in MappingsCard.swift) owns the toolbar/sheet/state and simply
 // dispatches to the style selected in `AppConfig.mappingsViewStyle`.
 
+// MARK: - Keycaps
+
+/// Which keycap look the trigger chips use. `.flat` is the original minimal chip
+/// (`Kbd`); `.raised` is the 3D physical keycap from the design mockup.
+enum KeycapStyle { case flat, raised }
+
+/// A raised, physical-looking keycap — ported from the design mockup
+/// (`docs/design/mappings-mockups.html`). Adapts to light/dark so it reads as a
+/// real key in either appearance (light-gray cap in light mode, graphite in dark).
+struct Keycap: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let dark = scheme == .dark
+        Text(text)
+            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+            .foregroundStyle(dark ? Color(red: 0.89, green: 0.91, blue: 0.95)
+                                  : Color(red: 0.13, green: 0.13, blue: 0.15))
+            .padding(.horizontal, 7)
+            .frame(minWidth: 26, minHeight: 25)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: dark ? [Color(red: 0.20, green: 0.24, blue: 0.30), Color(red: 0.115, green: 0.145, blue: 0.19)]
+                                     : [Color.white, Color(red: 0.90, green: 0.91, blue: 0.93)],
+                        startPoint: .top, endPoint: .bottom)))
+            .overlay(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(LinearGradient(
+                        colors: dark ? [Color.white.opacity(0.16), Color.black.opacity(0.55)]
+                                     : [Color.white, Color.black.opacity(0.20)],
+                        startPoint: .top, endPoint: .bottom), lineWidth: 1))
+            .shadow(color: .black.opacity(dark ? 0.35 : 0.16), radius: 1.2, y: 1)
+    }
+}
+
 // MARK: - Shared trigger chips
 
 /// The trigger rendered as keycap chips (`Caps + H`, `Caps ×2`, `⌘ ×2`, …).
 /// Shared by every style so a trigger reads the same everywhere.
 struct TriggerChips: View {
     let trigger: Trigger
+    var style: KeycapStyle = .flat
 
     var body: some View {
         HStack(spacing: 5) {
             switch trigger {
             case .singleTapHyper:
-                Kbd("Caps"); times; Kbd("1")
+                cap("Caps"); times; cap("1")
             case .doubleTapHyper:
-                Kbd("Caps"); times; Kbd("2")
+                cap("Caps"); times; cap("2")
             case .doubleTapModifier(let m):
-                Kbd(modifierGlyph(m)); times; Kbd("2")
+                cap(modifierGlyph(m)); times; cap("2")
             case .hyperPlusKey(let key, let withShift):
-                Kbd("Caps"); plus
-                if withShift { Kbd("Shift"); plus }
-                Kbd(keyCodeDisplay(key))
+                cap("Caps"); plus
+                if withShift { cap("Shift"); plus }
+                cap(keyCodeDisplay(key))
             }
         }
     }
 
+    @ViewBuilder private func cap(_ t: String) -> some View {
+        switch style {
+        case .flat: Kbd(t)
+        case .raised: Keycap(t)
+        }
+    }
     private var plus: some View { Text("+").foregroundColor(.secondary).font(.caption) }
     private var times: some View { Text("×").foregroundColor(.secondary).font(.caption) }
+}
+
+// MARK: - Trigger categories (for the grouped style)
+
+/// Buckets a trigger into one of the grouped-style sections. Declaration order
+/// is section order.
+enum TriggerCategory: CaseIterable {
+    case capsKey, capsShiftKey, singleTap, doubleTap, doubleTapModifier
+
+    var nameKey: String {
+        switch self {
+        case .capsKey:           return "mappings.group.caps_key"
+        case .capsShiftKey:      return "mappings.group.caps_shift_key"
+        case .singleTap:         return "mappings.group.single_tap"
+        case .doubleTap:         return "mappings.group.double_tap"
+        case .doubleTapModifier: return "mappings.group.double_tap_modifier"
+        }
+    }
+}
+
+func triggerCategory(_ t: Trigger) -> TriggerCategory {
+    switch t {
+    case .hyperPlusKey(_, let withShift): return withShift ? .capsShiftKey : .capsKey
+    case .singleTapHyper:                 return .singleTap
+    case .doubleTapHyper:                 return .doubleTap
+    case .doubleTapModifier:              return .doubleTapModifier
+    }
 }
 
 // MARK: - Shared mapping row
@@ -43,6 +115,7 @@ struct TriggerChips: View {
 struct MappingRow: View {
     let entry: ActionMappingEntry
     let availableInputSources: [String: InputSourceFix.AvailableSource]
+    var keycapStyle: KeycapStyle = .flat
     let onEdit: () -> Void
     let onDelete: () -> Void
     @EnvironmentObject var loc: LocalizationManager
@@ -73,7 +146,7 @@ struct MappingRow: View {
                 Button(action: onDelete) { Image(systemName: "trash") }.buttonStyle(.borderless)
             }
         } label: {
-            TriggerChips(trigger: entry.trigger)
+            TriggerChips(trigger: entry.trigger, style: keycapStyle)
         }
         .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: onEdit)
@@ -113,9 +186,35 @@ struct MappingsGroupedStyleView: View {
     let availableInputSources: [String: InputSourceFix.AvailableSource]
     let onEdit: (ActionMappingEntry) -> Void
     let onDelete: (ActionMappingEntry) -> Void
+    @EnvironmentObject var loc: LocalizationManager
 
     var body: some View {
-        StylePlaceholder(symbol: "square.stack.3d.up.fill", title: "Grouped by trigger")
+        Form {
+            if entries.isEmpty {
+                Section { Text(loc.t("mappings.empty")).foregroundStyle(.secondary) }
+            } else {
+                // `entries` arrives pre-sorted by triggerSortKey; filtering per
+                // category preserves that order. Empty categories are skipped.
+                ForEach(TriggerCategory.allCases, id: \.self) { category in
+                    let items = entries.filter { triggerCategory($0.trigger) == category }
+                    if !items.isEmpty {
+                        Section {
+                            ForEach(items, id: \.trigger) { entry in
+                                MappingRow(entry: entry, availableInputSources: availableInputSources,
+                                           keycapStyle: .raised,
+                                           onEdit: { onEdit(entry) }, onDelete: { onDelete(entry) })
+                            }
+                        } header: {
+                            HStack(spacing: 7) {
+                                Text(loc.t(category.nameKey))
+                                Text("\(items.count)").foregroundStyle(.tertiary).monospacedDigit()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 
