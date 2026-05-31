@@ -107,6 +107,39 @@ func triggerCategory(_ t: Trigger) -> TriggerCategory {
     }
 }
 
+// MARK: - Action pill
+
+/// The action half of a row / tooltip: the action icon in its category color +
+/// label, inside a faint category-tinted capsule so it reads as one distinct
+/// unit. Shared by the grouped rows, the keyboard's Other Triggers, and the
+/// keyboard hover tooltip.
+struct ActionPill: View {
+    let display: ActionDisplay
+    let accent: Color
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if let icon = display.icon {
+                Image(nsImage: icon).resizable().frame(width: 15, height: 15)
+            } else {
+                Image(systemName: display.symbol).font(.system(size: 12, weight: .medium)).foregroundStyle(accent)
+            }
+            Text(display.text).font(.system(size: 12, weight: .medium))
+                .foregroundStyle(display.invalid ? .orange : .primary)
+                .lineLimit(1).truncationMode(.middle)
+        }
+        .padding(.horizontal, 8).padding(.vertical, 4)
+        .background(Capsule().fill(accent.opacity(0.14)))
+        .overlay(Capsule().strokeBorder(accent.opacity(0.32)))
+    }
+}
+
+/// Category accent color for a mapping's resolved action; orange when the action
+/// is unresolved/invalid.
+func actionAccent(_ entry: ActionMappingEntry, invalid: Bool) -> Color {
+    invalid ? .orange : (ActionsRegistry.shared.resolve(entry).map(actionCategoryColor) ?? .secondary)
+}
+
 // MARK: - Shared mapping row
 
 /// One mapping row: trigger chips on the left, the resolved action on the right,
@@ -130,12 +163,7 @@ struct MappingRow: View {
         return HStack(spacing: 8) {
             TriggerChips(trigger: entry.trigger, style: keycapStyle)
             Spacer(minLength: 12)
-            if let icon = d.icon {
-                Image(nsImage: icon).resizable().frame(width: 16, height: 16)
-            } else {
-                Image(systemName: d.symbol).foregroundStyle(d.invalid ? .orange : .secondary)
-            }
-            Text(d.text).foregroundStyle(d.invalid ? .orange : .secondary).lineLimit(1).truncationMode(.middle)
+            ActionPill(display: d, accent: actionAccent(entry, invalid: d.invalid))
             if !entry.bindings.isEmpty {
                 HStack(spacing: 3) {
                     Image(systemName: bindingsInvalid ? "exclamationmark.triangle.fill" : "macwindow")
@@ -158,33 +186,7 @@ struct MappingRow: View {
     }
 }
 
-// MARK: - Style: List (original flat list)
-
-struct MappingsListStyleView: View {
-    let entries: [ActionMappingEntry]
-    let availableInputSources: [String: InputSourceFix.AvailableSource]
-    let onEdit: (ActionMappingEntry) -> Void
-    let onDelete: (ActionMappingEntry) -> Void
-    @EnvironmentObject var loc: LocalizationManager
-
-    var body: some View {
-        Form {
-            if entries.isEmpty {
-                Section { Text(loc.t("mappings.empty")).foregroundStyle(.secondary) }
-            } else {
-                Section {
-                    ForEach(entries, id: \.trigger) { entry in
-                        MappingRow(entry: entry, availableInputSources: availableInputSources,
-                                   onEdit: { onEdit(entry) }, onDelete: { onDelete(entry) })
-                    }
-                }
-            }
-        }
-        .formStyle(.grouped)
-    }
-}
-
-// MARK: - Style: Grouped by trigger (implemented in a later step)
+// MARK: - Style: Grouped by trigger
 
 struct MappingsGroupedStyleView: View {
     let entries: [ActionMappingEntry]

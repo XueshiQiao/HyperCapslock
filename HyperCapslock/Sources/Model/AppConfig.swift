@@ -9,8 +9,7 @@ enum ThemeMode: String, Codable, CaseIterable {
 /// themselves are identical across styles. Persisted in `app_config.yml` so the
 /// chosen style survives relaunch.
 enum MappingsViewStyle: String, Codable, CaseIterable, Equatable {
-    case list      // the original flat list (one row per mapping)
-    case grouped   // sectioned by trigger category
+    case grouped   // sectioned by trigger category (default)
     case keyboard  // a visual keyboard map
 }
 
@@ -38,7 +37,7 @@ struct AppConfig: Codable, Equatable {
     /// can arm its "hold CapsLock and drag a window" gesture. Off by default —
     /// users who don't run AnyDrag emit zero cross-app chatter.
     var broadcastCapsHoldForAnyDrag: Bool = false
-    var mappingsViewStyle: MappingsViewStyle = .list
+    var mappingsViewStyle: MappingsViewStyle = .grouped
 
     enum CodingKeys: String, CodingKey {
         case hideDockIcon = "hide_dock_icon"
@@ -53,7 +52,7 @@ struct AppConfig: Codable, Equatable {
     init(hideDockIcon: Bool = false, showHud: Bool = false, hudDurationMs: Int = 1350,
          themeMode: ThemeMode = .system, cjkvFixStrategy: CJKVFixStrategy = .none,
          broadcastCapsHoldForAnyDrag: Bool = false,
-         mappingsViewStyle: MappingsViewStyle = .list) {
+         mappingsViewStyle: MappingsViewStyle = .grouped) {
         self.hideDockIcon = hideDockIcon
         self.showHud = showHud
         self.hudDurationMs = hudDurationMs
@@ -72,7 +71,8 @@ struct AppConfig: Codable, Equatable {
         // Tolerant: an unknown future strategy value decodes back to `.none`.
         self.cjkvFixStrategy = (try? c.decodeIfPresent(CJKVFixStrategy.self, forKey: .cjkvFixStrategy)) ?? .none
         self.broadcastCapsHoldForAnyDrag = try c.decodeIfPresent(Bool.self, forKey: .broadcastCapsHoldForAnyDrag) ?? false
-        // Tolerant: an unknown future view style decodes back to `.list`.
-        self.mappingsViewStyle = (try? c.decodeIfPresent(MappingsViewStyle.self, forKey: .mappingsViewStyle)) ?? .list
+        // Tolerant: a missing value, or the now-removed legacy "list" value,
+        // decodes back to `.grouped`.
+        self.mappingsViewStyle = (try? c.decodeIfPresent(MappingsViewStyle.self, forKey: .mappingsViewStyle)) ?? .grouped
     }
 }

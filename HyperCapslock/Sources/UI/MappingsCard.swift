@@ -162,9 +162,6 @@ struct MappingsPage: View {
     /// same `sorted` mappings + shared edit/delete actions, so they stay in sync.
     @ViewBuilder private var styledContent: some View {
         switch config.appConfig.mappingsViewStyle {
-        case .list:
-            MappingsListStyleView(entries: sorted, availableInputSources: availableInputSources,
-                                  onEdit: { sheet = .edit($0) }, onDelete: deleteEntry)
         case .grouped:
             MappingsGroupedStyleView(entries: sorted, availableInputSources: availableInputSources,
                                      onEdit: { sheet = .edit($0) }, onDelete: deleteEntry)
@@ -183,8 +180,7 @@ struct MappingsPage: View {
             get: { config.appConfig.mappingsViewStyle },
             set: { try? app.setMappingsViewStyle($0) }
         )) {
-            Image(systemName: "list.bullet").tag(MappingsViewStyle.list)
-            Image(systemName: "square.stack.3d.up.fill").tag(MappingsViewStyle.grouped)
+            Image(systemName: "list.bullet").tag(MappingsViewStyle.grouped)
             Image(systemName: "keyboard").tag(MappingsViewStyle.keyboard)
         }
         .pickerStyle(.segmented)
