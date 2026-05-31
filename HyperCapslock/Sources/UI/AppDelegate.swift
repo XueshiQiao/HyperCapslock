@@ -9,19 +9,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupMainMenu()
         // Order matters: state/config first, then engine, then UI surfaces.
         AppState.shared.bootstrap()
-        KeyboardHook.shared.start()
+        // Under -uitest (XCUITest), do NOT install the global keyboard hook /
+        // hidutil remap — tests must never grab the host keyboard. Config is
+        // already isolated to a temp dir (see ConfigStore.appDataDir).
+        if !AppEnvironment.isUITest {
+            KeyboardHook.shared.start()
+        }
         HudController.shared.install()
         // Frontmost-app tracker feeds per-app scoped mappings — runs in all builds.
         #if DEBUG
         // Debug overlay (toggle in Settings ▸ Debug) consumes the tracker's
         // onChange; install it before start() so the initial seed is shown.
-        FrontmostAppHud.shared.install()
+        if !AppEnvironment.isUITest { FrontmostAppHud.shared.install() }
         #endif
         FrontmostAppTracker.shared.start()
         tray = TrayController()
         MainWindowController.shared = MainWindowController()
         MainWindowController.shared?.show()
-        _ = UpdaterManager.shared   // start Sparkle's background update checker
+        if !AppEnvironment.isUITest {
+            _ = UpdaterManager.shared   // start Sparkle's background update checker
+        }
 
         // Re-check permissions when the app regains focus (user may have just
         // granted them in System Settings).
@@ -39,6 +46,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // -uitest never installed the hook / remap, so there's nothing to tear
+        // down — and we must not touch global hidutil state on test exit.
+        guard !AppEnvironment.isUITest else { return }
         // Release any chord held at quit (a synthesized push-to-talk modifier
         // would otherwise stay stuck system-wide), then restore CapsLock. Pause
         // first so the tap stops claiming new chords, then drain the release

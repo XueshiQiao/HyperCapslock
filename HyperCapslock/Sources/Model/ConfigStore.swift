@@ -68,6 +68,13 @@ final class ConfigStore: ObservableObject {
     // MARK: - Paths
 
     private var appDataDir: URL {
+        // -uitest: isolate to a fresh per-process temp dir so tests never read or
+        // write the user's real config. An empty dir makes ConfigStore seed
+        // deterministic defaults on load.
+        if AppEnvironment.isUITest {
+            return FileManager.default.temporaryDirectory
+                .appendingPathComponent("hypercapslock-uitest-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+        }
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
         let bundleID = Bundle.main.bundleIdentifier ?? "me.xueshi.hypercapslock"
