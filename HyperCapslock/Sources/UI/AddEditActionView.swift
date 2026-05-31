@@ -122,7 +122,9 @@ struct ActionConfigDraft {
             let id = inputSourceID.trimmingCharacters(in: .whitespaces)
             return id.isEmpty ? nil : .inputSource(inputSourceID: id)
         case "command":
-            let c = command.trimmingCharacters(in: .whitespaces)
+            // Trim newlines too: a command that is only blank lines is invalid, and
+            // a `/bin/sh -c` script never needs leading/trailing blank lines.
+            let c = command.trimmingCharacters(in: .whitespacesAndNewlines)
             return c.isEmpty ? nil : .command(c)
         case "key_combo":
             guard let k = targetKey else { return nil }
@@ -168,7 +170,21 @@ struct ActionConfigDetail: View {
         case "input_source":
             InputSourcePicker(title: loc.t("group.input_source"), sourceID: $draft.inputSourceID)
         case "command":
-            TextField(loc.t("group.command"), text: $draft.command, prompt: Text("open -a Calculator"))
+            // A multi-line script field can't use a TextField here: the grouped
+            // Form trailing-aligns TextField text and ignores
+            // `.multilineTextAlignment(.leading)`. TextEditor (NSTextView) is always
+            // leading-aligned + full-width, and renders typed chars immediately. A
+            // command runs as `/bin/sh -c`, so newlines are just shell statements.
+            // Bounded height (scrolls past ~7 lines) to fit the fixed editor window.
+            VStack(alignment: .leading, spacing: 4) {
+                Text(loc.t("group.command"))
+                TextEditor(text: $draft.command)
+                    .font(.system(.body, design: .monospaced))
+                    .scrollContentBackground(.hidden)
+                    .padding(6)
+                    .frame(minHeight: 60, maxHeight: 150)
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
+            }
         case "open_app":
             LabeledContent(loc.t("actions.app")) {
                 HStack(spacing: 8) {
