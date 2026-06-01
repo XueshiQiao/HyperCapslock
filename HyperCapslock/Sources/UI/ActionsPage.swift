@@ -16,7 +16,15 @@ struct ActionsPage: View {
         Form {
             Section(loc.t("actions.custom")) {
                 if config.customActions.isEmpty {
-                    Text(loc.t("actions.none_custom")).foregroundStyle(.secondary)
+                    VStack(spacing: 8) {
+                        Image(systemName: "wand.and.stars")
+                            .font(.system(size: 26, weight: .regular))
+                            .foregroundStyle(.orange.opacity(0.7))
+                        Text(loc.t("actions.none_custom"))
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
                 } else {
                     ForEach(config.customActions) { action in actionRow(action, editable: true) }
                 }
