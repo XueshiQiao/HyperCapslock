@@ -176,7 +176,9 @@ struct MappingRow: View {
                 .help(bindingsInvalid ? loc.t("mappings.invalid") : loc.t("mappings.app_rules"))
             }
             Button(action: onEdit) { Image(systemName: "pencil") }.buttonStyle(.borderless)
+                .accessibilityIdentifier("mapping.edit.\(triggerUniqueID(entry.trigger))")
             Button(action: onDelete) { Image(systemName: "trash") }.buttonStyle(.borderless)
+                .accessibilityIdentifier("mapping.delete.\(triggerUniqueID(entry.trigger))")
         }
         // Fill the row width so the Spacer actually spreads trigger-left /
         // action-right — needed outside a Form (Form rows already get full width).

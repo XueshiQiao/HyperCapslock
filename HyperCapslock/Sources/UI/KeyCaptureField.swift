@@ -8,6 +8,10 @@ struct KeyCaptureField: NSViewRepresentable {
     @Binding var jsKeyCode: UInt16?
     var enabled: Bool = true
     var placeholder: String
+    /// Accessibility identifier set directly on the underlying `NSView` so the
+    /// XCUITest suite can find + focus this custom capture control (SwiftUI's
+    /// `.accessibilityIdentifier` doesn't reliably reach a bare NSViewRepresentable).
+    var accessibilityID: String? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -15,6 +19,12 @@ struct KeyCaptureField: NSViewRepresentable {
         let v = CaptureView()
         v.onCapture = { mac in
             if let js = KeyCodes.macToJs(mac) { context.coordinator.parent.jsKeyCode = js }
+        }
+        if let id = accessibilityID {
+            v.setAccessibilityElement(true)
+            v.setAccessibilityRole(.textField)
+            v.setAccessibilityIdentifier(id)
+            v.setAccessibilityLabel("Key capture field")
         }
         return v
     }

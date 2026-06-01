@@ -157,7 +157,8 @@ struct AddEditMappingView: View {
                         HStack {
                             Text(loc.t("mappings.key"))
                             Spacer()
-                            KeyCaptureField(jsKeyCode: $key, enabled: !editing, placeholder: loc.t("mappings.press_key"))
+                            KeyCaptureField(jsKeyCode: $key, enabled: !editing, placeholder: loc.t("mappings.press_key"),
+                                            accessibilityID: "mapping.key_field")
                                 .frame(width: 140, height: 28)
                         }
                     } else if triggerNeedsModifier {
@@ -195,6 +196,7 @@ struct AddEditMappingView: View {
                             lastRealActionId = newValue
                         }
                     }
+                    .accessibilityIdentifier("mapping.action")
                     if inlineKind(for: selectedActionId) != nil {
                         ActionConfigDetail(draft: $inlineDraft)
                     }
