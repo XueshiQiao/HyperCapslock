@@ -171,8 +171,19 @@ Die App benötigt die Berechtigung **Bedienungshilfen (Accessibility)**, um ihre
 ## Screenshot
 
 <div align="center">
-  <img src="./docs/assets/HyperCapslock.png" width="400" />
+  <img src="./docs/assets/screenshots/mappings.png" width="760" alt="Mappings — keyboard view" />
 </div>
+
+<table align="center">
+  <tr>
+    <td width="50%"><img src="./docs/assets/screenshots/settings.png" alt="Settings" /></td>
+    <td width="50%"><img src="./docs/assets/screenshots/actions.png" alt="Actions" /></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="./docs/assets/screenshots/input-source.png" alt="Input Source" /></td>
+    <td width="50%"><img src="./docs/assets/screenshots/about.png" alt="About" /></td>
+  </tr>
+</table>
 
 ## Warum nicht Karabiner-Elements?
 
