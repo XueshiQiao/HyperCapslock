@@ -42,6 +42,7 @@ struct ActionsPage: View {
         .toolbar {
             ToolbarItem {
                 Button { sheet = .add } label: { Image(systemName: "plus") }.help(loc.t("actions.add"))
+                    .accessibilityIdentifier("actions.add")
             }
         }
         .sheet(item: $sheet) { mode in
@@ -64,18 +65,21 @@ struct ActionsPage: View {
                 if editable {
                     Button { sheet = .edit(action) } label: { Image(systemName: "pencil") }.buttonStyle(.borderless)
                     Button { delete(action) } label: { Image(systemName: "trash") }.buttonStyle(.borderless)
-                } else {
-                    Image(systemName: actionSymbol(action.config)).foregroundStyle(.secondary)
                 }
             }
         } label: {
-            if editable && name != desc {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                    Text(desc).font(.caption).foregroundStyle(.secondary)
+            // Leading category-colored icon (same palette as the Mappings page), then
+            // the name (+ value for custom actions whose name differs from it).
+            HStack(spacing: 10) {
+                ActionIconTile(config: action.config)
+                if editable && name != desc {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(name)
+                        Text(desc).font(.caption).foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text(name)   // built-ins: one line (name == description)
                 }
-            } else {
-                Text(name)   // built-ins: one line (name == description)
             }
         }
     }
@@ -91,5 +95,24 @@ struct ActionsPage: View {
                 app.showToast(loc.t("toast.action_remove_failed"), isError: true)
             }
         }
+    }
+}
+
+/// A small category-colored tile showing an action's icon — the Actions-page
+/// counterpart to the Mappings page's `ActionPill` leading icon. Uses the same
+/// `actionCategoryColor` / `actionSymbol`, so an action reads with one consistent
+/// color language across both pages (blue navigation, amber editing, green command…).
+struct ActionIconTile: View {
+    let config: ActionConfig
+    var body: some View {
+        let color = actionCategoryColor(config)
+        Image(systemName: actionSymbol(config))
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 26, height: 26)
+            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(
+                LinearGradient(colors: [color, color.opacity(0.72)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)))
+            .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(.white.opacity(0.18)))
     }
 }
