@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HyperCapslock — UI Direction Explorations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,400&family=JetBrains+Mono:wght@400..700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sf: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+    --display: "Bricolage Grotesque", var(--sf);
+    --serif: "Fraunces", Georgia, serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:var(--sf);
+    background:#1b1d22;
+    color:#e7e7ea;
+    -webkit-font-smoothing:antialiased;
+    padding:0 0 120px;
+  }
+
+  /* ---------- page chrome ---------- */
+  .page-head{
+    position:sticky;top:0;z-index:50;
+    background:rgba(20,21,26,.78);backdrop-filter:blur(18px);
+    border-bottom:1px solid rgba(255,255,255,.07);
+    padding:18px 40px;display:flex;align-items:baseline;gap:24px;flex-wrap:wrap;
+  }
+  .page-head h1{font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:-.01em}
+  .page-head h1 b{color:#5b9dff}
+  .page-head .sub{color:#9b9ca6;font-size:13px}
+  .tabs{margin-left:auto;display:flex;gap:6px}
+  .tabs a{
+    font-size:12.5px;color:#b9bac4;text-decoration:none;
+    padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.09);
+    transition:.18s;
+  }
+  .tabs a:hover{color:#fff;border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.05)}
+
+  .intro{max-width:760px;margin:42px auto 8px;padding:0 32px;text-align:center}
+  .intro p{color:#a7a8b2;font-size:14.5px;line-height:1.65}
+
+  .scheme{padding:54px 24px 12px;scroll-margin-top:72px}
+  .scheme-label{max-width:980px;margin:0 auto 22px;display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+  .scheme-num{font-family:var(--mono);font-size:12px;color:#6d6f7a;letter-spacing:.18em}
+  .scheme-label h2{font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:-.02em}
+  .lane{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#0c0d10;background:#7f8190;padding:3px 9px;border-radius:6px}
+  .scheme-label .desc{color:#9b9ca6;font-size:13.5px;max-width:520px;margin-left:auto;text-align:right;line-height:1.5}
+
+  /* ---------- shared macOS window shell ---------- */
+  .stage{display:flex;justify-content:center}
+  .win{
+    width:960px;max-width:100%;border-radius:14px;overflow:hidden;
+    box-shadow:0 40px 90px -30px rgba(0,0,0,.7), 0 0 0 1px rgba(0,0,0,.4);
+    display:grid;grid-template-columns:232px 1fr;
+  }
+  .tl{display:flex;gap:8px;align-items:center}
+  .tl i{width:12px;height:12px;border-radius:50%;display:block}
+  .tl .r{background:#ff5f57}.tl .y{background:#febc2e}.tl .g{background:#28c840}
+
+  .side{display:flex;flex-direction:column}
+  .brand{display:flex;align-items:center;gap:10px;padding:14px 16px 12px}
+  .brand .app{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:15px;flex:none}
+  .brand .nm{font-weight:700;font-size:13.5px;line-height:1.1}
+  .brand .ver{font-size:11px;opacity:.55}
+  .nav{padding:4px 10px;display:flex;flex-direction:column;gap:2px;flex:1}
+  .nav .row{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;font-size:13px;cursor:default}
+  .nav .row .ic{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;color:#fff;font-size:12px;flex:none}
+  .foot{display:flex;align-items:center;gap:7px;padding:11px 16px;font-size:11px;opacity:.75}
+  .foot .dot{width:8px;height:8px;border-radius:50%;background:#34c759;box-shadow:0 0 0 0 rgba(52,199,89,.5);animation:breathe 2.2s ease-in-out infinite}
+  @keyframes breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+
+  .detail{display:flex;flex-direction:column;min-width:0}
+  .toolbar{display:flex;align-items:center;gap:12px;padding:14px 20px;font-weight:600}
+  .toolbar .title{font-size:15px}
+  .toolbar .tools{margin-left:auto;display:flex;gap:14px;opacity:.6;font-size:14px}
+  .content{padding:8px 22px 26px;overflow:hidden}
+  .sec-h{font-size:12px;font-weight:600;letter-spacing:.02em;opacity:.55;margin:14px 4px 9px;text-transform:uppercase}
+  .map{display:flex;align-items:center;gap:10px;padding:11px 14px;min-width:0}
+  .trig{display:flex;align-items:center;gap:5px}
+  .cap{font-family:var(--mono);font-size:11.5px;font-weight:600;min-width:24px;height:25px;padding:0 7px;display:grid;place-items:center;border-radius:7px}
+  .plus{opacity:.4;font-size:12px}
+  .spacer{flex:1}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 10px;border-radius:999px;white-space:nowrap}
+  .pill .pi{font-size:12px;width:14px;text-align:center}
+
+  /* ============================================================ */
+  /* 1 — REFINED NATIVE (light, macOS System Settings)            */
+  /* ============================================================ */
+  .s-native .win{background:#fff;color:#1d1d1f;font-family:var(--sf)}
+  .s-native .chrome{grid-column:1/3;display:flex;align-items:center;gap:14px;padding:12px 16px;background:#f5f5f7;border-bottom:1px solid #e3e3e6}
+  .s-native .chrome .ttl{font-size:13px;font-weight:600}
+  .s-native .side{background:#f3f3f5;border-right:1px solid #e6e6e9}
+  .s-native .brand .app{background:linear-gradient(160deg,#2b3553,#161a26);color:#7fd1ff;box-shadow:inset 0 1px 0 rgba(255,255,255,.15)}
+  .s-native .brand .ver{color:#86868b}
+  .s-native .nav .row.sel{background:#007aff;color:#fff}
+  .s-native .nav .row.sel .ic{background:rgba(255,255,255,.22)!important}
+  .s-native .nav .row:not(.sel):hover{background:rgba(0,0,0,.045)}
+  .s-native .ic.blue{background:#0a84ff}.s-native .ic.gray{background:#8e8e93}.s-native .ic.orange{background:#ff9500}.s-native .ic.green{background:#30b94d}
+  .s-native .foot{color:#6b6b70;border-top:1px solid #e6e6e9}
+  .s-native .detail{background:#fff}
+  .s-native .toolbar{color:#1d1d1f;border-bottom:1px solid #ededf0}
+  .s-native .map{background:#fafafb;border-radius:9px;margin-bottom:5px}
+  .s-native .cap{background:linear-gradient(#fff,#ececef);border:1px solid #dadade;color:#1d1d1f;box-shadow:0 1px 1px rgba(0,0,0,.05)}
+  .s-native .pill{background:rgba(0,0,0,.045);color:#1d1d1f;border:1px solid rgba(0,0,0,.06)}
+  .s-native .pill.nav .pi{color:#0a84ff}.s-native .pill.edit .pi{color:#ff9500}.s-native .pill.is .pi{color:#30b94d}
+
+  /* ============================================================ */
+  /* 2 — AURORA (vibrant glass, gradient mesh)                    */
+  /* ============================================================ */
+  .s-aurora .win{position:relative;color:#2a2540;font-family:var(--sf);background:#fdf2ff}
+  .s-aurora .win::before{content:"";position:absolute;inset:0;z-index:0;
+    background:
+      radial-gradient(40% 50% at 12% 8%, #ffd6a5 0, transparent 60%),
+      radial-gradient(45% 55% at 88% 4%, #b9c6ff 0, transparent 60%),
+      radial-gradient(50% 60% at 78% 96%, #c5ffe1 0, transparent 60%),
+      radial-gradient(45% 55% at 6% 92%, #ffc2ec 0, transparent 60%),
+      linear-gradient(#fbf4ff,#f3f0ff)}
+  .s-aurora .win>*{position:relative;z-index:1}
+  .s-aurora .chrome{grid-column:1/3;display:flex;align-items:center;gap:14px;padding:12px 16px;background:rgba(255,255,255,.45);backdrop-filter:blur(14px);border-bottom:1px solid rgba(255,255,255,.6)}
+  .s-aurora .chrome .ttl{font-family:var(--display);font-weight:700;font-size:13.5px;letter-spacing:-.01em}
+  .s-aurora .side{background:rgba(255,255,255,.42);backdrop-filter:blur(20px);border-right:1px solid rgba(255,255,255,.55)}
+  .s-aurora .brand .nm{font-family:var(--display);font-weight:800;letter-spacing:-.02em;font-size:14px;background:linear-gradient(92deg,#7a3cff,#ff4db8);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .s-aurora .brand .app{background:linear-gradient(150deg,#7a3cff,#ff4db8);color:#fff;box-shadow:0 6px 16px -4px rgba(150,60,255,.55)}
+  .s-aurora .brand .ver{color:#8b85a3}
+  .s-aurora .nav .row{color:#46406a}
+  .s-aurora .nav .row.sel{background:linear-gradient(92deg,rgba(122,60,255,.16),rgba(255,77,184,.16));box-shadow:inset 0 0 0 1px rgba(122,60,255,.35);color:#3a2b66;font-weight:600}
+  .s-aurora .nav .row:not(.sel):hover{background:rgba(255,255,255,.5)}
+  .s-aurora .ic{box-shadow:0 4px 10px -3px rgba(0,0,0,.25)}
+  .s-aurora .ic.blue{background:linear-gradient(145deg,#4d8bff,#7a3cff)}.s-aurora .ic.gray{background:linear-gradient(145deg,#a9a6c4,#7d7a96)}.s-aurora .ic.orange{background:linear-gradient(145deg,#ffb24d,#ff6a3c)}.s-aurora .ic.green{background:linear-gradient(145deg,#4dffb2,#1ec98a)}
+  .s-aurora .foot{color:#6b6486;border-top:1px solid rgba(255,255,255,.5)}
+  .s-aurora .toolbar .title{font-family:var(--display);font-weight:700;font-size:15px}
+  .s-aurora .toolbar{color:#3a2b66}
+  .s-aurora .sec-h{color:#8a7fb0;opacity:1}
+  .s-aurora .map{background:rgba(255,255,255,.55);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.7);border-radius:13px;margin-bottom:8px;box-shadow:0 8px 22px -16px rgba(80,40,140,.45)}
+  .s-aurora .cap{color:#2a2540;background:linear-gradient(#fff,#efeafc);border:1px solid #e3dbfb;box-shadow:0 2px 5px -1px rgba(120,60,200,.18),inset 0 1px 0 #fff;height:26px}
+  .s-aurora .pill{font-weight:600;color:#fff;border:none}
+  .s-aurora .pill.nav{background:linear-gradient(92deg,#4d8bff,#7a3cff)}
+  .s-aurora .pill.edit{background:linear-gradient(92deg,#ffa64d,#ff6a3c)}
+  .s-aurora .pill.is{background:linear-gradient(92deg,#2ed3a0,#13b07a)}
+  .s-aurora .pill .pi{color:#fff}
+
+  /* ============================================================ */
+  /* 3 — GRAPHITE PRO (dark glass, neon accent)                  */
+  /* ============================================================ */
+  .s-graphite .win{color:#d7dae3;font-family:var(--sf);background:#0d0e12;position:relative}
+  .s-graphite .win::before{content:"";position:absolute;inset:0;z-index:0;opacity:.5;
+    background:
+      radial-gradient(60% 50% at 80% -10%, rgba(40,120,255,.22), transparent 60%),
+      radial-gradient(50% 40% at 0% 100%, rgba(0,225,200,.12), transparent 60%),
+      repeating-linear-gradient(0deg,transparent 0 27px, rgba(255,255,255,.018) 27px 28px)}
+  .s-graphite .win>*{position:relative;z-index:1}
+  .s-graphite .chrome{grid-column:1/3;display:flex;align-items:center;gap:14px;padding:12px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.06)}
+  .s-graphite .chrome .ttl{font-family:var(--mono);font-weight:600;font-size:12.5px;color:#aeb4c2}
+  .s-graphite .side{background:rgba(255,255,255,.025);backdrop-filter:blur(12px);border-right:1px solid rgba(255,255,255,.06)}
+  .s-graphite .brand .nm{font-family:var(--mono);font-weight:700;font-size:12.5px;letter-spacing:-.01em;color:#eef1f7}
+  .s-graphite .brand .app{background:linear-gradient(160deg,#1b2236,#0c1018);color:#39e0ff;box-shadow:0 0 22px -6px rgba(57,224,255,.5),inset 0 0 0 1px rgba(57,224,255,.25)}
+  .s-graphite .brand .ver{color:#6a7080;font-family:var(--mono);font-size:10px}
+  .s-graphite .nav .row{color:#9aa1b2}
+  .s-graphite .nav .row.sel{background:linear-gradient(92deg,rgba(57,170,255,.18),rgba(57,224,255,.06));box-shadow:inset 0 0 0 1px rgba(57,200,255,.4),0 0 18px -8px rgba(57,200,255,.6);color:#eaf6ff;font-weight:600}
+  .s-graphite .nav .row:not(.sel):hover{background:rgba(255,255,255,.04)}
+  .s-graphite .ic.blue{background:#2a7bff;box-shadow:0 0 14px -4px #2a7bff}.s-graphite .ic.gray{background:#5b6172}.s-graphite .ic.orange{background:#ff8a2a;box-shadow:0 0 14px -4px #ff8a2a}.s-graphite .ic.green{background:#1ed687;box-shadow:0 0 14px -4px #1ed687}
+  .s-graphite .foot{color:#7a8090;border-top:1px solid rgba(255,255,255,.06)}
+  .s-graphite .toolbar{color:#eef1f7}
+  .s-graphite .toolbar .title{font-family:var(--mono);font-weight:600;font-size:14px}
+  .s-graphite .sec-h{color:#6a7184;opacity:1;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em}
+  .s-graphite .map{background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.06);border-radius:11px;margin-bottom:7px}
+  .s-graphite .map:hover{border-color:rgba(57,200,255,.3)}
+  .s-graphite .cap{font-weight:600;color:#dfe4ee;background:linear-gradient(#2a3142,#191e2a);border:1px solid #3a4256;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 4px rgba(0,0,0,.5);height:26px}
+  .s-graphite .pill{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#cfd5e2}
+  .s-graphite .pill.nav{border-color:rgba(57,140,255,.5);box-shadow:0 0 14px -7px #3a8cff inset}.s-graphite .pill.nav .pi{color:#5aa6ff}
+  .s-graphite .pill.edit{border-color:rgba(255,150,60,.5)}.s-graphite .pill.edit .pi{color:#ffae5c}
+  .s-graphite .pill.is{border-color:rgba(40,220,150,.5)}.s-graphite .pill.is .pi{color:#3ee6a0}
+
+  /* ============================================================ */
+  /* 4 — EDITORIAL MONO (cream, serif-led, hairlines, one accent) */
+  /* ============================================================ */
+  .s-edit .win{color:#1a1714;font-family:var(--sf);background:#faf7f1}
+  .s-edit .chrome{grid-column:1/3;display:flex;align-items:center;gap:14px;padding:13px 18px;background:#f3efe6;border-bottom:1px solid #e4ddcf}
+  .s-edit .chrome .ttl{font-family:var(--serif);font-weight:500;font-size:15px;font-style:italic}
+  .s-edit .side{background:#f5f1e8;border-right:1px solid #e4ddcf}
+  .s-edit .brand{padding:18px 18px 14px}
+  .s-edit .brand .app{background:#1a1714;color:#faf7f1;border-radius:7px;font-family:var(--serif)}
+  .s-edit .brand .nm{font-family:var(--serif);font-weight:500;font-size:16px;letter-spacing:-.01em}
+  .s-edit .brand .ver{font-family:var(--mono);font-size:9.5px;color:#9a9182;letter-spacing:.05em}
+  .s-edit .nav{padding:4px 12px}
+  .s-edit .nav .row{font-family:var(--mono);font-size:11.5px;letter-spacing:.02em;text-transform:uppercase;color:#6e665a;border-radius:0;padding:9px 8px;border-bottom:1px solid transparent}
+  .s-edit .nav .row .ic{background:none!important;color:#b3ab9c;width:16px;font-size:13px}
+  .s-edit .nav .row.sel{color:#c0392b;font-weight:700;border-bottom:1px solid #e4ddcf}
+  .s-edit .nav .row.sel .ic{color:#c0392b}
+  .s-edit .nav .row:not(.sel):hover{color:#1a1714}
+  .s-edit .foot{color:#9a9182;border-top:1px solid #e4ddcf;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+  .s-edit .foot .dot{background:#c0392b}
+  .s-edit .toolbar{color:#1a1714;border-bottom:1px solid #e4ddcf;padding:16px 22px}
+  .s-edit .toolbar .title{font-family:var(--serif);font-weight:500;font-size:21px;letter-spacing:-.01em}
+  .s-edit .content{padding:6px 26px 26px}
+  .s-edit .sec-h{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:#b0a797;opacity:1;margin:18px 2px 4px}
+  .s-edit .map{border-bottom:1px solid #e9e2d5;padding:13px 4px;margin:0;border-radius:0}
+  .s-edit .map:last-child{border-bottom:none}
+  .s-edit .cap{font-family:var(--mono);font-weight:600;color:#1a1714;background:none;border:1px solid #cfc6b5;border-radius:5px;height:24px}
+  .s-edit .plus{font-family:var(--mono)}
+  .s-edit .pill{background:none;border:none;padding:4px 0;color:#1a1714;font-family:var(--sf);font-size:13px;font-weight:500}
+  .s-edit .pill .pi{color:#c0392b}
+
+  .note{max-width:980px;margin:18px auto 0;color:#8e8f99;font-size:12.5px;text-align:center}
+  @media(max-width:1000px){.win{grid-template-columns:200px 1fr}.scheme-label .desc{text-align:left;margin-left:0}}
+</style>
+</head>
+<body>
+  <div class="page-head">
+    <h1><b>Hyper</b>Capslock · UI Directions</h1>
+    <span class="sub">Same screen (Mappings), four aesthetics — pick a lane (or mix)</span>
+    <nav class="tabs">
+      <a href="#native">Refined Native</a>
+      <a href="#aurora">Aurora</a>
+      <a href="#graphite">Graphite Pro</a>
+      <a href="#edit">Editorial Mono</a>
+    </nav>
+  </div>
+
+  <div class="intro">
+    <p>Four high-fidelity treatments of the <b>Mappings</b> page. 1 refines the native macOS look; 2–4 are progressively more distinctive. They share the exact same content so only the design language changes.</p>
+  </div>
+
+  <!-- 1 NATIVE -->
+  <section class="scheme s-native" id="native">
+    <div class="scheme-label">
+      <div><div class="scheme-num">01 / REFINE</div><h2>Refined Native</h2></div>
+      <span class="lane">lane a</span>
+      <span class="desc">The current System-Settings feel, tightened: leading action icons, soft row cards, crisp keycaps, macOS blue. Feels at home on macOS, just more finished.</span>
+    </div>
+    <div class="stage"><div class="win" data-page></div></div>
+  </section>
+
+  <!-- 2 AURORA -->
+  <section class="scheme s-aurora" id="aurora">
+    <div class="scheme-label">
+      <div><div class="scheme-num">02 / DISTINCT</div><h2>Aurora</h2></div>
+      <span class="lane">lane b</span>
+      <span class="desc">A soft gradient-mesh world behind frosted glass. Category-gradient action pills, raised keycaps, a violet→pink brand. Playful-premium, lots of personality.</span>
+    </div>
+    <div class="stage"><div class="win" data-page></div></div>
+  </section>
+
+  <!-- 3 GRAPHITE -->
+  <section class="scheme s-graphite" id="graphite">
+    <div class="scheme-label">
+      <div><div class="scheme-num">03 / DISTINCT</div><h2>Graphite Pro</h2></div>
+      <span class="lane">lane b</span>
+      <span class="desc">Dark glass, faint grid, electric-cyan glow. Mono headers, graphite 3D keycaps, neon-edged pills. Reads like a pro developer tool — the keyboard view's vibe, everywhere.</span>
+    </div>
+    <div class="stage"><div class="win" data-page></div></div>
+  </section>
+
+  <!-- 4 EDITORIAL -->
+  <section class="scheme s-edit" id="edit">
+    <div class="scheme-label">
+      <div><div class="scheme-num">04 / DISTINCT</div><h2>Editorial Mono</h2></div>
+      <span class="lane">lane a/b</span>
+      <span class="desc">Typography-led restraint: a Fraunces serif for titles, monospace nav + keycaps, hairline rows, one vermillion accent, generous whitespace. Calm, magazine-like, unmistakably designed.</span>
+    </div>
+    <div class="stage"><div class="win" data-page></div></div>
+  </section>
+
+  <p class="note">Mockups are HTML approximations of the SwiftUI app · open in a browser · tell me which lane (or which bits of each) and I'll build it for real.</p>
+
+<script>
+  const nav = [
+    {ic:'blue',  g:'⌨', label:'Mappings', sel:true},
+    {ic:'gray',  g:'⚙', label:'Settings'},
+    {ic:'orange',g:'⚡', label:'Actions'},
+    {ic:'green', g:'🌐', label:'Input Source'},
+    {ic:'gray',  g:'ⓘ', label:'About'},
+  ];
+  const maps = [
+    {keys:['Caps','H'], cls:'nav',  pi:'←', t:'Move Left'},
+    {keys:['Caps','J'], cls:'nav',  pi:'↓', t:'Move Down'},
+    {keys:['Caps','K'], cls:'nav',  pi:'↑', t:'Move Up'},
+    {keys:['Caps','L'], cls:'nav',  pi:'→', t:'Move Right'},
+    {keys:['Caps','A'], cls:'nav',  pi:'⤒', t:'Home'},
+    {keys:['Caps','E'], cls:'nav',  pi:'⤓', t:'End'},
+    {keys:['Caps','I'], cls:'edit', pi:'⌫', t:'Backspace'},
+    {keys:['Caps','O'], cls:'edit', pi:'↵', t:'New Line'},
+    {keys:['Caps',','], cls:'is',   pi:'🌐', t:'Switch to ABC'},
+    {keys:['Caps','.'], cls:'is',   pi:'🌐', t:'Switch to Pinyin'},
+  ];
+  function caps(keys){return keys.map((k,i)=>(i?'<span class="plus">+</span>':'')+`<span class="cap">${k}</span>`).join('')}
+  const html = `
+    <div class="chrome"><div class="tl"><i class="r"></i><i class="y"></i><i class="g"></i></div><span class="ttl">Mappings</span></div>
+    <aside class="side">
+      <div class="brand"><div class="app">⌶</div><div><div class="nm">HyperCapslock</div><div class="ver">v26.05</div></div></div>
+      <nav class="nav">${nav.map(n=>`<div class="row ${n.sel?'sel':''}"><span class="ic ${n.ic}">${n.g}</span>${n.label}</div>`).join('')}</nav>
+      <div class="foot"><span class="dot"></span>Running</div>
+    </aside>
+    <main class="detail">
+      <div class="toolbar"><span class="title">Mappings</span><span class="tools">▤ ⌨ ⬇ ⬆ ＋</span></div>
+      <div class="content">
+        <div class="sec-h">Caps + Key</div>
+        ${maps.map(m=>`<div class="map"><div class="trig">${caps(m.keys)}</div><span class="spacer"></span><span class="pill ${m.cls}"><span class="pi">${m.pi}</span>${m.t}</span></div>`).join('')}
+      </div>
+    </main>`;
+  document.querySelectorAll('[data-page]').forEach(el=>el.innerHTML=html);
+</script>
+</body>
+</html>
