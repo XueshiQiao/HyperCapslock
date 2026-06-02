@@ -84,11 +84,17 @@ struct ContentView: View {
             // Liveliness: a soft aurora wash behind the detail; hide the Form's own
             // background so the grouped cards float on it (layout unchanged).
             .scrollContentBackground(.hidden)
+            // Composite the wash over an OPAQUE window color. Perf-critical: with the
+            // Form's background hidden, a translucent detail background lets the
+            // window's vibrancy sample the desktop and re-blur on every drag frame
+            // (a visible stutter). An opaque base keeps window dragging smooth.
             .background(
-                LinearGradient(colors: [Color(.sRGB, red: 0.40, green: 0.55, blue: 1.00, opacity: 0.10),
-                                        Color(.sRGB, red: 1.00, green: 0.55, blue: 0.85, opacity: 0.07),
-                                        Color(.sRGB, red: 0.35, green: 0.85, blue: 0.70, opacity: 0.08)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                Color(nsColor: .windowBackgroundColor)
+                    .overlay(
+                        LinearGradient(colors: [Color(.sRGB, red: 0.40, green: 0.55, blue: 1.00, opacity: 0.10),
+                                                Color(.sRGB, red: 1.00, green: 0.55, blue: 0.85, opacity: 0.07),
+                                                Color(.sRGB, red: 0.35, green: 0.85, blue: 0.70, opacity: 0.08)],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing))
                     .ignoresSafeArea()
             )
             // A leading sidebar toggle, always present on the detail side so the

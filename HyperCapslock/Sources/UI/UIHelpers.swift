@@ -53,20 +53,6 @@ func modifierFullLabel(_ m: ModifierKey, _ loc: LocalizationManager) -> String {
     }
 }
 
-/// A keycap-styled label used across the mappings list.
-struct Kbd: View {
-    let text: String
-    init(_ text: String) { self.text = text }
-    var body: some View {
-        Text(text)
-            .font(.system(size: 13, design: .monospaced))
-            .padding(.horizontal, 8).padding(.vertical, 4)
-            .frame(minWidth: 32)
-            .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.15)))
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.25), lineWidth: 1))
-    }
-}
-
 /// A rounded "card" container matching the original panel look.
 struct Card<Content: View>: View {
     @ViewBuilder var content: Content
