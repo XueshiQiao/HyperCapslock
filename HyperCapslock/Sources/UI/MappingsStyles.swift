@@ -52,17 +52,18 @@ struct GlassCap: View {
     }
 
     private func textColor(_ dark: Bool) -> Color {
-        if modifier { return dark ? Color(red: 0.80, green: 0.83, blue: 0.90) : Color(red: 0.34, green: 0.37, blue: 0.46) }
+        if modifier { return dark ? Color(red: 0.90, green: 0.93, blue: 1.0) : Color(red: 0.20, green: 0.30, blue: 0.60) }
         return dark ? Color(red: 0.93, green: 0.95, blue: 1.0) : Color(red: 0.24, green: 0.26, blue: 0.46)
     }
 
     @ViewBuilder private func fill(_ dark: Bool) -> some View {
         let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
         if modifier {
-            // Cooler slate, no backdrop blur.
+            // Bright periwinkle (no backdrop blur) — still distinct from the frosted
+            // key, but lively rather than gray.
             shape.fill(LinearGradient(
-                colors: dark ? [Color(red: 0.30, green: 0.33, blue: 0.40), Color(red: 0.23, green: 0.26, blue: 0.32)]
-                             : [Color(red: 0.91, green: 0.93, blue: 0.97), Color(red: 0.81, green: 0.84, blue: 0.90)],
+                colors: dark ? [Color(red: 0.36, green: 0.43, blue: 0.64), Color(red: 0.27, green: 0.33, blue: 0.52)]
+                             : [Color(red: 0.82, green: 0.89, blue: 1.0), Color(red: 0.66, green: 0.77, blue: 1.0)],
                 startPoint: .top, endPoint: .bottom))
         } else {
             // Colorful frosted glass (the look kept from the chosen style).

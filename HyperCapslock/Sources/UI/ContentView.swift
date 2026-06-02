@@ -62,8 +62,8 @@ struct ContentView: View {
                 sidebarRow(.mappings, loc.t("nav.mappings"), "keyboard.fill", .blue)
                 sidebarRow(.actions, loc.t("nav.actions"), "bolt.fill", .orange)
                 sidebarRow(.inputSource, loc.t("nav.input_source"), "globe", .green)
-                sidebarRow(.settings, loc.t("nav.settings"), "gearshape.fill", .gray)
-                sidebarRow(.about, loc.t("nav.about"), "info.circle.fill", .gray)
+                sidebarRow(.settings, loc.t("nav.settings"), "gearshape.fill", .indigo)
+                sidebarRow(.about, loc.t("nav.about"), "info.circle.fill", .pink)
             }
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 215, ideal: 220, max: 240)
