@@ -60,9 +60,9 @@ struct ContentView: View {
         NavigationSplitView {
             List(selection: $page) {
                 sidebarRow(.mappings, loc.t("nav.mappings"), "keyboard.fill", .blue)
-                sidebarRow(.settings, loc.t("nav.settings"), "gearshape.fill", .gray)
                 sidebarRow(.actions, loc.t("nav.actions"), "bolt.fill", .orange)
                 sidebarRow(.inputSource, loc.t("nav.input_source"), "globe", .green)
+                sidebarRow(.settings, loc.t("nav.settings"), "gearshape.fill", .gray)
                 sidebarRow(.about, loc.t("nav.about"), "info.circle.fill", .gray)
             }
             .listStyle(.sidebar)
