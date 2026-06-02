@@ -118,19 +118,24 @@ struct ActionPill: View {
     let accent: Color
 
     var body: some View {
-        HStack(spacing: 6) {
+        let tint = display.invalid ? Color.orange : accent
+        return HStack(spacing: 6) {
             if let icon = display.icon {
                 Image(nsImage: icon).resizable().frame(width: 15, height: 15)
             } else {
-                Image(systemName: display.symbol).font(.system(size: 12, weight: .medium)).foregroundStyle(accent)
+                Image(systemName: display.symbol).font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
             }
-            Text(display.text).font(.system(size: 12, weight: .medium))
-                .foregroundStyle(display.invalid ? .orange : .primary)
+            Text(display.text).font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
                 .lineLimit(1).truncationMode(.middle)
         }
-        .padding(.horizontal, 8).padding(.vertical, 4)
-        .background(Capsule().fill(accent.opacity(0.14)))
-        .overlay(Capsule().strokeBorder(accent.opacity(0.32)))
+        .padding(.horizontal, 9).padding(.vertical, 4)
+        .background(
+            Capsule().fill(LinearGradient(colors: [tint, tint.opacity(0.72)],
+                                          startPoint: .topLeading, endPoint: .bottomTrailing))
+        )
+        .overlay(Capsule().strokeBorder(.white.opacity(0.18)))
+        .shadow(color: tint.opacity(0.35), radius: 4, y: 1.5)
     }
 }
 

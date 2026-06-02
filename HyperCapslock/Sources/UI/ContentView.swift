@@ -39,7 +39,9 @@ struct SidebarIcon: View {
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(.white)
             .frame(width: 26, height: 26)
-            .background(RoundedRectangle(cornerRadius: 6).fill(color))
+            .background(RoundedRectangle(cornerRadius: 6).fill(
+                LinearGradient(colors: [color.opacity(0.98), color.opacity(0.68)],
+                               startPoint: .top, endPoint: .bottom)))
             // Rasterize so the row-selection vibrancy can't tint/blend the tile —
             // keeps the icon its true color on the selected (blue) row.
             .drawingGroup()
@@ -79,6 +81,16 @@ struct ContentView: View {
             }
             // Match System Settings' taller rows (SwiftUI's grouped-Form default is tighter).
             .environment(\.defaultMinListRowHeight, 34)
+            // Liveliness: a soft aurora wash behind the detail; hide the Form's own
+            // background so the grouped cards float on it (layout unchanged).
+            .scrollContentBackground(.hidden)
+            .background(
+                LinearGradient(colors: [Color(.sRGB, red: 0.40, green: 0.55, blue: 1.00, opacity: 0.10),
+                                        Color(.sRGB, red: 1.00, green: 0.55, blue: 0.85, opacity: 0.07),
+                                        Color(.sRGB, red: 0.35, green: 0.85, blue: 0.70, opacity: 0.08)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                    .ignoresSafeArea()
+            )
             // A leading sidebar toggle, always present on the detail side so the
             // sidebar can be reopened after it's collapsed (NavigationSplitView
             // doesn't provide one on its own). Merges with each page's own toolbar.
