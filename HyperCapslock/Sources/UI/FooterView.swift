@@ -22,9 +22,9 @@ struct AboutPage: View {
             }
 
             Section(loc.t("about.links")) {
-                linkRow(asset: "GitHubLogo", title: loc.t("footer.github"), url: "https://github.com/XueshiQiao/HyperCapslock")
-                linkRow(asset: "XLogo", title: "@XueshiQiao", url: "https://x.com/XueshiQiao")
-                linkRow(systemImage: "globe", title: "\(loc.t("footer.more_apps_desc")) xueshi.dev", url: "https://xueshi.dev")
+                linkRow(asset: "GitHubLogo", tint: Color(red: 0.16, green: 0.17, blue: 0.20), title: loc.t("footer.github"), url: "https://github.com/XueshiQiao/HyperCapslock")
+                linkRow(asset: "XLogo", tint: Color(red: 0.16, green: 0.17, blue: 0.20), title: "@XueshiQiao", url: "https://x.com/XueshiQiao")
+                linkRow(systemImage: "globe", tint: .blue, title: "\(loc.t("footer.more_apps_desc")) xueshi.dev", url: "https://xueshi.dev")
             }
         }
         .formStyle(.grouped)
@@ -47,11 +47,11 @@ struct AboutPage: View {
         }
     }
 
-    private func linkRow(asset: String? = nil, systemImage: String? = nil, title: String, url: String) -> some View {
+    private func linkRow(asset: String? = nil, systemImage: String? = nil, tint: Color, title: String, url: String) -> some View {
         Button { if let u = URL(string: url) { NSWorkspace.shared.open(u) } } label: {
-            HStack(spacing: 9) {
-                if let asset { Image(asset).renderingMode(.template).resizable().frame(width: 15, height: 15) }
-                else if let systemImage { Image(systemName: systemImage) }
+            HStack(spacing: 10) {
+                if let asset { AssetIconTile(asset: asset, color: tint) }
+                else if let systemImage { IconTile(symbol: systemImage, color: tint) }
                 Text(title)
                 Spacer()
                 Image(systemName: "arrow.up.right").font(.caption).foregroundStyle(.tertiary)

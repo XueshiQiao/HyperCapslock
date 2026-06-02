@@ -31,11 +31,14 @@ struct InputSourcePage: View {
 
                 Picker("", selection: strategyBinding) {
                     ForEach(CJKVFixStrategy.allCases, id: \.self) { strategy in
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(loc.t(nameKey(strategy)))
-                            Text(loc.t(descKey(strategy)))
-                                .font(.callout).foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: 10) {
+                            IconTile(symbol: methodSymbol(strategy), color: methodColor(strategy))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(loc.t(nameKey(strategy)))
+                                Text(loc.t(descKey(strategy)))
+                                    .font(.callout).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                         .padding(.vertical, 2)
                         .tag(strategy)
@@ -68,6 +71,22 @@ struct InputSourcePage: View {
             }
         }
         .onAppear { shortcutAvailable = InputSourceFix.isPreviousInputSourceShortcutAvailable }
+    }
+
+    private func methodSymbol(_ s: CJKVFixStrategy) -> String {
+        switch s {
+        case .none: return "minus.circle.fill"
+        case .shortcutSimulation: return "keyboard.fill"
+        case .switchingFocus: return "cursorarrow.rays"
+        }
+    }
+
+    private func methodColor(_ s: CJKVFixStrategy) -> Color {
+        switch s {
+        case .none: return .gray
+        case .shortcutSimulation: return .blue
+        case .switchingFocus: return .purple
+        }
     }
 
     private func nameKey(_ s: CJKVFixStrategy) -> String {

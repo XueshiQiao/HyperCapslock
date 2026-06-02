@@ -23,6 +23,58 @@ extension View {
     }
 }
 
+// MARK: - Colored icon tiles
+//
+// The shared leading-icon visual used across the app (Actions rows, Settings rows,
+// Input Source methods, About links): a white glyph on a category/accent-colored
+// gradient tile, matching the sidebar icons. `ArtTile` is the exception for
+// self-contained artwork (an app icon) that shouldn't be tinted.
+
+/// 26pt rounded gradient tile background in `color`, with a hairline white edge.
+private struct ColorTile: ViewModifier {
+    let color: Color
+    func body(content: Content) -> some View {
+        content
+            .frame(width: 26, height: 26)
+            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(
+                LinearGradient(colors: [color, color.opacity(0.72)], startPoint: .topLeading, endPoint: .bottomTrailing)))
+            .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(.white.opacity(0.18)))
+    }
+}
+extension View { func colorTile(_ color: Color) -> some View { modifier(ColorTile(color: color)) } }
+
+/// White SF Symbol on a colored tile.
+struct IconTile: View {
+    let symbol: String
+    let color: Color
+    var body: some View {
+        Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white).colorTile(color)
+    }
+}
+
+/// A white template-rendered asset (e.g. a brand logo) on a colored tile.
+struct AssetIconTile: View {
+    let asset: String
+    let color: Color
+    var glyph: CGFloat = 15
+    var body: some View {
+        Image(asset).renderingMode(.template).resizable().scaledToFit()
+            .frame(width: glyph, height: glyph).foregroundStyle(.white).colorTile(color)
+    }
+}
+
+/// Self-contained artwork (an app icon) at the tile footprint — shown as-is on a
+/// rounded clip, NOT tinted, since the artwork carries its own colors.
+struct ArtTile: View {
+    let image: Image
+    var body: some View {
+        image.resizable().interpolation(.high)
+            .frame(width: 26, height: 26)
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(.black.opacity(0.08)))
+    }
+}
+
 /// Display string for a JS keyCode in the UI (mirrors `keyCodeToDisplay` in
 /// App.tsx — arrows/symbols get glyphs, letters/digits show as-is).
 func keyCodeDisplay(_ keyCode: UInt16) -> String {

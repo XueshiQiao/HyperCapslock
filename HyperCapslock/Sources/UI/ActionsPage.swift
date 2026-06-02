@@ -105,14 +105,6 @@ struct ActionsPage: View {
 struct ActionIconTile: View {
     let config: ActionConfig
     var body: some View {
-        let color = actionCategoryColor(config)
-        Image(systemName: actionSymbol(config))
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: 26, height: 26)
-            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(
-                LinearGradient(colors: [color, color.opacity(0.72)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing)))
-            .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(.white.opacity(0.18)))
+        IconTile(symbol: actionSymbol(config), color: actionCategoryColor(config))
     }
 }

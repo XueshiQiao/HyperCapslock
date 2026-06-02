@@ -28,42 +28,47 @@ struct SettingsPage: View {
                         .modifier(BadgeStyle(color: .red))
                     }
                 } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(loc.t("perm.accessibility"))
-                        Text(loc.t("perm.macos_hint")).font(.caption).foregroundStyle(.secondary)
+                    HStack(spacing: 10) {
+                        IconTile(symbol: "accessibility", color: .blue)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(loc.t("perm.accessibility"))
+                            Text(loc.t("perm.macos_hint")).font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 }
-                LabeledContent(loc.t("perm.refresh_label")) {
+                LabeledContent {
                     Button(loc.t("perm.refresh")) {
                         app.refreshPermissions()
                         app.showToast(loc.t("toast.perm_refreshed"))
                     }
+                } label: {
+                    iconLabel("arrow.clockwise", .gray, loc.t("perm.refresh_label"))
                 }
             }
 
             Section(loc.t("settings.label")) {
-                Toggle(loc.t("settings.autostart"), isOn: Binding(
+                Toggle(isOn: Binding(
                     get: { app.autostart },
                     set: { _ in
                         do {
                             try app.toggleAutostart()
                             app.showToast(app.autostart ? loc.t("toast.autostart_enabled") : loc.t("toast.autostart_disabled"))
                         } catch { app.showToast(loc.t("toast.autostart_failed"), isError: true) }
-                    }))
-                Toggle(loc.t("settings.hide_dock"), isOn: Binding(
+                    })) { iconLabel("power", .green, loc.t("settings.autostart")) }
+                Toggle(isOn: Binding(
                     get: { config.appConfig.hideDockIcon },
                     set: { v in
                         do { try app.setHideDockIcon(v); app.showToast(v ? loc.t("toast.hide_dock_enabled") : loc.t("toast.hide_dock_disabled")) }
                         catch { app.showToast(loc.t("toast.hide_dock_failed"), isError: true) }
-                    }))
-                Toggle(loc.t("settings.show_hud"), isOn: Binding(
+                    })) { iconLabel("dock.rectangle", .indigo, loc.t("settings.hide_dock")) }
+                Toggle(isOn: Binding(
                     get: { config.appConfig.showHud },
                     set: { v in
                         do { try app.setShowHud(v); app.showToast(v ? loc.t("toast.show_hud_enabled") : loc.t("toast.show_hud_disabled")) }
                         catch { app.showToast(loc.t("toast.show_hud_failed"), isError: true) }
-                    }))
+                    })) { iconLabel("bubble.left.fill", .teal, loc.t("settings.show_hud")) }
                 if config.appConfig.showHud {
-                    LabeledContent(loc.t("settings.hud_duration")) {
+                    LabeledContent {
                         HStack(spacing: 10) {
                             Text(String(format: "%.1fs", Double(config.appConfig.hudDurationMs) / 1000.0))
                                 .foregroundStyle(.secondary).font(.callout).monospacedDigit()
@@ -71,28 +76,39 @@ struct SettingsPage: View {
                                                   set: { try? app.setHudDuration(Int($0)) }),
                                    in: 300...6000, step: 100).frame(width: 160)
                         }
+                    } label: {
+                        iconLabel("timer", .orange, loc.t("settings.hud_duration"))
                     }
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Toggle(loc.t("settings.anydrag_caps_hold"), isOn: Binding(
+                    Toggle(isOn: Binding(
                         get: { config.appConfig.broadcastCapsHoldForAnyDrag },
                         set: { v in
                             do { try app.setBroadcastCapsHoldForAnyDrag(v); app.showToast(v ? loc.t("toast.anydrag_caps_hold_enabled") : loc.t("toast.anydrag_caps_hold_disabled")) }
                             catch { app.showToast(loc.t("toast.anydrag_caps_hold_failed"), isError: true) }
-                        }))
+                        })) {
+                        HStack(spacing: 10) {
+                            ArtTile(image: Image("AnyDragIcon"))
+                            Text(loc.t("settings.anydrag_caps_hold"))
+                        }
+                    }
                     Text(loc.t("settings.anydrag_caps_hold_hint")).font(.caption).foregroundStyle(.secondary)
                 }
             }
 
             Section(loc.t("appearance.label")) {
-                Picker(loc.t("settings.language"), selection: Binding(get: { loc.locale }, set: { loc.setLocale($0) })) {
+                Picker(selection: Binding(get: { loc.locale }, set: { loc.setLocale($0) })) {
                     ForEach(AppLocale.allCases, id: \.self) { l in Text("\(l.flag)  \(l.label)").tag(l) }
+                } label: {
+                    iconLabel("globe", .blue, loc.t("settings.language"))
                 }
                 .accessibilityIdentifier("settings.language")
-                Picker(loc.t("settings.theme"), selection: Binding(get: { app.themeMode }, set: { app.setTheme($0) })) {
+                Picker(selection: Binding(get: { app.themeMode }, set: { app.setTheme($0) })) {
                     Text(loc.t("theme.light_opt")).tag(ThemeMode.light)
                     Text(loc.t("theme.dark_opt")).tag(ThemeMode.dark)
                     Text(loc.t("theme.system_opt")).tag(ThemeMode.system)
+                } label: {
+                    iconLabel("circle.lefthalf.filled", .purple, loc.t("settings.theme"))
                 }
                 .pickerStyle(.segmented)
             }
@@ -125,6 +141,11 @@ struct SettingsPage: View {
                 }
             }
         }
+    }
+
+    /// A settings-row label: a category-colored icon tile + the text.
+    private func iconLabel(_ symbol: String, _ color: Color, _ text: String) -> some View {
+        HStack(spacing: 10) { IconTile(symbol: symbol, color: color); Text(text) }
     }
 
     private var statusRow: some View {
