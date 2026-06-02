@@ -41,6 +41,7 @@ struct AddEditActionView: View {
                 }
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
             .scrollDisabled(true)
 
             Divider()
@@ -48,12 +49,14 @@ struct AddEditActionView: View {
                 Spacer()
                 Button(loc.t("update.cancel")) { dismiss() }
                 Button(loc.t("mappings.save")) { save() }
+                    .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || draft.build() == nil)
             }
             .padding(12)
         }
         .frame(width: 480, height: 300)
+        .auroraBackground()
         .navigationTitle(editing ? loc.t("actions.edit_title") : loc.t("actions.add_title"))
         .onAppear(perform: prefill)
     }

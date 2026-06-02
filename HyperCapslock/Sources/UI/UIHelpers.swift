@@ -1,4 +1,27 @@
 import SwiftUI
+import AppKit
+
+extension View {
+    /// The app's signature soft aurora wash, composited over an OPAQUE base.
+    ///
+    /// Opaque matters for performance: when the foreground (a grouped Form) hides
+    /// its own background via `.scrollContentBackground(.hidden)`, a translucent
+    /// wash would let the window's vibrancy sample the desktop and re-blur on every
+    /// drag frame (a visible stutter). The opaque window-color base avoids that.
+    /// Pair this with `.scrollContentBackground(.hidden)` on the Form so the grouped
+    /// cards float over the wash.
+    func auroraBackground() -> some View {
+        background(
+            Color(nsColor: .windowBackgroundColor)
+                .overlay(
+                    LinearGradient(colors: [Color(.sRGB, red: 0.40, green: 0.55, blue: 1.00, opacity: 0.10),
+                                            Color(.sRGB, red: 1.00, green: 0.55, blue: 0.85, opacity: 0.07),
+                                            Color(.sRGB, red: 0.35, green: 0.85, blue: 0.70, opacity: 0.08)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing))
+                .ignoresSafeArea()
+        )
+    }
+}
 
 /// Display string for a JS keyCode in the UI (mirrors `keyCodeToDisplay` in
 /// App.tsx — arrows/symbols get glyphs, letters/digits show as-is).

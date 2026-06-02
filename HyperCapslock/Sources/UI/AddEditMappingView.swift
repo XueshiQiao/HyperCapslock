@@ -223,12 +223,14 @@ struct AddEditMappingView: View {
                 }
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
 
             Divider()
             HStack {
                 Spacer()
                 Button(loc.t("update.cancel")) { dismiss() }
                 Button(loc.t("mappings.save")) { save() }
+                    .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("mapping.save")
                     .disabled(draftTrigger == nil
@@ -238,6 +240,7 @@ struct AddEditMappingView: View {
             .padding(12)
         }
         .frame(width: 520, height: 560)
+        .auroraBackground()
         .navigationTitle(editing ? loc.t("mappings.edit_title") : loc.t("mappings.add_title"))
         .onAppear(perform: prefill)
         .sheet(isPresented: $showCreateAction) {
