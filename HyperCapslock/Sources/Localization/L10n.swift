@@ -21,6 +21,12 @@ enum AppLocale: String, CaseIterable {
     }
 }
 
+/// The language setting: follow the system, or a specific app language.
+enum LanguageChoice: Hashable {
+    case system
+    case fixed(AppLocale)
+}
+
 /// Observable localization. Mirrors `i18n.ts`: same keys/values, system-locale
 /// detection, `hc-locale` persistence, and `{param}` interpolation. SwiftUI
 /// views observe `shared` so a language switch re-renders the whole UI.
@@ -29,17 +35,21 @@ final class LocalizationManager: ObservableObject {
     static let shared = LocalizationManager()
 
     @Published var locale: AppLocale
+    /// True when no explicit language is stored — the UI tracks the system language
+    /// (resolved at launch). Cleared as soon as the user picks a specific language.
+    @Published var followsSystem: Bool
 
     /// Called whenever the locale changes (used to refresh the tray menu).
     var onLocaleChange: ((AppLocale) -> Void)?
 
     private init() {
-        locale = LocalizationManager.detectLocale()
+        let stored = UserDefaults.standard.string(forKey: "hc-locale").flatMap(AppLocale.init(rawValue:))
+        followsSystem = (stored == nil)
+        locale = stored ?? LocalizationManager.systemLocale()
     }
 
-    private static func detectLocale() -> AppLocale {
-        if let stored = UserDefaults.standard.string(forKey: "hc-locale"),
-           let l = AppLocale(rawValue: stored) { return l }
+    /// The best-matching app language for the current system preferences (English fallback).
+    private static func systemLocale() -> AppLocale {
         for code in Locale.preferredLanguages {
             let short = code.lowercased().split(separator: "-").first.map(String.init) ?? ""
             if let l = AppLocale(rawValue: short) { return l }
@@ -47,10 +57,20 @@ final class LocalizationManager: ObservableObject {
         return .en
     }
 
+    /// Pick a specific language (persisted; stops following the system).
     func setLocale(_ l: AppLocale) {
         locale = l
+        followsSystem = false
         UserDefaults.standard.set(l.rawValue, forKey: "hc-locale")
         onLocaleChange?(l)
+    }
+
+    /// Follow the system language: forget the stored choice and resolve from the system now.
+    func useSystemLocale() {
+        followsSystem = true
+        UserDefaults.standard.removeObject(forKey: "hc-locale")
+        locale = LocalizationManager.systemLocale()
+        onLocaleChange?(locale)
     }
 
     func t(_ key: String, _ params: [String: String] = [:]) -> String {
@@ -145,7 +165,7 @@ final class LocalizationManager: ObservableObject {
             "mappings.switch_input_source": "Switch Input Source",
             "mappings.inline_section": "Action Type",
             "is.refresh": "Re-check input source settings",
-            "appearance.label": "Appearance", "settings.language": "Language", "settings.theme": "Theme",
+            "appearance.label": "Appearance", "settings.language": "Language", "settings.language_system": "Follow System", "settings.theme": "Theme",
             "theme.light_opt": "Light", "theme.dark_opt": "Dark", "theme.system_opt": "System",
             "perm.refresh_label": "Re-check after granting",
             "mappings.action": "Action", "mappings.action_hint": "Pick an action from the library, or create a new one at the bottom of the list.",
@@ -248,7 +268,7 @@ final class LocalizationManager: ObservableObject {
             "mappings.switch_input_source": "切换输入法",
             "mappings.inline_section": "动作类型",
             "is.refresh": "重新检查输入法设置",
-            "appearance.label": "外观", "settings.language": "语言", "settings.theme": "主题",
+            "appearance.label": "外观", "settings.language": "语言", "settings.language_system": "跟随系统", "settings.theme": "主题",
             "theme.light_opt": "浅色", "theme.dark_opt": "深色", "theme.system_opt": "跟随系统",
             "perm.refresh_label": "授权后重新检查",
             "mappings.action": "动作", "mappings.action_hint": "从动作库中选择一个动作，或在列表底部新建。",
@@ -351,7 +371,7 @@ final class LocalizationManager: ObservableObject {
             "mappings.switch_input_source": "入力ソースを切り替え",
             "mappings.inline_section": "アクションの種類",
             "is.refresh": "入力ソース設定を再確認",
-            "appearance.label": "外観", "settings.language": "言語", "settings.theme": "テーマ",
+            "appearance.label": "外観", "settings.language": "言語", "settings.language_system": "システムに従う", "settings.theme": "テーマ",
             "theme.light_opt": "ライト", "theme.dark_opt": "ダーク", "theme.system_opt": "システム",
             "perm.refresh_label": "許可後に再確認",
             "mappings.action": "アクション", "mappings.action_hint": "ライブラリからアクションを選択するか、リスト下部で新規作成できます。",
@@ -454,7 +474,7 @@ final class LocalizationManager: ObservableObject {
             "mappings.switch_input_source": "Eingabequelle wechseln",
             "mappings.inline_section": "Aktionstyp",
             "is.refresh": "Eingabequellen-Einstellungen neu prüfen",
-            "appearance.label": "Erscheinungsbild", "settings.language": "Sprache", "settings.theme": "Design",
+            "appearance.label": "Erscheinungsbild", "settings.language": "Sprache", "settings.language_system": "Systemstandard", "settings.theme": "Design",
             "theme.light_opt": "Hell", "theme.dark_opt": "Dunkel", "theme.system_opt": "System",
             "perm.refresh_label": "Nach Erteilung erneut prüfen",
             "mappings.action": "Aktion", "mappings.action_hint": "Aktion aus der Bibliothek wählen oder unten in der Liste eine neue erstellen.",

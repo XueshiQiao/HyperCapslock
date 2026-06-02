@@ -97,8 +97,18 @@ struct SettingsPage: View {
             }
 
             Section(loc.t("appearance.label")) {
-                Picker(selection: Binding(get: { loc.locale }, set: { loc.setLocale($0) })) {
-                    ForEach(AppLocale.allCases, id: \.self) { l in Text("\(l.flag)  \(l.label)").tag(l) }
+                Picker(selection: Binding(
+                    get: { loc.followsSystem ? LanguageChoice.system : LanguageChoice.fixed(loc.locale) },
+                    set: { choice in
+                        switch choice {
+                        case .system: loc.useSystemLocale()
+                        case .fixed(let l): loc.setLocale(l)
+                        }
+                    })) {
+                    Text(loc.t("settings.language_system")).tag(LanguageChoice.system)
+                    ForEach(AppLocale.allCases, id: \.self) { l in
+                        Text("\(l.flag)  \(l.label)").tag(LanguageChoice.fixed(l))
+                    }
                 } label: {
                     iconLabel("globe", .blue, loc.t("settings.language"))
                 }
