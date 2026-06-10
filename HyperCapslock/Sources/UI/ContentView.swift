@@ -137,7 +137,7 @@ struct ContentView: View {
 
     private var statusFooter: some View {
         HStack(spacing: 7) {
-            StatusDot(running: app.isRunning, animate: app.isRunning)
+            StatusDot(running: app.isRunning)
             Text(app.isRunning ? loc.t("status.running") : loc.t("status.paused"))
                 .font(.system(size: 11)).foregroundColor(.secondary)
             Spacer()
@@ -159,25 +159,15 @@ struct ContentView: View {
     }
 }
 
-/// Status dot: breathes in place when running, solid when paused.
+/// Status dot: solid green when running, orange when paused.
 struct StatusDot: View {
     let running: Bool
-    var animate: Bool = false
-    @State private var breathe = false
     private var color: Color { running ? .green : .orange }
 
     var body: some View {
         Circle()
             .fill(color)
             .frame(width: 9, height: 9)
-            .scaleEffect(animate ? (breathe ? 1.0 : 0.72) : 1.0)
-            .opacity(animate ? (breathe ? 1.0 : 0.5) : 1.0)
             .frame(width: 12, height: 12)
-            .onAppear {
-                guard animate else { return }
-                DispatchQueue.main.async {
-                    withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { breathe = true }
-                }
-            }
     }
 }
