@@ -166,7 +166,7 @@ struct SettingsPage: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("HyperCapslock").font(.headline)
                 HStack(spacing: 6) {
-                    StatusDot(running: app.isRunning, animate: app.isRunning)
+                    StatusDot(running: app.isRunning)
                     Text(loc.t("status.\(app.status.rawValue)")).font(.callout).foregroundStyle(.secondary)
                 }
             }
