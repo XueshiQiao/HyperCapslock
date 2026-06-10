@@ -24,3 +24,6 @@ Package.resolved
 # Claude Code runtime / transient state
 .claude/scheduled_tasks.lock
 .claude/worktrees/
+
+# Local tool cache (path → project-id map)
+cache/
