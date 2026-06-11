@@ -87,6 +87,7 @@ private func hcTapCallback(
             if let modifier = ModifierDoubleTap.modifier(for: keycode),
                let action = ModifierDoubleTap.shared.onModifierFlags(modifier, flags: flags) {
                 FileLog.shared.info("Modifier DOUBLE-TAP detected (keycode=\(keycode)). Firing action.")
+                UsageStats.shared.record(triggerUniqueID(.doubleTapModifier(modifier)))
                 let (combo, caption) = hudParts(action)
                 HudCenter.shared.emit(trigger: "\(modifierHudLabel(modifier)) ×2", combo: combo, caption: caption)
                 ActionExecutor.fireDoubleTapModifierAction(action)

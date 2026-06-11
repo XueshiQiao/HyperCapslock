@@ -10,4 +10,20 @@ enum AppEnvironment {
     static let isUITest: Bool =
         CommandLine.arguments.contains("-uitest")
         || ProcessInfo.processInfo.environment["HC_UITEST"] == "1"
+
+    /// The app's per-process Application Support directory: an isolated temp dir
+    /// under `-uitest` (so tests never touch the user's data), else
+    /// `…/Application Support/<bundle id>`. Single source of truth for the data
+    /// directory — both `ConfigStore` and `UsageStats` resolve their files from
+    /// here so the path (and the uitest isolation) can never drift between them.
+    static var appSupportDirectory: URL {
+        if isUITest {
+            return FileManager.default.temporaryDirectory
+                .appendingPathComponent("hypercapslock-uitest-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+        }
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
+        let bundleID = Bundle.main.bundleIdentifier ?? "me.xueshi.hypercapslock"
+        return base.appendingPathComponent(bundleID, isDirectory: true)
+    }
 }

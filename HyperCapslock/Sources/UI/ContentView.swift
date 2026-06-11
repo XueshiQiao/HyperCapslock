@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 enum SidebarPage: Hashable, CaseIterable {
-    case settings, mappings, actions, inputSource, about
+    case settings, mappings, actions, statistics, inputSource, about
 
     /// Stable, language-independent id stem for accessibility identifiers:
     /// `nav.<axID>` on the sidebar row, `page.<axID>` on the detail root. These
@@ -13,6 +13,7 @@ enum SidebarPage: Hashable, CaseIterable {
         case .mappings: return "mappings"
         case .settings: return "settings"
         case .actions: return "actions"
+        case .statistics: return "statistics"
         case .inputSource: return "input_source"
         case .about: return "about"
         }
@@ -61,6 +62,7 @@ struct ContentView: View {
             List(selection: $page) {
                 sidebarRow(.mappings, loc.t("nav.mappings"), "keyboard.fill", .blue)
                 sidebarRow(.actions, loc.t("nav.actions"), "bolt.fill", .orange)
+                sidebarRow(.statistics, loc.t("nav.statistics"), "chart.bar.fill", .purple)
                 sidebarRow(.inputSource, loc.t("nav.input_source"), "globe", .green)
                 sidebarRow(.settings, loc.t("nav.settings"), "gearshape.fill", .indigo)
                 sidebarRow(.about, loc.t("nav.about"), "info.circle.fill", .pink)
@@ -75,6 +77,7 @@ struct ContentView: View {
                 case .settings: SettingsPage().accessibilityIdentifier("page.settings")
                 case .mappings: MappingsPage().accessibilityIdentifier("page.mappings")
                 case .actions: ActionsPage().accessibilityIdentifier("page.actions")
+                case .statistics: StatisticsPage().accessibilityIdentifier("page.statistics")
                 case .inputSource: InputSourcePage().accessibilityIdentifier("page.input_source")
                 case .about: AboutPage().accessibilityIdentifier("page.about")
                 }

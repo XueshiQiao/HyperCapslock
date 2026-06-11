@@ -127,16 +127,28 @@ struct MappingsPage: View {
     /// id→source map for input-source rows (name + icon), and to flag a removed
     /// source with ⚠️. Seeded from the cache, refreshed on appear (re-renders rows).
     @State private var availableInputSources: [String: InputSourceFix.AvailableSource] = InputSourceFix.availableSourcesByID()
+    /// All-time press counts (triggerID → count) for the inline row badges.
+    /// Empty when the `stats_show_inline` setting is off. Refreshed on appear, so
+    /// counts reflect the latest each time the Mappings page is shown.
+    @State private var usageTotals: [String: Int] = [:]
 
     private var sorted: [ActionMappingEntry] {
         config.mappings.sorted { triggerSortKey($0.trigger) < triggerSortKey($1.trigger) }
+    }
+
+    private func refreshUsageTotals() {
+        usageTotals = config.appConfig.statsShowInline ? UsageStats.shared.totals(in: .all) : [:]
     }
 
     var body: some View {
         styledContent
             .navigationTitle(loc.t("nav.mappings"))
             // Recompute installed input sources so names/icons are fresh and a removed one shows ⚠️.
-            .onAppear { availableInputSources = InputSourceFix.refreshAvailableSourcesByID() }
+            .onAppear {
+                availableInputSources = InputSourceFix.refreshAvailableSourcesByID()
+                refreshUsageTotals()
+            }
+            .onChange(of: config.appConfig.statsShowInline) { _, _ in refreshUsageTotals() }
             .toolbar {
                 ToolbarItemGroup {
                     styleSwitcher
@@ -166,12 +178,14 @@ struct MappingsPage: View {
         switch config.appConfig.mappingsViewStyle {
         case .grouped:
             MappingsGroupedStyleView(entries: sorted, availableInputSources: availableInputSources,
+                                     usageTotals: usageTotals,
                                      onEdit: { sheet = .edit($0) }, onDelete: deleteEntry)
         case .keyboard:
             MappingsKeyboardStyleView(entries: sorted, availableInputSources: availableInputSources,
                                       onEdit: { sheet = .edit($0) },
                                       onAddTrigger: { sheet = .addForTrigger($0) },
-                                      onDelete: deleteEntry)
+                                      onDelete: deleteEntry,
+                                      usageTotals: usageTotals)
         }
     }
 
