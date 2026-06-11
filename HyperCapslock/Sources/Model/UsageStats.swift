@@ -48,30 +48,31 @@ final class UsageStats {
         f.calendar = Calendar(identifier: .gregorian)
         f.dateFormat = "yyyy-MM-dd"
         // Track system timezone dynamically so the record-side day key never
-        // drifts from the dynamic `Calendar.current` window / query-side formatter
-        // if the timezone changes while the app runs.
+        // drifts from the day-boundary window / query-side cutoff if the timezone
+        // changes while the app runs.
         f.timeZone = .autoupdatingCurrent
         return f
     }()
+
+    /// A Gregorian calendar in the current timezone, used for ALL day-boundary
+    /// math (startOfDay, ±days). The day keys are formatted with the Gregorian
+    /// `dayFormatter`, so the boundaries must be Gregorian too — otherwise a user
+    /// whose *system* calendar is non-Gregorian (Buddhist / Japanese / Hebrew…)
+    /// would get boundaries that disagree with the "yyyy-MM-dd" labels.
+    private static func localCalendar() -> Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = .autoupdatingCurrent
+        return cal
+    }
 
     private struct StatsDoc: Codable {
         var version: Int
         var days: [String: [String: Int]]
     }
 
-    private let fileURL: URL = {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
-        let dir: URL
-        if AppEnvironment.isUITest {
-            dir = FileManager.default.temporaryDirectory
-                .appendingPathComponent("hypercapslock-uitest-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
-        } else {
-            let bundleID = Bundle.main.bundleIdentifier ?? "me.xueshi.hypercapslock"
-            dir = base.appendingPathComponent(bundleID, isDirectory: true)
-        }
-        return dir.appendingPathComponent("usage_stats.json")
-    }()
+    // Path resolution (uitest temp-dir isolation + bundle-id dir) is the single
+    // source of truth in `AppEnvironment.appSupportDirectory`, shared with ConfigStore.
+    private let fileURL = AppEnvironment.appSupportDirectory.appendingPathComponent("usage_stats.json")
 
     private init() {}
 
@@ -86,8 +87,18 @@ final class UsageStats {
             counts = doc.days
             FileLog.shared.info("UsageStats loaded: \(counts.count) tracked trigger(s).")
         } else {
-            // Leave the file intact; just start empty in memory (never clobber).
-            FileLog.shared.warn("usage_stats.json unreadable — starting empty, file left untouched.")
+            // We start empty, and the first recorded press will overwrite this
+            // file — so move the unreadable original aside first (mirrors
+            // ConfigStore's parse-failure backup). Never silently destroy a user's
+            // accumulated history.
+            let corruptURL = fileURL.deletingPathExtension().appendingPathExtension("corrupt.json")
+            try? FileManager.default.removeItem(at: corruptURL)
+            do {
+                try FileManager.default.moveItem(at: fileURL, to: corruptURL)
+                FileLog.shared.warn("usage_stats.json unreadable — preserved as \(corruptURL.lastPathComponent), starting empty.")
+            } catch {
+                FileLog.shared.error("usage_stats.json unreadable and backup failed (\(error.localizedDescription)); starting empty.")
+            }
         }
     }
 
@@ -111,7 +122,7 @@ final class UsageStats {
     /// `now` has crossed midnight. MUST be called with `lock` held.
     private func dayKeyLocked(_ now: Date) -> String {
         if now >= cachedDayStart && now < cachedDayEnd { return cachedDayKey }
-        let cal = Calendar.current
+        let cal = Self.localCalendar()
         let start = cal.startOfDay(for: now)
         let end = cal.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86_400)
         cachedDayStart = start
@@ -126,25 +137,22 @@ final class UsageStats {
     /// Day keys are zero-padded ISO dates, so a lexicographic `>=` against the
     /// cutoff key correctly selects the in-range days.
     func totals(in range: StatsRange, asOf now: Date = Date()) -> [String: Int] {
+        // Hold the lock across the whole query so the cutoff can reuse the static
+        // `dayFormatter` (only ever touched under `lock`) — no per-call DateFormatter
+        // allocation on the page's 1.5s refresh tick.
+        lock.lock(); defer { lock.unlock() }
         let included: (String) -> Bool
         switch range {
         case .all:
             included = { _ in true }
         case .today, .last7, .last30:
-            let cal = Calendar.current
+            let cal = Self.localCalendar()
             let today = cal.startOfDay(for: now)
             let back = range == .today ? 0 : (range == .last7 ? 6 : 29)
             let cutoff = cal.date(byAdding: .day, value: -back, to: today) ?? today
-            let f = DateFormatter()
-            f.locale = Locale(identifier: "en_US_POSIX")
-            f.calendar = Calendar(identifier: .gregorian)
-            f.dateFormat = "yyyy-MM-dd"
-            f.timeZone = .autoupdatingCurrent
-            let cutoffKey = f.string(from: cutoff)
+            let cutoffKey = Self.dayFormatter.string(from: cutoff)
             included = { $0 >= cutoffKey }
         }
-
-        lock.lock(); defer { lock.unlock() }
         var out: [String: Int] = [:]
         for (trigger, days) in counts {
             var sum = 0
@@ -168,6 +176,8 @@ final class UsageStats {
         counts = [:]
         dirty = false
         lock.unlock()
+        // A destructive, data-clearing op — record it.
+        FileLog.shared.info("UsageStats reset — all recorded press counts cleared.")
         io.async { [weak self] in self?.persist([:]) }
     }
 

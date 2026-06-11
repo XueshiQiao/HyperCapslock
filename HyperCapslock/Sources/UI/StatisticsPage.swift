@@ -180,6 +180,7 @@ struct StatisticsPage: View {
                                 count: item.count,
                                 fraction: maxCount > 0 ? Double(item.count) / Double(maxCount) : 0,
                                 availableInputSources: availableInputSources)
+                            .accessibilityIdentifier("stats.row.\(item.id)")
                     }
                 }
             } header: {
