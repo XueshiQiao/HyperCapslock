@@ -296,6 +296,7 @@ enum ActionExecutor {
     static func fireCapsShortTap() -> Bool {
         if let action = findSingleTapAction(currentContext()) {
             FileLog.shared.info("Caps single-tap action: \(describeAction(action))")
+            UsageStats.shared.record(triggerUniqueID(.singleTapHyper))
             let (combo, caption) = hudParts(action)
             HudCenter.shared.emit(trigger: "Caps", combo: combo, caption: caption)
             if case .independent(.toggleCapsLock) = action {
@@ -320,6 +321,7 @@ enum ActionExecutor {
         // 2nd tap within the double-tap window?
         if prevTap > 0, now &- prevTap <= EngineConstants.doubleTapWindowMs, let action = dtAction {
             FileLog.shared.info("Caps(F18) DOUBLE-TAP detected (\(now &- prevTap)ms gap). Firing action.")
+            UsageStats.shared.record(triggerUniqueID(.doubleTapHyper))
             let (combo, caption) = hudParts(action)
             HudCenter.shared.emit(trigger: "Caps ×2", combo: combo, caption: caption)
             execute(action, keyDown: true, activeModifiers: [])
@@ -426,6 +428,12 @@ enum ActionExecutor {
         // Fresh press. Stage 1: trigger group. No group → not ours; pass through.
         let ctx = currentContext()
         guard let mapping = resolveEntry(jsKeycode: jsKeycode, shiftHeld: shiftHeld, ctx: ctx) else { return false }
+        // Usage stat: one count per fresh physical press of a configured chord.
+        // Reached only on a fresh press — OS auto-repeat returns at the `cached`
+        // branch above, so a held key counts once. Counts the trigger that fired
+        // (the shift-fallback resolves `mapping` to the Caps+key it borrowed),
+        // including swallow/no-op resolutions (the key is still configured).
+        UsageStats.shared.record(triggerUniqueID(mapping.trigger))
         // Stage 2: effective action under the frontmost app. Latch it. Use
         // updateValue, not subscript-assign: for a `[Key: Optional]` dictionary,
         // `dict[key] = nil` REMOVES the entry, but we need to store an explicit

@@ -361,6 +361,7 @@ final class ConfigStore: ObservableObject {
     func setCJKVFixStrategy(_ strategy: CJKVFixStrategy) throws { try mutateConfig { $0.cjkvFixStrategy = strategy } }
     func setBroadcastCapsHoldForAnyDrag(_ on: Bool) throws { try mutateConfig { $0.broadcastCapsHoldForAnyDrag = on } }
     func setMappingsViewStyle(_ style: MappingsViewStyle) throws { try mutateConfig { $0.mappingsViewStyle = style } }
+    func setStatsShowInline(_ on: Bool) throws { try mutateConfig { $0.statsShowInline = on } }
 
     private func mutateConfig(_ change: (inout AppConfig) -> Void) throws {
         let prev = appConfig

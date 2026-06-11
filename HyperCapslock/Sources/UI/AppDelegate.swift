@@ -46,6 +46,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Persist any presses recorded since the last debounced flush before we
+        // exit. Safe in -uitest too (no-op: the hook never recorded anything).
+        UsageStats.shared.flushNow()
         // -uitest never installed the hook / remap, so there's nothing to tear
         // down — and we must not touch global hidutil state on test exit.
         guard !AppEnvironment.isUITest else { return }

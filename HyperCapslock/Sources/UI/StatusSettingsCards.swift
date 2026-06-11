@@ -80,6 +80,12 @@ struct SettingsPage: View {
                         iconLabel("timer", .orange, loc.t("settings.hud_duration"))
                     }
                 }
+                Toggle(isOn: Binding(
+                    get: { config.appConfig.statsShowInline },
+                    set: { v in try? app.setStatsShowInline(v) })) {
+                    iconLabel("chart.bar.fill", .purple, loc.t("settings.stats_inline"))
+                }
+                .accessibilityIdentifier("settings.stats_inline")
                 VStack(alignment: .leading, spacing: 2) {
                     Toggle(isOn: Binding(
                         get: { config.appConfig.broadcastCapsHoldForAnyDrag },

@@ -53,6 +53,9 @@ final class AppState: ObservableObject {
 
     func bootstrap() {
         config.load()
+        // Load before the keyboard hook installs, so the first recorded press
+        // accumulates onto the persisted history instead of a blank slate.
+        UsageStats.shared.load()
         FileLog.shared.info("bootstrap: \(config.mappings.count) mappings, \(config.customActions.count) custom actions; appConfig=\(config.appConfig)")
         applyHudSettings()
         applyInputSourceSettings()
@@ -179,6 +182,13 @@ final class AppState: ObservableObject {
     /// off the published `appConfig`. No engine/runtime side effects.
     func setMappingsViewStyle(_ style: MappingsViewStyle) throws {
         try config.setMappingsViewStyle(style)
+    }
+
+    var statsShowInline: Bool { config.appConfig.statsShowInline }
+
+    /// Pure presentation toggle for the Mappings-page inline press counts.
+    func setStatsShowInline(_ on: Bool) throws {
+        try config.setStatsShowInline(on)
     }
 
     private func applyInputSourceSettings() {

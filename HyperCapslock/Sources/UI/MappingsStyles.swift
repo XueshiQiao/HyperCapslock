@@ -213,6 +213,9 @@ struct MappingRow: View {
     let entry: ActionMappingEntry
     let availableInputSources: [String: InputSourceFix.AvailableSource]
     var keycapStyle: KeycapStyle = .raised
+    /// All-time press count, shown as a subtle inline badge when non-nil and > 0
+    /// (gated by the `stats_show_inline` setting at the call site).
+    var usageCount: Int? = nil
     let onEdit: () -> Void
     let onDelete: () -> Void
     @EnvironmentObject var loc: LocalizationManager
@@ -228,6 +231,11 @@ struct MappingRow: View {
             TriggerChips(trigger: entry.trigger, style: keycapStyle)
             Spacer(minLength: 12)
             ActionPill(display: d, accent: actionAccent(entry, invalid: d.invalid))
+            if let n = usageCount, n > 0 {
+                UsageCountBadge(count: n)
+                    .help(loc.t("stats.inline_help"))
+                    .accessibilityIdentifier("mapping.usage.\(triggerUniqueID(entry.trigger))")
+            }
             if !entry.bindings.isEmpty {
                 HStack(spacing: 3) {
                     Image(systemName: bindingsInvalid ? "exclamationmark.triangle.fill" : "macwindow")
@@ -258,6 +266,8 @@ struct MappingsGroupedStyleView: View {
     let entries: [ActionMappingEntry]
     let availableInputSources: [String: InputSourceFix.AvailableSource]
     var keycapStyle: KeycapStyle = .glass
+    /// triggerID → all-time press count; empty when inline counts are disabled.
+    var usageTotals: [String: Int] = [:]
     let onEdit: (ActionMappingEntry) -> Void
     let onDelete: (ActionMappingEntry) -> Void
     @EnvironmentObject var loc: LocalizationManager
@@ -276,6 +286,7 @@ struct MappingsGroupedStyleView: View {
                             ForEach(items, id: \.trigger) { entry in
                                 MappingRow(entry: entry, availableInputSources: availableInputSources,
                                            keycapStyle: keycapStyle,
+                                           usageCount: usageTotals[triggerUniqueID(entry.trigger)],
                                            onEdit: { onEdit(entry) }, onDelete: { onDelete(entry) })
                             }
                         } header: {

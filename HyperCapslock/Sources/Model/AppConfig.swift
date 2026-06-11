@@ -38,6 +38,9 @@ struct AppConfig: Codable, Equatable {
     /// users who don't run AnyDrag emit zero cross-app chatter.
     var broadcastCapsHoldForAnyDrag: Bool = false
     var mappingsViewStyle: MappingsViewStyle = .grouped
+    /// Show each mapping's all-time press count inline on the Mappings page rows.
+    /// On by default; the full breakdown always lives on the Statistics page.
+    var statsShowInline: Bool = true
 
     enum CodingKeys: String, CodingKey {
         case hideDockIcon = "hide_dock_icon"
@@ -47,12 +50,14 @@ struct AppConfig: Codable, Equatable {
         case cjkvFixStrategy = "cjkv_fix_strategy"
         case broadcastCapsHoldForAnyDrag = "broadcast_caps_hold_for_anydrag"
         case mappingsViewStyle = "mappings_view_style"
+        case statsShowInline = "stats_show_inline"
     }
 
     init(hideDockIcon: Bool = false, showHud: Bool = false, hudDurationMs: Int = 1350,
          themeMode: ThemeMode = .system, cjkvFixStrategy: CJKVFixStrategy = .none,
          broadcastCapsHoldForAnyDrag: Bool = false,
-         mappingsViewStyle: MappingsViewStyle = .grouped) {
+         mappingsViewStyle: MappingsViewStyle = .grouped,
+         statsShowInline: Bool = true) {
         self.hideDockIcon = hideDockIcon
         self.showHud = showHud
         self.hudDurationMs = hudDurationMs
@@ -60,6 +65,7 @@ struct AppConfig: Codable, Equatable {
         self.cjkvFixStrategy = cjkvFixStrategy
         self.broadcastCapsHoldForAnyDrag = broadcastCapsHoldForAnyDrag
         self.mappingsViewStyle = mappingsViewStyle
+        self.statsShowInline = statsShowInline
     }
 
     init(from decoder: Decoder) throws {
@@ -74,5 +80,6 @@ struct AppConfig: Codable, Equatable {
         // Tolerant: a missing value, or the now-removed legacy "list" value,
         // decodes back to `.grouped`.
         self.mappingsViewStyle = (try? c.decodeIfPresent(MappingsViewStyle.self, forKey: .mappingsViewStyle)) ?? .grouped
+        self.statsShowInline = try c.decodeIfPresent(Bool.self, forKey: .statsShowInline) ?? true
     }
 }
