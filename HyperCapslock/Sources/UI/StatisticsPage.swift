@@ -100,6 +100,9 @@ private struct StatRow: View {
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Capsule().fill(Color.secondary.opacity(0.12)))
             }
+            if let entry, !entry.bindings.isEmpty {
+                PerAppRulesBadge(bindings: entry.bindings)
+            }
             Spacer(minLength: 8)
             UsageBar(fraction: fraction, color: accent).frame(width: 84)
             Text(formatCount(count))

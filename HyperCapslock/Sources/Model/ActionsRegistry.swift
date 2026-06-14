@@ -31,18 +31,24 @@ final class ActionsRegistry {
         return custom.first { $0.id == id }
     }
 
+    /// Effective action config for an `(actionId, inline)` reference — the shared
+    /// precedence used by both mappings and per-app bindings: a resolvable
+    /// `actionId` wins, else the inline action, else nil.
+    func resolve(actionId: String?, inline: ActionConfig?) -> ActionConfig? {
+        if let id = actionId, let a = action(byID: id) { return a.config }
+        return inline
+    }
+
     /// Effective action config for a mapping: a resolvable `actionId` wins;
     /// otherwise the inline action; otherwise nil (an invalid/orphaned mapping —
     /// the caller logs it and shows ⚠️, never silently drops it).
     func resolve(_ entry: ActionMappingEntry) -> ActionConfig? {
-        if let id = entry.actionId, let a = action(byID: id) { return a.config }
-        return entry.inlineAction
+        resolve(actionId: entry.actionId, inline: entry.inlineAction)
     }
 
     /// Effective action config for a per-app binding — same precedence as a
     /// mapping: resolvable `actionId` wins, else inline, else nil.
     func resolve(_ binding: MappingBinding) -> ActionConfig? {
-        if let id = binding.actionId, let a = action(byID: id) { return a.config }
-        return binding.inlineAction
+        resolve(actionId: binding.actionId, inline: binding.inlineAction)
     }
 }

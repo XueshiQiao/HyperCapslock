@@ -192,4 +192,49 @@ final class HyperCapslockTests: XCTestCase {
         XCTAssertNil(ActionExecutor.effectiveAction(scopedOnly, RuntimeContext(frontmostBundleID: "com.apple.finder")))
         XCTAssertEqual(ActionExecutor.effectiveAction(scopedOnly, RuntimeContext(frontmostBundleID: "com.apple.Safari")), .directional(.right))
     }
+
+    // MARK: UI — representative action (a noop-default mapping displays its first
+    // meaningful per-app rule instead of "Do Nothing").
+
+    func testRepresentativeActionRefForNoopDefault() {
+        let reg = ActionsRegistry.shared
+        reg.setCustom([Action(id: "cust-tmux", name: "tmux", config: .command("tmux"), isBuiltin: false)])
+        defer { reg.setCustom([]) }
+        let safari: [Condition] = [.frontmostApp(include: ["com.apple.Safari"], exclude: [])]
+        let term: [Condition]   = [.frontmostApp(include: ["com.apple.Terminal"], exclude: [])]
+
+        // noop default + a meaningful per-app rule → borrow that rule's action.
+        let borrowed = representativeActionRef(ActionMappingEntry(
+            trigger: .hyperPlusKey(key: 70, withShift: false), actionId: "builtin.noop",
+            bindings: [MappingBinding(when: term, actionId: "cust-tmux")]))
+        XCTAssertEqual(borrowed.actionId, "cust-tmux")
+        XCTAssertNil(borrowed.inline)
+
+        // First rule is itself noop → skip it, take the first one that does something.
+        let skipNoop = representativeActionRef(ActionMappingEntry(
+            trigger: .hyperPlusKey(key: 70, withShift: false), actionId: "builtin.noop",
+            bindings: [MappingBinding(when: safari, actionId: "builtin.noop"),
+                       MappingBinding(when: term, inlineAction: .directional(.left))]))
+        XCTAssertNil(skipNoop.actionId)
+        XCTAssertEqual(skipNoop.inline, .directional(.left))
+
+        // Dangling (unresolvable) rule is skipped in favor of a resolvable one.
+        let skipDangling = representativeActionRef(ActionMappingEntry(
+            trigger: .hyperPlusKey(key: 70, withShift: false), actionId: "builtin.noop",
+            bindings: [MappingBinding(when: safari, actionId: "dangling-xyz"),
+                       MappingBinding(when: term, actionId: "cust-tmux")]))
+        XCTAssertEqual(skipDangling.actionId, "cust-tmux")
+
+        // All rules noop, or no rules at all → keep the (noop) default unchanged.
+        XCTAssertEqual(representativeActionRef(ActionMappingEntry(
+            trigger: .hyperPlusKey(key: 70, withShift: false), actionId: "builtin.noop",
+            bindings: [MappingBinding(when: safari, actionId: "builtin.noop")])).actionId, "builtin.noop")
+        XCTAssertEqual(representativeActionRef(ActionMappingEntry(
+            trigger: .hyperPlusKey(key: 70, withShift: false), actionId: "builtin.noop")).actionId, "builtin.noop")
+
+        // Meaningful default + rules → default is the representative (unchanged behavior).
+        XCTAssertEqual(representativeActionRef(ActionMappingEntry(
+            trigger: .hyperPlusKey(key: 70, withShift: false), actionId: "builtin.move_left",
+            bindings: [MappingBinding(when: term, actionId: "cust-tmux")])).actionId, "builtin.move_left")
+    }
 }

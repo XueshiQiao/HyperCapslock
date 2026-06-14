@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Per-App 动作显示方案 · 高仿真预览</title>
+<style>
+  :root {
+    --sans: -apple-system, "SF Pro Text", "SF Pro Display", "PingFang SC", system-ui, sans-serif;
+    --rounded: "SF Pro Rounded", -apple-system, "PingFang SC", system-ui, sans-serif;
+    --mono: "SF Mono", ui-monospace, Menlo, monospace;
+    /* category accents — verbatim from actionCategoryColor() */
+    --c-nav:#3B9CFF; --c-muted:#8A94A6; --c-amber:#F5A624; --c-purple:#B07DFF;
+    --c-pink:#F573B5; --c-green:#33D499; --c-cyan:#21D4ED; --c-rose:#FA7085;
+    --accent:#007AFF;
+  }
+  body[data-theme="light"]{
+    --page:#d8d8dc; --win:#ECECEE; --sidebar:#E4E4E8; --content:#F2F2F4; --card:#FFF;
+    --card-brd:rgba(0,0,0,.07); --sep:rgba(0,0,0,.075); --txt:#1d1d1f; --txt2:#86868b;
+    --seg-track:#E1E1E6; --seg-sel:#FFF;
+    --keycap-key-bg:linear-gradient(135deg,rgba(107,148,255,.22),rgba(168,117,255,.13)),#fbfcff;
+    --keycap-key-txt:#3D4275; --keycap-key-brd:rgba(120,130,170,.30);
+  }
+  body[data-theme="dark"]{
+    --page:#161618; --win:#1f1f21; --sidebar:#252527; --content:#1c1c1e; --card:#2c2c2e;
+    --card-brd:rgba(255,255,255,.07); --sep:rgba(255,255,255,.09); --txt:#f5f5f7; --txt2:#98989d;
+    --seg-track:#2e2e30; --seg-sel:#636366;
+    --keycap-key-bg:linear-gradient(135deg,rgba(107,148,255,.42),rgba(168,117,255,.30)),#2b2f3e;
+    --keycap-key-txt:#EDEFFF; --keycap-key-brd:rgba(160,175,230,.30);
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{background:var(--page);font-family:var(--sans);color:var(--txt);-webkit-font-smoothing:antialiased;padding:34px 20px 80px;}
+
+  .toolbar{max-width:1180px;margin:0 auto 24px;display:flex;gap:22px;align-items:center;flex-wrap:wrap;font-size:13px;}
+  .toolbar .grp{display:flex;align-items:center;gap:8px;}
+  .toolbar .lbl{color:var(--txt2);font-weight:600;}
+  .seg2{display:inline-flex;background:var(--seg-track);border-radius:8px;padding:2px;}
+  .seg2 button{border:0;background:transparent;color:var(--txt);font:inherit;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer;}
+  .seg2 button.on{background:var(--seg-sel);box-shadow:0 1px 2px rgba(0,0,0,.18);}
+  body[data-theme="dark"] .seg2 button.on{color:#fff;}
+  .note{max-width:1180px;margin:0 auto 14px;color:var(--txt2);font-size:12.5px;line-height:1.5;}
+
+  .window{max-width:1180px;margin:0 auto;background:var(--win);border-radius:12px;overflow:hidden;
+    box-shadow:0 28px 70px rgba(0,0,0,.34),0 2px 8px rgba(0,0,0,.22);display:grid;grid-template-columns:212px 1fr;border:.5px solid rgba(0,0,0,.18);}
+  .titlebar{grid-column:1/3;height:44px;display:flex;align-items:center;padding:0 16px;gap:8px;background:var(--win);border-bottom:.5px solid var(--sep);}
+  .lights{display:flex;gap:8px;} .lights i{width:12px;height:12px;border-radius:50%;display:block;}
+  .lights .r{background:#FF5F57;}.lights .y{background:#FEBC2E;}.lights .g{background:#28C840;}
+  .titlebar .ttl{margin-left:10px;font-size:13px;font-weight:600;}
+  .sidebar{background:var(--sidebar);padding:12px 10px;border-right:.5px solid var(--sep);}
+  .sidebar .item{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:7px;font-size:13.5px;margin-bottom:2px;font-weight:500;}
+  .sidebar .item.sel{background:var(--accent);color:#fff;}
+  .content{background:var(--content);padding:22px 26px 30px;min-height:560px;}
+  .nav-title{font-size:22px;font-weight:700;margin:2px 0 18px;letter-spacing:-.01em;}
+  .section{margin-bottom:20px;}
+  .sec-hd{font-size:12px;font-weight:600;color:var(--txt2);text-transform:uppercase;letter-spacing:.04em;margin:0 0 7px 4px;}
+  .sec-ft{font-size:11.5px;color:var(--txt2);margin:7px 0 0 4px;}
+  .card{background:var(--card);border:.5px solid var(--card-brd);border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+  .card .rowsep{height:.5px;background:var(--sep);margin-left:14px;}
+  .pad{padding:10px 12px;}
+  .range{display:flex;background:var(--seg-track);border-radius:7px;padding:2px;}
+  .range div{flex:1;text-align:center;font-size:12.5px;font-weight:600;padding:5px 0;border-radius:5px;}
+  .range div.on{background:var(--seg-sel);box-shadow:0 1px 2px rgba(0,0,0,.18);}
+  body[data-theme="dark"] .range div.on{color:#fff;}
+  .total{display:flex;align-items:center;gap:11px;padding:14px;}
+  .tile{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:#fff;}
+  .total .lab{font-size:14px;font-weight:500;}
+  .total .big{margin-left:auto;font-family:var(--rounded);font-weight:800;font-size:30px;font-variant-numeric:tabular-nums;}
+
+  .row{display:flex;align-items:center;gap:10px;padding:9px 14px;}
+  .chips{display:flex;align-items:center;gap:5px;}
+  .cap{min-width:29px;height:27px;padding:0 9px;border-radius:8px;display:grid;place-items:center;
+    font-family:var(--rounded);font-weight:600;font-size:13px;line-height:1;border:1px solid;}
+  .cap.mod{background:linear-gradient(180deg,#D1E3FF,#A8C4FF);color:#334D99;border-color:rgba(255,255,255,.7);}
+  body[data-theme="dark"] .cap.mod{background:linear-gradient(180deg,#5C6EA3,#454F83);color:#E6EBFF;border-color:rgba(255,255,255,.25);}
+  .cap.key{background:var(--keycap-key-bg);color:var(--keycap-key-txt);border-color:var(--keycap-key-brd);font-family:var(--mono);font-size:12px;}
+  .op{color:var(--txt2);font-size:12px;}
+
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;color:#fff;
+    font-size:12px;font-weight:600;line-height:1;white-space:nowrap;
+    background:linear-gradient(135deg,var(--c),color-mix(in srgb,var(--c) 72%,#fff));
+    border:1px solid rgba(255,255,255,.20);box-shadow:0 1px 1px rgba(0,0,0,.10);}
+  .pill svg{width:13px;height:13px;display:block;}
+  .ic{width:13px;height:13px;display:grid;place-items:center;}
+  .ppmark{width:12px;height:12px;display:grid;place-items:center;opacity:.95;margin-right:-1px;}
+  .apptile{width:15px;height:15px;border-radius:4px;display:grid;place-items:center;color:#fff;flex:none;}
+  .apptile svg{width:10px;height:10px;}
+  .ppbadge{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;padding:2px 6px;border-radius:999px;
+    color:var(--accent);background:color-mix(in srgb,var(--accent) 15%,transparent);}
+  .ppbadge svg{width:11px;height:11px;display:block;}
+  .spacer{flex:1;}
+  .bar{width:84px;height:7px;border-radius:999px;position:relative;background:color-mix(in srgb,var(--c) 16%,transparent);overflow:hidden;}
+  .bar>span{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,var(--c),color-mix(in srgb,var(--c) 62%,transparent));}
+  .count{min-width:54px;text-align:right;font-family:var(--rounded);font-weight:700;font-size:15px;font-variant-numeric:tabular-nums;}
+
+  .variant{display:none;align-items:center;gap:8px;}
+  body[data-opt="cur"] .v-cur, body[data-opt="a"] .v-a, body[data-opt="b"] .v-b, body[data-opt="c"] .v-c{display:inline-flex;}
+  .focusrow{position:relative;}
+  .focusrow::before{content:"";position:absolute;left:0;top:3px;bottom:3px;width:3px;border-radius:2px;background:var(--accent);opacity:.85;}
+
+  .compare{max-width:1180px;margin:34px auto 0;}
+  .compare h2{font-size:16px;font-weight:700;margin:0 0 4px;}
+  .compare .sub{color:var(--txt2);font-size:13px;margin:0 0 18px;line-height:1.5;}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  .opt{background:var(--card);border:.5px solid var(--card-brd);border-radius:12px;padding:16px 16px 14px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+  .opt.rec{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 35%,transparent);}
+  .opt .tag{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--txt2);}
+  .rec-pill{display:inline-block;font-size:10.5px;font-weight:700;color:#fff;background:var(--accent);border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:middle;}
+  .opt h3{font-size:15px;margin:3px 0 12px;font-weight:700;}
+  .opt .demo{display:flex;align-items:center;gap:8px;padding:11px 12px;border-radius:9px;background:var(--content);margin-bottom:12px;}
+  .opt ul{margin:0;padding-left:0;list-style:none;font-size:12.5px;line-height:1.5;}
+  .opt li{display:flex;gap:7px;margin-bottom:5px;}
+  .opt li.pro::before{content:"＋";color:var(--c-green);font-weight:800;}
+  .opt li.con::before{content:"－";color:var(--c-rose);font-weight:800;}
+  .subnote{margin-top:11px;padding-top:10px;border-top:.5px dashed var(--sep);font-size:12px;color:var(--txt2);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .scenario{margin-top:22px;background:var(--card);border:.5px solid var(--card-brd);border-radius:12px;padding:14px 16px;}
+  .scenario .stitle{font-size:13px;font-weight:700;margin:0 0 10px;}
+  .scenario .line{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12.5px;color:var(--txt2);}
+  .scenario .line .tagx{width:64px;flex:none;color:var(--txt);font-weight:700;}
+</style>
+</head>
+<body data-theme="light" data-opt="a">
+
+<div class="toolbar">
+  <div class="grp"><span class="lbl">外观</span>
+    <span class="seg2" id="theme"><button data-t="light" class="on">浅色</button><button data-t="dark">深色</button></span>
+  </div>
+  <div class="grp"><span class="lbl">给下面预览里的 Caps+Q 套用</span>
+    <span class="seg2" id="opt">
+      <button data-o="cur">现状</button><button data-o="a" class="on">方案 A</button>
+      <button data-o="b">方案 B</button><button data-o="c">方案 C</button>
+    </span>
+  </div>
+</div>
+<div class="note">切换右侧按钮，看同一条「默认 = 什么都不做 + 3 条 App 规则」的 mapping（<b>蓝色竖条标记的那行</b>）在统计页里的真实样子。其余行是普通 mapping，保持不变。</div>
+
+<!-- ===================== app window ===================== -->
+<div class="window">
+  <div class="titlebar"><span class="lights"><i class="r"></i><i class="y"></i><i class="g"></i></span><span class="ttl">HyperCapslock</span></div>
+  <nav class="sidebar">
+    <div class="item"><span>⌨️</span> 按键映射</div>
+    <div class="item"><span>🌐</span> 输入源</div>
+    <div class="item sel"><span>📊</span> 使用统计</div>
+    <div class="item"><span>⚙️</span> 设置</div>
+  </nav>
+  <main class="content">
+    <div class="nav-title">使用统计</div>
+
+    <div class="section"><div class="card pad">
+      <div class="range"><div>今天</div><div>最近 7 天</div><div>最近 30 天</div><div class="on">全部</div></div>
+    </div></div>
+
+    <div class="section">
+      <div class="card"><div class="total">
+        <span class="tile" style="background:#A45CFF"><svg viewBox="0 0 24 24" width="17" height="17" fill="#fff"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11z"/></svg></span>
+        <span class="lab">总触发次数</span><span class="big">8,642</span>
+      </div></div>
+      <div class="sec-ft">统计仅记录你的物理按键，不含系统自动重复。</div>
+    </div>
+
+    <div class="section">
+      <div class="sec-hd">排行</div>
+      <div class="card">
+
+        <div class="row" style="--c:var(--c-nav)">
+          <div class="chips"><span class="cap mod">Caps</span><span class="op">+</span><span class="cap key">H</span></div>
+          <span class="pill" style="--c:var(--c-nav)"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6l-6 6 6 6M5 12h14"/></svg></span>左移</span>
+          <span class="spacer"></span><span class="bar"><span style="width:84px"></span></span><span class="count">2,540</span>
+        </div><div class="rowsep"></div>
+
+        <div class="row" style="--c:var(--c-purple)">
+          <div class="chips"><span class="cap mod">Caps</span><span class="op">+</span><span class="cap key">K</span></div>
+          <span class="pill" style="--c:var(--c-purple)"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg></span>ABC</span>
+          <span class="spacer"></span><span class="bar"><span style="width:58px"></span></span><span class="count">1,712</span>
+        </div><div class="rowsep"></div>
+
+        <!-- ==== focus row: Caps+Q (default noop, 3 app rules) ==== -->
+        <div class="row focusrow">
+          <div class="chips"><span class="cap mod">Caps</span><span class="op">+</span><span class="cap key">Q</span></div>
+
+          <span class="variant v-cur" style="--c:var(--c-muted)">
+            <span class="pill" style="--c:var(--c-muted)"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/></svg></span>什么都不做</span>
+          </span>
+
+          <span class="variant v-a" style="--c:var(--c-pink)">
+            <span class="pill" style="--c:var(--c-pink)"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" stroke-linecap="round"/></svg></span>分屏</span>
+            <span class="ppbadge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2.4"/><path d="M3 9h18"/></svg>3</span>
+          </span>
+
+          <span class="variant v-b" style="--c:var(--c-pink)">
+            <span class="pill" style="--c:var(--c-pink)"><span class="apptile" style="background:#0a0a0a"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="3"/></svg></span>Cursor · 分屏</span>
+            <span class="ppbadge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2.4"/><path d="M3 9h18"/></svg>+2</span>
+          </span>
+
+          <span class="variant v-c" style="--c:var(--c-muted)">
+            <span class="pill" style="--c:var(--c-muted)"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2.4"/><path d="M3 9h18"/></svg></span>按 App 规则 · 3</span>
+          </span>
+
+          <span class="spacer"></span><span class="bar"><span style="width:44px"></span></span><span class="count">1,284</span>
+        </div><div class="rowsep"></div>
+
+        <div class="row" style="--c:var(--c-green)">
+          <div class="chips"><span class="cap mod">Caps</span><span class="op">+</span><span class="cap key">T</span></div>
+          <span class="pill" style="--c:var(--c-green)"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9l3 3-3 3M13 15h4"/></svg></span>tmux 新窗口</span>
+          <span class="spacer"></span><span class="bar"><span style="width:30px"></span></span><span class="count">906</span>
+        </div><div class="rowsep"></div>
+
+        <div class="row" style="--c:var(--c-amber)">
+          <div class="chips"><span class="cap mod">Caps</span><span class="op">+</span><span class="cap key">D</span></div>
+          <span class="pill" style="--c:var(--c-amber)"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H9L3 12l6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1zM16 9l-5 6M11 9l5 6"/></svg></span>删除</span>
+          <span class="spacer"></span><span class="bar"><span style="width:20px"></span></span><span class="count">600</span>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ===================== comparison ===================== -->
+<section class="compare">
+  <h2>三个方案 · 同一条「Caps+Q（默认 = 什么都不做，3 条 App 规则）」</h2>
+  <p class="sub">3 条规则：Cursor→<b>分屏</b>（key combo，最高优先级）、iTerm→<b>tmux 分屏</b>（command）、Safari→<b>后退</b>（key combo）。即「各 App 动作不同」的最难情形。</p>
+
+  <div class="grid">
+    <div class="opt rec">
+      <div class="tag">方案 A<span class="rec-pill">推荐</span></div>
+      <h3>代表动作</h3>
+      <div class="demo" style="--c:var(--c-pink)">
+        <span class="pill" style="--c:var(--c-pink)"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" stroke-linecap="round"/></svg></span>分屏</span>
+        <span class="ppbadge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2.4"/><path d="M3 9h18"/></svg>3</span>
+      </div>
+      <ul>
+        <li class="pro">显示最高优先级那条规则的真实动作，一眼就懂</li>
+        <li class="pro">全部规则同动作时自动收敛成那一个（见下方）</li>
+        <li class="pro">复用现有 pill + 🪟N 徽章，改动最小</li>
+        <li class="con">各 App 动作不同时 pill 只展示其一，靠 🪟3 提示「还有」</li>
+      </ul>
+      <div class="subnote">小问题：要不要在 pill 里再加个 App 角标？
+        <span class="pill" style="--c:var(--c-pink)"><span class="ppmark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2.4"/><path d="M3 9h18"/></svg></span><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" stroke-linecap="round"/></svg></span>分屏</span>
+        <span>（vs 仅靠 🪟3 徽章）</span>
+      </div>
+    </div>
+
+    <div class="opt">
+      <div class="tag">方案 B</div>
+      <h3>App 视角</h3>
+      <div class="demo" style="--c:var(--c-pink)">
+        <span class="pill" style="--c:var(--c-pink)"><span class="apptile" style="background:#0a0a0a"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="3"/></svg></span>Cursor · 分屏</span>
+        <span class="ppbadge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2.4"/><path d="M3 9h18"/></svg>+2</span>
+      </div>
+      <ul>
+        <li class="pro">同时告诉你「在哪个 App、做什么」</li>
+        <li class="con">App 一多就挤；图标加载/缺失要处理，改动更重</li>
+        <li class="con">和 🪟N 徽章信息重复</li>
+      </ul>
+    </div>
+
+    <div class="opt">
+      <div class="tag">方案 C</div>
+      <h3>通用标签</h3>
+      <div class="demo" style="--c:var(--c-muted)">
+        <span class="pill" style="--c:var(--c-muted)"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2.4"/><path d="M3 9h18"/></svg></span>按 App 规则 · 3</span>
+      </div>
+      <ul>
+        <li class="pro">永远没有歧义，最简单</li>
+        <li class="con">只说「是 App 规则」，<b>不告诉你具体做什么</b></li>
+        <li class="con">统计页里几乎和「什么都不做」一样无感</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="scenario">
+    <div class="stitle">方案 A 的收敛：当 3 条规则其实是「同一个动作」时（例：Cmd+W 只在 Terminal / iTerm / Ghostty 启用）</div>
+    <div class="line" style="--c:var(--c-muted)">
+      <span class="tagx">现状</span>
+      <span class="pill" style="--c:var(--c-muted)"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/></svg></span>什么都不做</span>
+      <span>← 三个终端里都按 Cmd+W 关闭，却显示「什么都不做」</span>
+    </div>
+    <div class="line" style="--c:var(--c-pink)">
+      <span class="tagx">方案 A</span>
+      <span class="pill" style="--c:var(--c-pink)"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" stroke-linecap="round"/></svg></span>关闭 ⌘W</span>
+      <span class="ppbadge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2.4"/><path d="M3 9h18"/></svg>3</span>
+      <span>← 动作一致 → 干净地显示那一个动作</span>
+    </div>
+  </div>
+</section>
+
+<script>
+  document.querySelectorAll('#theme button').forEach(b=>b.addEventListener('click',()=>{
+    document.body.dataset.theme=b.dataset.t;
+    document.querySelectorAll('#theme button').forEach(x=>x.classList.toggle('on',x===b));
+  }));
+  document.querySelectorAll('#opt button').forEach(b=>b.addEventListener('click',()=>{
+    document.body.dataset.opt=b.dataset.o;
+    document.querySelectorAll('#opt button').forEach(x=>x.classList.toggle('on',x===b));
+  }));
+</script>
+</body>
+</html>

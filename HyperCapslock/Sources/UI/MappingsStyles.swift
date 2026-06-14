@@ -198,10 +198,37 @@ struct ActionPill: View {
     }
 }
 
-/// Category accent color for a mapping's resolved action; orange when the action
-/// is unresolved/invalid.
+/// Category accent color for the action a mapping is *represented* by (see
+/// `representativeActionRef` — a noop-default mapping borrows its first real
+/// per-app action), so the pill/bar color always matches the shown label; orange
+/// when that action is unresolved/invalid.
+@MainActor
 func actionAccent(_ entry: ActionMappingEntry, invalid: Bool) -> Color {
-    invalid ? .orange : (ActionsRegistry.shared.resolve(entry).map(actionCategoryColor) ?? .secondary)
+    if invalid { return .orange }
+    let ref = representativeActionRef(entry)
+    return ActionsRegistry.shared.resolve(actionId: ref.actionId, inline: ref.inline)
+        .map(actionCategoryColor) ?? .secondary
+}
+
+/// The "🪟 N" badge counting a mapping's per-app rules (orange ⚠️ when any rule's
+/// action is unresolved). Shared by the Mappings rows and the Statistics rows so
+/// a mapping reads identically on both pages.
+struct PerAppRulesBadge: View {
+    let bindings: [MappingBinding]
+    @EnvironmentObject var loc: LocalizationManager
+
+    var body: some View {
+        let invalid = bindings.contains { ActionsRegistry.shared.resolve($0) == nil }
+        HStack(spacing: 3) {
+            Image(systemName: invalid ? "exclamationmark.triangle.fill" : "macwindow")
+            Text("\(bindings.count)")
+        }
+        .font(.caption2)
+        .padding(.horizontal, 6).padding(.vertical, 2)
+        .background(Capsule().fill((invalid ? Color.orange : Color.accentColor).opacity(0.15)))
+        .foregroundStyle(invalid ? Color.orange : Color.accentColor)
+        .help(invalid ? loc.t("mappings.invalid") : loc.t("mappings.app_rules"))
+    }
 }
 
 // MARK: - Shared mapping row
@@ -222,7 +249,6 @@ struct MappingRow: View {
 
     var body: some View {
         let d = mappingActionDisplay(entry, loc, availableInputSources: availableInputSources)
-        let bindingsInvalid = entry.bindings.contains { ActionsRegistry.shared.resolve($0) == nil }
         // Explicit HStack (not LabeledContent) so the trigger sits left and the
         // action sits right in EVERY context — LabeledContent only spreads that
         // way inside a Form; elsewhere (e.g. the keyboard style's Other Triggers)
@@ -237,15 +263,7 @@ struct MappingRow: View {
                     .accessibilityIdentifier("mapping.usage.\(triggerUniqueID(entry.trigger))")
             }
             if !entry.bindings.isEmpty {
-                HStack(spacing: 3) {
-                    Image(systemName: bindingsInvalid ? "exclamationmark.triangle.fill" : "macwindow")
-                    Text("\(entry.bindings.count)")
-                }
-                .font(.caption2)
-                .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(Capsule().fill((bindingsInvalid ? Color.orange : Color.accentColor).opacity(0.15)))
-                .foregroundStyle(bindingsInvalid ? Color.orange : Color.accentColor)
-                .help(bindingsInvalid ? loc.t("mappings.invalid") : loc.t("mappings.app_rules"))
+                PerAppRulesBadge(bindings: entry.bindings)
             }
             Button(action: onEdit) { Image(systemName: "pencil") }.buttonStyle(.borderless)
                 .accessibilityIdentifier("mapping.edit.\(triggerUniqueID(entry.trigger))")

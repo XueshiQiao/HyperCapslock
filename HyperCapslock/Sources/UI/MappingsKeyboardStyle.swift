@@ -297,7 +297,11 @@ private struct MagicKeyboardView: View {
 
     private func mapInfo(_ key: KKey) -> MapInfo {
         guard key.role == .normal, let js = key.js, let entry = mapped[js] else { return MapInfo() }
-        return MapInfo(entry: entry, cfg: ActionsRegistry.shared.resolve(entry))
+        // Tint by the action the key is *represented* by — for a noop-default key
+        // that's its first real per-app action — so the keycap color matches the
+        // hover tooltip / list / stats pill (see `representativeActionRef`).
+        let ref = representativeActionRef(entry)
+        return MapInfo(entry: entry, cfg: ActionsRegistry.shared.resolve(actionId: ref.actionId, inline: ref.inline))
     }
 
     private func tap(_ key: KKey, _ info: MapInfo) {

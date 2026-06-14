@@ -29,20 +29,50 @@ private func triggerSortKey(_ t: Trigger) -> String {
 
 struct ActionDisplay { let text: String; let symbol: String; let invalid: Bool; var icon: NSImage? = nil }
 
+/// The `(actionId, inline)` reference a mapping should be *represented* by in the
+/// UI. Normally the mapping's own default action — but when that default does
+/// nothing (`noop`) AND per-app rules exist, the first per-app rule that actually
+/// does something. This is the whole point of a noop-default mapping: the key is
+/// inert globally and only acts in specific apps, so a row/stat should show what
+/// it actually does there instead of a misleading "Do Nothing". When the default
+/// is meaningful, or no per-app rule does anything, the default is returned
+/// unchanged. Used for both the action label and its category accent so they
+/// always agree.
+@MainActor
+func representativeActionRef(_ entry: ActionMappingEntry) -> (actionId: String?, inline: ActionConfig?) {
+    if case .independent(.noop) = ActionsRegistry.shared.resolve(entry) {
+        if let b = entry.bindings.first(where: { binding in
+            guard let c = ActionsRegistry.shared.resolve(binding) else { return false }
+            if case .independent(.noop) = c { return false }
+            return true
+        }) {
+            return (b.actionId, b.inlineAction)
+        }
+    }
+    return (entry.actionId, entry.inlineAction)
+}
+
 @MainActor
 func mappingActionDisplay(_ entry: ActionMappingEntry, _ loc: LocalizationManager,
                           availableInputSources: [String: InputSourceFix.AvailableSource]) -> ActionDisplay {
-    if let id = entry.actionId {
+    let ref = representativeActionRef(entry)
+    return actionRefDisplay(ref.actionId, ref.inline, loc, availableInputSources: availableInputSources)
+}
+
+@MainActor
+private func actionRefDisplay(_ actionId: String?, _ inlineAction: ActionConfig?, _ loc: LocalizationManager,
+                              availableInputSources: [String: InputSourceFix.AvailableSource]) -> ActionDisplay {
+    if let id = actionId {
         if let action = ActionsRegistry.shared.action(byID: id) {
             let name = action.nameKey.map { loc.t($0) } ?? action.name
             return inputSourceAware(action.config, text: name, available: availableInputSources)
         }
-        if let inline = entry.inlineAction {
+        if let inline = inlineAction {
             return inputSourceAware(inline, text: actionPresentation(inline, loc).value, available: availableInputSources)
         }
         return ActionDisplay(text: loc.t("mappings.invalid"), symbol: "exclamationmark.triangle.fill", invalid: true)
     }
-    if let inline = entry.inlineAction {
+    if let inline = inlineAction {
         return inputSourceAware(inline, text: actionPresentation(inline, loc).value, available: availableInputSources)
     }
     return ActionDisplay(text: loc.t("mappings.invalid"), symbol: "exclamationmark.triangle.fill", invalid: true)
