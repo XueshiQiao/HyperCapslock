@@ -191,6 +191,14 @@ final class AppState: ObservableObject {
         try config.setStatsShowInline(on)
     }
 
+    var showWindowOnLaunch: Bool { config.appConfig.showWindowOnLaunch }
+
+    /// Whether the main window auto-shows at launch. Just persist it — there's no
+    /// runtime side effect; it's read by `AppDelegate` on the next launch.
+    func setShowWindowOnLaunch(_ on: Bool) throws {
+        try config.setShowWindowOnLaunch(on)
+    }
+
     private func applyInputSourceSettings() {
         InputSourceController.setFixStrategy(config.appConfig.cjkvFixStrategy)
         FileLog.shared.info("Input-source fix strategy applied: \(config.appConfig.cjkvFixStrategy.rawValue)")

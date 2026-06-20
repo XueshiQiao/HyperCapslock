@@ -25,7 +25,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         FrontmostAppTracker.shared.start()
         tray = TrayController()
         MainWindowController.shared = MainWindowController()
-        MainWindowController.shared?.show()
+        // Show the window on launch unless the user turned it off (then the app
+        // starts silently in the menu bar — reopen via the tray or Dock icon).
+        // Always show under -uitest so XCUITest can drive the UI.
+        if AppEnvironment.isUITest || AppState.shared.showWindowOnLaunch {
+            MainWindowController.shared?.show()
+        }
         if !AppEnvironment.isUITest {
             _ = UpdaterManager.shared   // start Sparkle's background update checker
         }

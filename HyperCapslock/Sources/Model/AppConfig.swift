@@ -41,6 +41,10 @@ struct AppConfig: Codable, Equatable {
     /// Show each mapping's all-time press count inline on the Mappings page rows.
     /// On by default; the full breakdown always lives on the Statistics page.
     var statsShowInline: Bool = true
+    /// Show the main settings window when the app launches. On by default. When
+    /// off, the app starts silently in the menu bar — the window can still be
+    /// opened from the tray's "Open Window" item or by clicking the Dock icon.
+    var showWindowOnLaunch: Bool = true
 
     enum CodingKeys: String, CodingKey {
         case hideDockIcon = "hide_dock_icon"
@@ -51,13 +55,15 @@ struct AppConfig: Codable, Equatable {
         case broadcastCapsHoldForAnyDrag = "broadcast_caps_hold_for_anydrag"
         case mappingsViewStyle = "mappings_view_style"
         case statsShowInline = "stats_show_inline"
+        case showWindowOnLaunch = "show_window_on_launch"
     }
 
     init(hideDockIcon: Bool = false, showHud: Bool = false, hudDurationMs: Int = 1350,
          themeMode: ThemeMode = .system, cjkvFixStrategy: CJKVFixStrategy = .none,
          broadcastCapsHoldForAnyDrag: Bool = false,
          mappingsViewStyle: MappingsViewStyle = .grouped,
-         statsShowInline: Bool = true) {
+         statsShowInline: Bool = true,
+         showWindowOnLaunch: Bool = true) {
         self.hideDockIcon = hideDockIcon
         self.showHud = showHud
         self.hudDurationMs = hudDurationMs
@@ -66,6 +72,7 @@ struct AppConfig: Codable, Equatable {
         self.broadcastCapsHoldForAnyDrag = broadcastCapsHoldForAnyDrag
         self.mappingsViewStyle = mappingsViewStyle
         self.statsShowInline = statsShowInline
+        self.showWindowOnLaunch = showWindowOnLaunch
     }
 
     init(from decoder: Decoder) throws {
@@ -81,5 +88,6 @@ struct AppConfig: Codable, Equatable {
         // decodes back to `.grouped`.
         self.mappingsViewStyle = (try? c.decodeIfPresent(MappingsViewStyle.self, forKey: .mappingsViewStyle)) ?? .grouped
         self.statsShowInline = try c.decodeIfPresent(Bool.self, forKey: .statsShowInline) ?? true
+        self.showWindowOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .showWindowOnLaunch) ?? true
     }
 }

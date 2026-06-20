@@ -353,6 +353,7 @@ final class ConfigStore: ObservableObject {
     func setBroadcastCapsHoldForAnyDrag(_ on: Bool) throws { try mutateConfig { $0.broadcastCapsHoldForAnyDrag = on } }
     func setMappingsViewStyle(_ style: MappingsViewStyle) throws { try mutateConfig { $0.mappingsViewStyle = style } }
     func setStatsShowInline(_ on: Bool) throws { try mutateConfig { $0.statsShowInline = on } }
+    func setShowWindowOnLaunch(_ on: Bool) throws { try mutateConfig { $0.showWindowOnLaunch = on } }
 
     private func mutateConfig(_ change: (inout AppConfig) -> Void) throws {
         let prev = appConfig

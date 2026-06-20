@@ -61,6 +61,16 @@ struct SettingsPage: View {
                         do { try app.setHideDockIcon(v); app.showToast(v ? loc.t("toast.hide_dock_enabled") : loc.t("toast.hide_dock_disabled")) }
                         catch { app.showToast(loc.t("toast.hide_dock_failed"), isError: true) }
                     })) { iconLabel("dock.rectangle", .indigo, loc.t("settings.hide_dock")) }
+                VStack(alignment: .leading, spacing: 2) {
+                    Toggle(isOn: Binding(
+                        get: { config.appConfig.showWindowOnLaunch },
+                        set: { v in
+                            do { try app.setShowWindowOnLaunch(v); app.showToast(v ? loc.t("toast.show_window_on_launch_enabled") : loc.t("toast.show_window_on_launch_disabled")) }
+                            catch { app.showToast(loc.t("toast.show_window_on_launch_failed"), isError: true) }
+                        })) { iconLabel("macwindow", .cyan, loc.t("settings.show_window_on_launch")) }
+                        .accessibilityIdentifier("settings.show_window_on_launch")
+                    Text(loc.t("settings.show_window_on_launch_hint")).font(.caption).foregroundStyle(.secondary)
+                }
                 Toggle(isOn: Binding(
                     get: { config.appConfig.showHud },
                     set: { v in
