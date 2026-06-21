@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HyperCapslock → Homebrew Cask submission plan</title>
+<style>
+  :root {
+    --bg: #faf9f5;
+    --surface: #ffffff;
+    --ink: #1f1e1c;
+    --ink-soft: #5a5751;
+    --ink-faint: #8a857c;
+    --rule: #e6e2d4;
+    --rule-soft: #efece1;
+    --code-bg: #f3f0e6;
+    --accent: #d97757;
+    --accent-soft: #f4e2d6;
+    --good: #4f8a5c;
+    --warn: #b6711c;
+    --bad: #b14338;
+    --serif: "Tiempos", "Source Serif Pro", "Iowan Old Style", Georgia, serif;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", "SF Mono", Menlo, Monaco, "Cascadia Code", monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .container {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 80px 40px 120px;
+  }
+
+  header.hero { margin-bottom: 56px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 18px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 48px;
+    line-height: 1.1;
+    margin: 0 0 20px;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+  }
+  .lede {
+    font-family: var(--serif);
+    font-size: 22px;
+    line-height: 1.45;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 640px;
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 30px;
+    line-height: 1.2;
+    margin: 64px 0 16px;
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 17px;
+    margin: 36px 0 10px;
+    letter-spacing: -0.005em;
+  }
+  p { margin: 0 0 16px; }
+  p, li { color: var(--ink); }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-soft); }
+  a:hover { border-bottom-color: var(--accent); }
+
+  ul, ol { padding-left: 24px; margin: 0 0 16px; }
+  li { margin-bottom: 8px; }
+  li code { font-size: 0.92em; }
+
+  code {
+    font-family: var(--mono);
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: #1f1e1c;
+    color: #f6f3eb;
+    padding: 20px 24px;
+    border-radius: 8px;
+    overflow-x: auto;
+    line-height: 1.55;
+    font-size: 13.5px;
+    margin: 20px 0 28px;
+  }
+  pre code {
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+  }
+  .tok-comment  { color: #9b9081; font-style: italic; }
+  .tok-keyword  { color: #e89b6f; }
+  .tok-fn       { color: #f0d68a; }
+  .tok-string   { color: #b8d49d; }
+  .tok-num      { color: #d8b9e3; }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px 32px;
+    margin: 32px 0 48px;
+    padding: 18px 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+  .meta-row b { color: var(--ink); font-weight: 500; margin-right: 8px; }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 18px 22px;
+    margin: 28px 0;
+    border-radius: 0 6px 6px 0;
+    color: var(--ink);
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .figure {
+    margin: 36px 0;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 28px 24px 18px;
+  }
+  .figure svg { display: block; width: 100%; height: auto; }
+  .figure .caption {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--rule);
+  }
+  .figure .caption b { color: var(--ink-soft); font-weight: 600; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 24px 0 32px;
+    font-size: 14.5px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  th {
+    font-weight: 600;
+    color: var(--ink-soft);
+    background: var(--rule-soft);
+    font-size: 13px;
+    letter-spacing: 0.01em;
+  }
+  td code { font-size: 0.88em; }
+
+  .pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .pill.good    { background: #e3f0e2; color: var(--good); }
+  .pill.warn    { background: #f5e7d0; color: var(--warn); }
+  .pill.bad     { background: #f5dad6; color: var(--bad); }
+  .pill.neutral { background: var(--rule-soft); color: var(--ink-soft); }
+
+  .footer {
+    margin-top: 96px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  /* SVG defaults */
+  svg text { font-family: var(--sans); font-size: 12.5px; fill: var(--ink); }
+  svg .label-mono  { font-family: var(--mono); font-size: 11.5px; fill: var(--ink-soft); }
+  svg .label-soft  { fill: var(--ink-soft); }
+  svg .label-faint { fill: var(--ink-faint); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ╔══ HERO ══════════════════════════════════════════════════════════╗ -->
+<header class="hero">
+  <div class="eyebrow">Distribution note · HyperCapslock · 2026-06-21</div>
+  <h1>Getting into the official Homebrew Cask</h1>
+  <p class="lede">The cask is technically ready today; the only thing standing between it and <code>brew&nbsp;install&nbsp;--cask&nbsp;hypercapslock</code> is a popularity bar — and we're far below it.</p>
+</header>
+
+<!-- ╔══ META ROW ══════════════════════════════════════════════════════╗ -->
+<div class="meta-row">
+  <span><b>Target</b><code>Homebrew/homebrew-cask</code></span>
+  <span><b>Today</b>7 ★ / 0 forks / 0 watchers</span>
+  <span><b>Need</b>225 ★ (author self-submit)</span>
+  <span><b>Verdict</b><span class="pill bad">BLOCKED — PARK IT</span></span>
+</div>
+
+<!-- ╔══ §1 ════════════════════════════════════════════════════════════╗ -->
+<h2>1 · The one blocker: notability</h2>
+
+<p>Homebrew Cask only accepts software above a popularity threshold (see its <a href="https://docs.brew.sh/Acceptable-Casks">Acceptable Casks</a> policy). The bar is <b>doubled for self-submissions</b> — a PR opened by the owner of the upstream repository, which is exactly our case.</p>
+
+<table>
+  <thead>
+    <tr><th>Submitter</th><th>Threshold (any one suffices)</th><th>HyperCapslock now</th><th>Pass?</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Third party</td>
+      <td>≥ 75 stars / ≥ 30 forks / ≥ 30 watchers</td>
+      <td>7 / 0 / 0</td>
+      <td><span class="pill bad">NO</span></td>
+    </tr>
+    <tr>
+      <td><b>Author (us)</b></td>
+      <td><b>≥ 225 stars / ≥ 90 forks / ≥ 90 watchers</b></td>
+      <td>7 / 0 / 0</td>
+      <td><span class="pill bad">NO</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="figure">
+<svg viewBox="0 0 800 250" xmlns="http://www.w3.org/2000/svg" aria-label="Notability gap bars">
+  <text x="0" y="20" font-weight="600" fill="#1f1e1c">Distance to the self-submit bar</text>
+
+  <!-- Stars row -->
+  <text x="0" y="70" class="label-mono">stars</text>
+  <rect x="90" y="56" width="660" height="20" rx="4" fill="#efece1"/>
+  <rect x="90" y="56" width="20.5" height="20" rx="4" fill="#d97757"/>
+  <line x1="750" y1="48" x2="750" y2="84" stroke="#b14338" stroke-width="2" stroke-dasharray="3 3"/>
+  <text x="115" y="71" class="label-mono" fill="#d97757">7</text>
+  <text x="744" y="44" text-anchor="end" class="label-mono" fill="#b14338">need 225</text>
+
+  <!-- Forks row -->
+  <text x="0" y="120" class="label-mono">forks</text>
+  <rect x="90" y="106" width="660" height="20" rx="4" fill="#efece1"/>
+  <rect x="90" y="106" width="3" height="20" rx="2" fill="#d97757"/>
+  <line x1="750" y1="98" x2="750" y2="134" stroke="#b14338" stroke-width="2" stroke-dasharray="3 3"/>
+  <text x="100" y="121" class="label-mono" fill="#8a857c">0</text>
+  <text x="744" y="151" text-anchor="end" class="label-mono" fill="#b14338">need 90</text>
+
+  <!-- Watchers row -->
+  <text x="0" y="170" class="label-mono">watch</text>
+  <rect x="90" y="156" width="660" height="20" rx="4" fill="#efece1"/>
+  <rect x="90" y="156" width="3" height="20" rx="2" fill="#d97757"/>
+  <line x1="750" y1="148" x2="750" y2="184" stroke="#b14338" stroke-width="2" stroke-dasharray="3 3"/>
+  <text x="100" y="171" class="label-mono" fill="#8a857c">0</text>
+
+  <text x="90" y="222" class="label-faint" font-style="italic">Orange = current. Dashed red = the threshold (any single one clears the bar).</text>
+</svg>
+<div class="caption"><b>Figure 1.</b> Scale of the gap, not just the numbers: 7 of 225 stars is ~3% of the way there. Forks/watchers are a faster path (90 each) but still untouched.</div>
+</div>
+
+<div class="callout">
+<span class="label">Reality check</span>
+<p>Opening the PR now gets it auto-flagged and closed as "not notable enough". This does not affect distribution — the third-party tap already installs the app. The official cask is discoverability, not capability.</p>
+</div>
+
+<!-- ╔══ §2 ════════════════════════════════════════════════════════════╗ -->
+<h2>2 · Strategy: prepare &amp; park, then grow</h2>
+
+<p>Everything Homebrew checks <i>other</i> than notability is already satisfied: a Developer&nbsp;ID-signed + notarized DMG (passes Gatekeeper), a stable versioned download URL, a homepage, and GPL-3.0 source that ships official binaries — so it correctly belongs in <code>cask</code>, not <code>homebrew/core</code>. The cask file is written and parked in the repo; the work that remains is entirely about growing the audience.</p>
+
+<div class="figure">
+<svg viewBox="0 0 800 300" xmlns="http://www.w3.org/2000/svg" aria-label="Decision flow">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5a5751"/>
+    </marker>
+  </defs>
+
+  <!-- start -->
+  <rect x="40" y="20" width="150" height="40" rx="8" fill="#fff" stroke="#e6e2d4"/>
+  <text x="115" y="45" text-anchor="middle" class="label-mono">cask ready</text>
+  <line x1="190" y1="40" x2="250" y2="40" stroke="#5a5751" marker-end="url(#arr)"/>
+
+  <!-- decision diamond -->
+  <polygon points="380,15 470,65 380,115 290,65" fill="#f4e2d6" stroke="#d97757"/>
+  <text x="380" y="58" text-anchor="middle" class="label-mono" fill="#1f1e1c">≥225★ or</text>
+  <text x="380" y="76" text-anchor="middle" class="label-mono" fill="#1f1e1c">≥90 f/w?</text>
+  <line x1="250" y1="40" x2="288" y2="58" stroke="#5a5751" marker-end="url(#arr)"/>
+
+  <!-- NO path -->
+  <line x1="380" y1="115" x2="380" y2="155" stroke="#b14338" marker-end="url(#arr)"/>
+  <text x="392" y="138" class="label-mono" fill="#b14338">no</text>
+  <rect x="270" y="155" width="220" height="46" rx="8" fill="#fff" stroke="#b14338"/>
+  <text x="380" y="175" text-anchor="middle" class="label-soft">Park cask · grow stars</text>
+  <text x="380" y="192" text-anchor="middle" class="label-faint" font-style="italic">awesome-lists, HN, PH, star CTA</text>
+  <!-- loop back -->
+  <path d="M270,178 C150,178 150,65 288,65" fill="none" stroke="#8a857c" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+  <text x="150" y="120" class="label-faint" font-style="italic">re-check</text>
+
+  <!-- YES path -->
+  <line x1="470" y1="65" x2="560" y2="65" stroke="#4f8a5c" marker-end="url(#arr)"/>
+  <text x="500" y="55" class="label-mono" fill="#4f8a5c">yes</text>
+  <rect x="560" y="42" width="210" height="46" rx="8" fill="#e3f0e2" stroke="#4f8a5c"/>
+  <text x="665" y="62" text-anchor="middle" class="label-soft">fork → audit → PR</text>
+  <text x="665" y="79" text-anchor="middle" class="label-faint" font-style="italic">§4 pipeline</text>
+</svg>
+<div class="caption"><b>Figure 2.</b> The gate is a single loop: keep promoting until any one metric clears, then run the mechanical submission pipeline once.</div>
+</div>
+
+<!-- ╔══ §3 ════════════════════════════════════════════════════════════╗ -->
+<h2>3 · The parked cask</h2>
+
+<p>Stored at <code>docs/homebrew-cask/hypercapslock.rb</code>. Cleaned to Homebrew idiom vs. the third-party tap: a single <code>url</code>/<code>sha256</code> (the DMG is universal — no <code>on_arm</code>/<code>on_intel</code> split), a style-compliant <code>desc</code>, a <code>:github_latest</code> livecheck, a macOS floor, and a <code>zap</code> stanza whose paths were verified against the real on-disk files.</p>
+
+<pre><code><span class="tok-keyword">cask</span> <span class="tok-string">"hypercapslock"</span> <span class="tok-keyword">do</span>
+  version <span class="tok-string">"26.06.106"</span>
+  sha256 <span class="tok-string">"3753…eb3e"</span>
+
+  url <span class="tok-string">"https://github.com/XueshiQiao/HyperCapslock/releases/download/v#{version}/HyperCapslock.dmg"</span>
+  name <span class="tok-string">"HyperCapslock"</span>
+  desc <span class="tok-string">"Remaps Caps Lock to a Hyper key for vim-style navigation and shortcuts"</span>
+  homepage <span class="tok-string">"https://github.com/XueshiQiao/HyperCapslock"</span>
+
+  <span class="tok-keyword">livecheck do</span>
+    url <span class="tok-num">:url</span>
+    strategy <span class="tok-num">:github_latest</span>
+  <span class="tok-keyword">end</span>
+
+  auto_updates <span class="tok-num">true</span>
+  depends_on macos: <span class="tok-string">"&gt;= :sonoma"</span>
+
+  app <span class="tok-string">"HyperCapslock.app"</span>
+
+  zap trash: [
+    <span class="tok-string">"~/Library/Application Support/me.xueshi.hypercapslock"</span>,
+    <span class="tok-string">"~/Library/Caches/me.xueshi.hypercapslock"</span>,
+    <span class="tok-string">"~/Library/HTTPStorages/me.xueshi.hypercapslock"</span>,
+    <span class="tok-string">"~/Library/HTTPStorages/me.xueshi.hypercapslock.binarycookies"</span>,
+    <span class="tok-string">"~/Library/Preferences/me.xueshi.hypercapslock.plist"</span>,
+  ]
+<span class="tok-keyword">end</span></code></pre>
+
+<!-- ╔══ §4 ════════════════════════════════════════════════════════════╗ -->
+<h2>4 · Submission pipeline (run once the bar is cleared)</h2>
+
+<div class="figure">
+<svg viewBox="0 0 800 150" xmlns="http://www.w3.org/2000/svg" aria-label="Submission pipeline">
+  <defs>
+    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5a5751"/>
+    </marker>
+  </defs>
+  <text x="0" y="20" font-weight="600" fill="#1f1e1c">fork → PR → CI → merge</text>
+  <line x1="40" y1="80" x2="772" y2="80" stroke="#e6e2d4" stroke-width="1.5"/>
+
+  <!-- nodes -->
+  <g class="label-mono" text-anchor="middle">
+    <circle cx="70"  cy="80" r="6" fill="#d97757"/><text x="70"  y="64">create</text><text x="70"  y="104" class="label-faint">brew create</text>
+    <circle cx="210" cy="80" r="6" fill="#d97757"/><text x="210" y="64">audit</text><text x="210" y="104" class="label-faint">--new --cask</text>
+    <circle cx="350" cy="80" r="6" fill="#d97757"/><text x="350" y="64">style</text><text x="350" y="104" class="label-faint">--fix</text>
+    <circle cx="490" cy="80" r="6" fill="#d97757"/><text x="490" y="64">test</text><text x="490" y="104" class="label-faint">install/zap</text>
+    <circle cx="630" cy="80" r="6" fill="#d97757"/><text x="630" y="64">PR</text><text x="630" y="104" class="label-faint">Casks/h/</text>
+    <circle cx="750" cy="80" r="6" fill="#4f8a5c"/><text x="750" y="64" fill="#4f8a5c">merge</text><text x="750" y="104" class="label-faint">CI green</text>
+  </g>
+</svg>
+<div class="caption"><b>Figure 3.</b> All mechanical and local-verifiable before the PR — Homebrew CI then re-runs audit/style/install on its own runners.</div>
+</div>
+
+<pre><code><span class="tok-comment"># 2) generate (downloads, computes sha256, opens editor)</span>
+brew create --cask \
+  https://github.com/XueshiQiao/HyperCapslock/releases/download/v26.06.106/HyperCapslock.dmg \
+  --set-name hypercapslock
+
+<span class="tok-comment"># 3) NEW-cask audit — note the flag shape</span>
+brew audit --new --cask hypercapslock
+<span class="tok-comment"># 4) auto-fix style</span>
+brew style --fix hypercapslock
+
+<span class="tok-comment"># 5) local install / uninstall / zap, bypassing the API</span>
+export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_FROM_API=1
+brew install   --cask hypercapslock
+brew uninstall --cask hypercapslock
+brew zap       --cask hypercapslock
+
+<span class="tok-comment"># 6) PR from a fork of Homebrew/homebrew-cask</span>
+git checkout -b hypercapslock
+git add Casks/h/hypercapslock.rb
+git commit -v        <span class="tok-comment"># "Add HyperCapslock 26.06.106"</span>
+git push &lt;your-fork&gt; hypercapslock</code></pre>
+
+<!-- ╔══ §5 ════════════════════════════════════════════════════════════╗ -->
+<h2>5 · Rejection risks &amp; how each is already covered</h2>
+
+<table>
+  <thead>
+    <tr><th>Homebrew rejects when…</th><th>HyperCapslock status</th><th>Risk</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Repo not notable enough</td><td>7★ — the live blocker</td><td><span class="pill bad">HIGH</span></td></tr>
+    <tr><td>App is unsigned / fails Gatekeeper</td><td>Developer ID signed + notarized + stapled in CI</td><td><span class="pill good">COVERED</span></td></tr>
+    <tr><td>No stable versioned download URL</td><td>GitHub Releases <code>v{version}/HyperCapslock.dmg</code></td><td><span class="pill good">COVERED</span></td></tr>
+    <tr><td>Open-source GUI with no official binary → belongs in core</td><td>Ships an official signed DMG → cask is correct</td><td><span class="pill good">COVERED</span></td></tr>
+    <tr><td>Missing <code>zap</code> for a new cask</td><td><code>zap trash:</code> present, paths file-verified</td><td><span class="pill good">COVERED</span></td></tr>
+    <tr><td>Style / audit failures</td><td><code>brew style --fix</code> + <code>audit --new</code> pre-run locally</td><td><span class="pill warn">LOW</span></td></tr>
+  </tbody>
+</table>
+
+<!-- ╔══ §6 ════════════════════════════════════════════════════════════╗ -->
+<h2>6 · Growing past the bar</h2>
+
+<p>This is the only real work. Highest-leverage, roughly in order:</p>
+<ul>
+  <li><b>Awesome-lists</b> — <code>jaywcjlove/awesome-mac</code>, <code>serhii-londar/open-source-mac-os-apps</code>, <code>iCHAIT/awesome-macOS</code>. Evergreen referral traffic. Drafts in <code>docs/promotion/awesome-lists.md</code>.</li>
+  <li><b>Launch posts</b> — Show HN, Product Hunt, r/macapps, 少数派, X. One good demo GIF outperforms any prose.</li>
+  <li><b>README star CTA + stars badge</b> — added across all four locale READMEs.</li>
+  <li><b>Fork/watch shortcut</b> — note that 90 forks or 90 watchers also clears it; a "good first issue" backlog can nudge forks.</li>
+</ul>
+
+<!-- ╔══ FOOTER ════════════════════════════════════════════════════════╗ -->
+<div class="footer">
+  <span>HyperCapslock · Homebrew Cask submission · 2026-06-21</span>
+  <span>blocker <code>notability 7/225★</code> · <code>docs/homebrew-cask/</code></span>
+</div>
+
+</div>
+</body>
+</html>

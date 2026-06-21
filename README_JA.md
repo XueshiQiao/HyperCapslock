@@ -19,6 +19,11 @@
   <a href="https://github.com/XueshiQiao/HyperCapslock/releases/latest"><img src="https://img.shields.io/github/v/release/XueshiQiao/HyperCapslock" alt="Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL%20v3.0-blue" alt="License" /></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple&logoColor=white" alt="macOS 14+" />
+  <a href="https://github.com/XueshiQiao/HyperCapslock/stargazers"><img src="https://img.shields.io/github/stars/XueshiQiao/HyperCapslock?style=social" alt="GitHub stars" /></a>
+</p>
+
+<p align="center">
+  ⭐ <b>HyperCapslock が役に立ったら、ぜひ <a href="https://github.com/XueshiQiao/HyperCapslock">スター</a>を</b> —— 他の人が見つけやすくなります。
 </p>
 
 ## コンセプト

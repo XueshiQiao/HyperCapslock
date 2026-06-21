@@ -19,6 +19,11 @@
   <a href="https://github.com/XueshiQiao/HyperCapslock/releases/latest"><img src="https://img.shields.io/github/v/release/XueshiQiao/HyperCapslock" alt="Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL%20v3.0-blue" alt="License" /></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple&logoColor=white" alt="macOS 14+" />
+  <a href="https://github.com/XueshiQiao/HyperCapslock/stargazers"><img src="https://img.shields.io/github/stars/XueshiQiao/HyperCapslock?style=social" alt="GitHub stars" /></a>
+</p>
+
+<p align="center">
+  ⭐ <b>If HyperCapslock saves your pinky, please <a href="https://github.com/XueshiQiao/HyperCapslock">star the repo</a></b> — it helps others find it.
 </p>
 
 ## The Idea
@@ -159,7 +164,16 @@ These are the defaults on a fresh install — **all of them are customizable in 
 brew install --cask XueshiQiao/tap/hypercapslock
 ```
 
-Or download the `.dmg` from [GitHub Releases](https://github.com/XueshiQiao/HyperCapslock/releases).
+<details>
+<summary>Prefer the two-step form?</summary>
+
+```bash
+brew tap XueshiQiao/tap
+brew install --cask hypercapslock
+```
+</details>
+
+Or download the `.dmg` from [GitHub Releases](https://github.com/XueshiQiao/HyperCapslock/releases) and drag it into `Applications`.
 
 ### Permissions
 

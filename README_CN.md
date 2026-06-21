@@ -19,6 +19,11 @@
   <a href="https://github.com/XueshiQiao/HyperCapslock/releases/latest"><img src="https://img.shields.io/github/v/release/XueshiQiao/HyperCapslock" alt="Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL%20v3.0-blue" alt="License" /></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple&logoColor=white" alt="macOS 14+" />
+  <a href="https://github.com/XueshiQiao/HyperCapslock/stargazers"><img src="https://img.shields.io/github/stars/XueshiQiao/HyperCapslock?style=social" alt="GitHub stars" /></a>
+</p>
+
+<p align="center">
+  ⭐ <b>如果 HyperCapslock 解放了你的小拇指，欢迎给个 <a href="https://github.com/XueshiQiao/HyperCapslock">Star</a></b> —— 能帮更多人发现它。
 </p>
 
 ## 设计思路
