@@ -45,6 +45,10 @@ struct AppConfig: Codable, Equatable {
     /// off, the app starts silently in the menu bar — the window can still be
     /// opened from the tray's "Open Window" item or by clicking the Dock icon.
     var showWindowOnLaunch: Bool = true
+    /// User-configured low-level key remaps (a spare right modifier → a free
+    /// function key), applied via `hidutil` on top of the built-in CapsLock→F18
+    /// remap. Empty by default. See `KeyRemap`.
+    var keyRemaps: [KeyRemap] = []
 
     enum CodingKeys: String, CodingKey {
         case hideDockIcon = "hide_dock_icon"
@@ -56,6 +60,7 @@ struct AppConfig: Codable, Equatable {
         case mappingsViewStyle = "mappings_view_style"
         case statsShowInline = "stats_show_inline"
         case showWindowOnLaunch = "show_window_on_launch"
+        case keyRemaps = "key_remaps"
     }
 
     init(hideDockIcon: Bool = false, showHud: Bool = false, hudDurationMs: Int = 1350,
@@ -63,7 +68,8 @@ struct AppConfig: Codable, Equatable {
          broadcastCapsHoldForAnyDrag: Bool = false,
          mappingsViewStyle: MappingsViewStyle = .grouped,
          statsShowInline: Bool = true,
-         showWindowOnLaunch: Bool = true) {
+         showWindowOnLaunch: Bool = true,
+         keyRemaps: [KeyRemap] = []) {
         self.hideDockIcon = hideDockIcon
         self.showHud = showHud
         self.hudDurationMs = hudDurationMs
@@ -73,6 +79,7 @@ struct AppConfig: Codable, Equatable {
         self.mappingsViewStyle = mappingsViewStyle
         self.statsShowInline = statsShowInline
         self.showWindowOnLaunch = showWindowOnLaunch
+        self.keyRemaps = keyRemaps
     }
 
     init(from decoder: Decoder) throws {
@@ -89,5 +96,8 @@ struct AppConfig: Codable, Equatable {
         self.mappingsViewStyle = (try? c.decodeIfPresent(MappingsViewStyle.self, forKey: .mappingsViewStyle)) ?? .grouped
         self.statsShowInline = try c.decodeIfPresent(Bool.self, forKey: .statsShowInline) ?? true
         self.showWindowOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .showWindowOnLaunch) ?? true
+        // Tolerant: a missing list, or one with an unknown source/target token,
+        // decodes back to empty rather than failing the whole config load.
+        self.keyRemaps = (try? c.decodeIfPresent([KeyRemap].self, forKey: .keyRemaps)) ?? []
     }
 }

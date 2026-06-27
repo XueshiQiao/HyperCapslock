@@ -354,6 +354,7 @@ final class ConfigStore: ObservableObject {
     func setMappingsViewStyle(_ style: MappingsViewStyle) throws { try mutateConfig { $0.mappingsViewStyle = style } }
     func setStatsShowInline(_ on: Bool) throws { try mutateConfig { $0.statsShowInline = on } }
     func setShowWindowOnLaunch(_ on: Bool) throws { try mutateConfig { $0.showWindowOnLaunch = on } }
+    func setKeyRemaps(_ remaps: [KeyRemap]) throws { try mutateConfig { $0.keyRemaps = remaps } }
 
     private func mutateConfig(_ change: (inout AppConfig) -> Void) throws {
         let prev = appConfig

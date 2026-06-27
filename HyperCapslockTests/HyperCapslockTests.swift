@@ -15,6 +15,26 @@ final class HyperCapslockTests: XCTestCase {
         }
     }
 
+    /// F13–F17 and F19 must be recordable (the key-capture field calls
+    /// `macToJs`, then `name` for display). F18 stays reserved (CapsLock remap),
+    /// so it must NOT translate. This is the contract the recorder relies on.
+    func testFunctionKeysF13toF19Recordable() throws {
+        // (macOS virtual keycode, JS keyCode, display name)
+        let cases: [(UInt16, UInt16, String)] = [
+            (0x69, 124, "F13"), (0x6B, 125, "F14"), (0x71, 126, "F15"),
+            (0x6A, 127, "F16"), (0x40, 128, "F17"), (0x50, 130, "F19"),
+        ]
+        for (mac, js, label) in cases {
+            XCTAssertEqual(KeyCodes.macToJs(mac), js, "\(label): macToJs(0x\(String(mac, radix: 16)))")
+            XCTAssertEqual(KeyCodes.jsToMac(js), mac, "\(label): jsToMac(\(js))")
+            XCTAssertEqual(KeyCodes.name(js), label, "\(label): name(\(js))")
+        }
+        // F18 is reserved — neither direction may resolve, or it could be bound
+        // as a normal key and collide with the CapsLock hyper engine.
+        XCTAssertNil(KeyCodes.macToJs(0x4F), "F18 mac keycode must not be recordable")
+        XCTAssertNil(KeyCodes.jsToMac(129), "F18 JS keycode must not be recordable")
+    }
+
     // MARK: Mapping (de)serialization
 
     func testMappingIdRoundTrip() throws {

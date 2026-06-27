@@ -59,6 +59,7 @@ final class AppState: ObservableObject {
         FileLog.shared.info("bootstrap: \(config.mappings.count) mappings, \(config.customActions.count) custom actions; appConfig=\(config.appConfig)")
         applyHudSettings()
         applyInputSourceSettings()
+        applyKeyRemaps()
         applyActivationPolicy(hide: config.appConfig.hideDockIcon)
         applyAppearance(config.appConfig.themeMode)
         autostart = LaunchAtLogin.isEnabled
@@ -202,6 +203,46 @@ final class AppState: ObservableObject {
     private func applyInputSourceSettings() {
         InputSourceController.setFixStrategy(config.appConfig.cjkvFixStrategy)
         FileLog.shared.info("Input-source fix strategy applied: \(config.appConfig.cjkvFixStrategy.rawValue)")
+    }
+
+    // MARK: - Key remapping (hidutil)
+
+    var keyRemaps: [KeyRemap] { config.appConfig.keyRemaps }
+
+    /// Persist a new remap list and re-apply it to the live `hidutil` mapping.
+    /// Errors surface as a toast (and a log line) rather than throwing, to keep
+    /// the settings UI simple.
+    func setKeyRemaps(_ remaps: [KeyRemap]) {
+        let prev = config.appConfig.keyRemaps
+        do {
+            try config.setKeyRemaps(remaps)
+        } catch {
+            FileLog.shared.error("Failed to persist key remaps: \(error)")
+            showToast(loc.t("toast.remap_failed"), isError: true)
+            return
+        }
+        // If hidutil rejects the new mapping the live keyboard is unchanged (a
+        // failed `--set` is atomic), so roll the config back to match reality
+        // instead of leaving the UI claiming a remap that never took effect.
+        if !applyKeyRemaps() {
+            try? config.setKeyRemaps(prev)
+            showToast(loc.t("toast.remap_failed"), isError: true)
+        }
+    }
+
+    /// (Re)apply the base CapsLock→F18 remap plus the user remaps via hidutil.
+    /// This is the single owner of the live `UserKeyMapping` (KeyboardHook.start
+    /// no longer touches it), so a settings edit and launch never clobber one
+    /// another. Skipped under -uitest, which must never touch global hidutil state.
+    /// Returns whether the apply succeeded (always true under -uitest).
+    @discardableResult
+    private func applyKeyRemaps() -> Bool {
+        guard !AppEnvironment.isUITest else { return true }
+        let ok = HidUtil.setupRemap(extra: config.appConfig.keyRemaps)
+        if !ok {
+            FileLog.shared.warn("hidutil remap apply failed — CapsLock / key remaps may be unreliable.")
+        }
+        return ok
     }
 
     func toggleAutostart() throws {

@@ -112,6 +112,22 @@ struct SettingsPage: View {
                 }
             }
 
+            Section {
+                ForEach(config.appConfig.keyRemaps.indices, id: \.self) { i in
+                    keyRemapRow(i)
+                }
+                Button { addKeyRemap() } label: {
+                    iconLabel("plus.circle.fill", .pink, loc.t("remap.add"))
+                }
+                .buttonStyle(.borderless)
+                .disabled(config.appConfig.keyRemaps.count >= KeyRemapSource.allCases.count)
+                .accessibilityIdentifier("settings.key_remap.add")
+            } header: {
+                Text(loc.t("remap.label"))
+            } footer: {
+                Text(loc.t("remap.hint")).font(.caption).foregroundStyle(.secondary)
+            }
+
             Section(loc.t("appearance.label")) {
                 Picker(selection: Binding(
                     get: { loc.followsSystem ? LanguageChoice.system : LanguageChoice.fixed(loc.locale) },
@@ -172,6 +188,84 @@ struct SettingsPage: View {
     /// A settings-row label: a category-colored icon tile + the text.
     private func iconLabel(_ symbol: String, _ color: Color, _ text: String) -> some View {
         HStack(spacing: 10) { IconTile(symbol: symbol, color: color); Text(text) }
+    }
+
+    // MARK: - Key remapping rows
+
+    /// One editable remap row: source modifier → target function key + remove.
+    private func keyRemapRow(_ i: Int) -> some View {
+        HStack(spacing: 10) {
+            Picker("", selection: Binding(
+                get: { config.appConfig.keyRemaps[i].source },
+                set: { newValue in
+                    var copy = config.appConfig.keyRemaps
+                    guard copy.indices.contains(i) else { return }
+                    copy[i].source = newValue
+                    app.setKeyRemaps(copy)
+                })) {
+                ForEach(availableSources(forRow: i)) { s in
+                    Text(loc.t("remap.src.\(s.rawValue)")).tag(s)
+                }
+            }
+            .labelsHidden()
+            .accessibilityIdentifier("settings.key_remap.row.\(i).source")
+
+            Image(systemName: "arrow.right").foregroundStyle(.secondary)
+
+            Picker("", selection: Binding(
+                get: { config.appConfig.keyRemaps[i].destination },
+                set: { newValue in
+                    var copy = config.appConfig.keyRemaps
+                    guard copy.indices.contains(i) else { return }
+                    copy[i].destination = newValue
+                    app.setKeyRemaps(copy)
+                })) {
+                ForEach(availableTargets(forRow: i)) { t in
+                    Text(t.displayName).tag(t)
+                }
+            }
+            .labelsHidden()
+            .accessibilityIdentifier("settings.key_remap.row.\(i).target")
+
+            Spacer()
+
+            Button {
+                var copy = config.appConfig.keyRemaps
+                guard copy.indices.contains(i) else { return }
+                copy.remove(at: i)
+                app.setKeyRemaps(copy)
+            } label: {
+                Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+            }
+            .buttonStyle(.borderless)
+            .contentShape(Rectangle())
+            .accessibilityIdentifier("settings.key_remap.row.\(i).remove")
+        }
+    }
+
+    /// Source keys still available to row `i` (its own current source, plus any
+    /// not used by another row) — so each modifier can be remapped at most once.
+    private func availableSources(forRow i: Int) -> [KeyRemapSource] {
+        let usedByOthers = Set(config.appConfig.keyRemaps.enumerated()
+            .filter { $0.offset != i }.map { $0.element.source })
+        return KeyRemapSource.allCases.filter { !usedByOthers.contains($0) }
+    }
+
+    /// Target keys still available to row `i` — each function key targeted once.
+    private func availableTargets(forRow i: Int) -> [KeyRemapTarget] {
+        let usedByOthers = Set(config.appConfig.keyRemaps.enumerated()
+            .filter { $0.offset != i }.map { $0.element.destination })
+        return KeyRemapTarget.allCases.filter { !usedByOthers.contains($0) }
+    }
+
+    /// Append a new remap with the first unused source + target.
+    private func addKeyRemap() {
+        let remaps = config.appConfig.keyRemaps
+        let usedSrc = Set(remaps.map { $0.source })
+        let usedDst = Set(remaps.map { $0.destination })
+        guard let src = KeyRemapSource.allCases.first(where: { !usedSrc.contains($0) }),
+              let dst = KeyRemapTarget.allCases.first(where: { !usedDst.contains($0) }) else { return }
+        app.setKeyRemaps(remaps + [KeyRemap(source: src, destination: dst)])
     }
 
     private var statusRow: some View {

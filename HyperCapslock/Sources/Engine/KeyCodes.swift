@@ -102,6 +102,10 @@ enum KeyCodes {
         case 115: return 0x76; case 116: return 0x60; case 117: return 0x61
         case 118: return 0x62; case 119: return 0x64; case 120: return 0x65
         case 121: return 0x6D; case 122: return 0x67; case 123: return 0x6F
+        // Function keys F13–F19. F18 (js 129 / mac 0x4F) is intentionally absent —
+        // it's the CapsLock remap target and must not be bindable as a normal key.
+        case 124: return 0x69; case 125: return 0x6B; case 126: return 0x71
+        case 127: return 0x6A; case 128: return 0x40; case 130: return 0x50
         default: return nil
         }
     }
@@ -135,6 +139,9 @@ enum KeyCodes {
         case 0x76: return 115; case 0x60: return 116; case 0x61: return 117
         case 0x62: return 118; case 0x64: return 119; case 0x65: return 120
         case 0x6D: return 121; case 0x67: return 122; case 0x6F: return 123
+        // Function keys F13–F19 (exact inverse; F18/0x4F reserved, omitted).
+        case 0x69: return 124; case 0x6B: return 125; case 0x71: return 126
+        case 0x6A: return 127; case 0x40: return 128; case 0x50: return 130
         default: return nil
         }
     }
@@ -145,7 +152,7 @@ enum KeyCodes {
         switch key {
         case 48...57: return String(UnicodeScalar(UInt8(48 + (key - 48) + 0)))  // 0-9 → '0'..'9'
         case 65...90: return String(UnicodeScalar(UInt8(65 + (key - 65))))      // A-Z
-        case 112...123: return "F\(key - 111)"
+        case 112...135: return "F\(key - 111)"   // F1–F24 (F13–F19 used by remaps)
         case 8: return "Backspace"
         case 9: return "Tab"
         case 13: return "Enter"

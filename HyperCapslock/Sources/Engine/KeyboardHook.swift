@@ -193,9 +193,10 @@ final class KeyboardHook {
             FileLog.shared.info("Accessibility permission already granted.")
         }
 
-        if !HidUtil.setupRemap() {
-            FileLog.shared.warn("Could not remap CapsLock via hidutil. Caps modifier may be unreliable.")
-        }
+        // hidutil remaps (CapsLock→F18 + any user key remaps) are applied by
+        // AppState.applyKeyRemaps() during bootstrap(), which runs before this —
+        // keeping a single owner of the UserKeyMapping so the two never clobber
+        // each other.
 
         let thread = Thread { [weak self] in self?.runTapLoop() }
         thread.name = "me.xueshi.hypercapslock.eventtap"
