@@ -28,9 +28,9 @@
 
 ## 设计思路
 
-Caps Lock 就在主键盘行（home row）上，却几乎没什么用。HyperCapslock 把它重映射为 **F18**（一个任何键盘上都不存在的物理按键），然后在操作系统层面拦截 F18 + 其它按键的组合，用来模拟导航、编辑、输入法切换、组合键和 shell 命令。
+Caps Lock 就在主键盘行（home row）上，却几乎没什么用。HyperCapslock 把它重映射为一个任何键盘上都不存在的按键——别的应用根本看不到它——然后在操作系统层面拦截 Caps + 其它按键的组合，用来模拟导航、编辑、输入法切换、组合键和 shell 命令。
 
-因为 F18 并不是真正的修饰键（不是 Cmd、Ctrl、Shift 或 Alt），所以**它可以直接和这些修饰键叠加使用，不需要额外占用组合键**：
+因为这个触发键并不是真正的修饰键（不是 Cmd、Ctrl、Shift 或 Alt），所以**它可以直接和这些修饰键叠加使用，不需要额外占用组合键**：
 
 所以如果把 `Caps + H ` 映射到 `←`方向键，那就会原生获得以下四个功能：
 
@@ -55,7 +55,7 @@ Caps Lock 就在主键盘行（home row）上，却几乎没什么用。HyperCap
 
 | 触发方式 | 说明 |
 |---------|------|
-| **Caps + 按键** | 按住 Caps（F18）再按某个键，如 `Caps + H` |
+| **Caps + 按键** | 按住 Caps 再按某个键，如 `Caps + H` |
 | **Caps + Shift + 按键** | 带 Shift 的独立映射，可绑定与无 Shift 版本不同的动作 |
 | **单击 Caps（Caps×1）** | 单独轻点一下 Caps 即触发（替代默认的大小写切换） |
 | **双击 Caps（Caps×2）** | 快速连点两下 Caps 触发；不影响单击的行为 |
@@ -196,26 +196,18 @@ brew install --cask XueshiQiao/tap/hypercapslock
 
 - **配置复杂度** —— Karabiner 对于稍微复杂一点的重映射需要手写 JSON。HyperCapslock 提供可视化界面，点几下就能配置，还支持按应用规则、自定义动作库等。
 - **占用** —— Karabiner 会安装一个内核扩展和多个后台进程。HyperCapslock 只是一个轻量的原生 macOS 应用。
-- **修饰键冲突** —— Karabiner 通常把 Caps Lock 映射成一个真正的修饰键组合（比如 Ctrl+Shift+Cmd+Opt）。这种「hyper key」方案能用，但可能和已有的快捷键冲突。HyperCapslock 映射到 F18，它不会和任何东西冲突，并能自然地和真正的修饰键叠加。
+- **修饰键冲突** —— Karabiner 通常把 Caps Lock 映射成一个真正的修饰键组合（比如 Ctrl+Shift+Cmd+Opt）。这种「hyper key」方案能用，但可能和已有的快捷键冲突。HyperCapslock 把 Caps Lock 映射成一个任何键盘上都不存在的按键，它不会和任何东西冲突，并能自然地和真正的修饰键叠加。
 
 如果你需要 Karabiner 的完整能力（鼠标重映射、按设备配置等），那就用 Karabiner。如果你主要想要在任何地方都能用、且几乎不用配置的 vim 导航与编辑，这个工具或许是更简单的选择。
-
-## 它是如何工作的
-
-Caps Lock 会在操作系统层面通过 `hidutil` 重映射为 F18。随后应用会在 HID 层安装一个 `CGEventTap`：这是一个全局事件 tap，会在键盘事件到达其他应用之前先拦截它们。
-
-当 F18 被按住、又按下另一个键时，应用会吞掉原始事件，并把重映射后的按键（例如方向键）注入到系统输入流中。注入的事件会携带一个标记，以防止形成反馈回路。
-
-状态跟踪使用受锁保护的运行时状态（`OSAllocatedUnfairLock` / `NSLock`），以保证 tap 线程、定时器线程和 UI 之间的线程安全。hook 回调只做最少的工作 —— 整数比较和提前返回 —— 以避免引入输入延迟。
-
-完整技术细节见 [how_does_it_work.md](how_does_it_work.md)。
 
 ## 技术栈
 
 - **原生 macOS** —— SwiftUI + AppKit，Swift 5 语言模式，macOS 14+
-- CoreGraphics `CGEventTap` + `hidutil` 实现 F18 重映射；IOKit 读取 CapsLock 状态；Carbon TIS 进行输入法切换
+- CoreGraphics `CGEventTap` + `hidutil` 实现 Caps Lock 重映射；IOKit 读取 CapsLock 状态；Carbon TIS 进行输入法切换
 - [Sparkle](https://sparkle-project.org) 实现自动更新，[Yams](https://github.com/jpsim/Yams) 解析 YAML 配置
 - 单一、轻量的原生进程
+
+想了解底层的事件拦截是怎么实现的？见[技术细节深入](how_does_it_work.md)。
 
 ## 开发
 

@@ -28,9 +28,9 @@
 
 ## The Idea
 
-Caps Lock sits right on the home row, yet does almost nothing. HyperCapslock remaps it to **F18** — a key that doesn't physically exist on any keyboard — then intercepts F18 + other key combos at the OS level to simulate navigation, editing, input-source switching, key combos, and shell commands.
+Caps Lock sits right on the home row, yet does almost nothing. HyperCapslock remaps it to a key that doesn't exist on any physical keyboard — one no other app ever sees — then intercepts Caps + other key combos at the OS level to simulate navigation, editing, input-source switching, key combos, and shell commands.
 
-Because F18 isn't a real modifier (not Cmd, Ctrl, Shift, or Alt), **it stacks with all of them for free, without eating up any combos of its own**:
+Because this trigger isn't a real modifier (not Cmd, Ctrl, Shift, or Alt), **it stacks with all of them for free, without eating up any combos of its own**:
 
 So if you map `Caps + H` to the `←` arrow key, you get these four behaviors natively:
 
@@ -55,7 +55,7 @@ A *mapping* is a **trigger** plus an **action**. The supported triggers are:
 
 | Trigger | Description |
 |---------|-------------|
-| **Caps + key** | Hold Caps (F18) and press a key, e.g. `Caps + H` |
+| **Caps + key** | Hold Caps and press a key, e.g. `Caps + H` |
 | **Caps + Shift + key** | A separate mapping with Shift held — can bind a different action than the non-Shift version |
 | **Single-tap Caps (Caps×1)** | Fires on a single tap of Caps (replaces the default Caps Lock toggle) |
 | **Double-tap Caps (Caps×2)** | Fires on two quick taps of Caps; doesn't affect single-tap behavior |
@@ -205,26 +205,18 @@ The app needs the **Accessibility** permission to install its keyboard event tap
 
 - **Config complexity** — Karabiner requires hand-editing JSON for non-trivial remaps. HyperCapslock has a point-and-click GUI, plus per-app rules, a custom-action library, and more.
 - **Footprint** — Karabiner installs a kernel extension and several background processes. HyperCapslock is a single lightweight native macOS app.
-- **The modifier problem** — Karabiner typically maps Caps Lock to a real modifier combo (e.g. Ctrl+Shift+Cmd+Opt). This "hyper key" approach works but can conflict with existing shortcuts. HyperCapslock maps to F18, which conflicts with nothing and naturally stacks with real modifiers.
+- **The modifier problem** — Karabiner typically maps Caps Lock to a real modifier combo (e.g. Ctrl+Shift+Cmd+Opt). This "hyper key" approach works but can conflict with existing shortcuts. HyperCapslock maps Caps Lock to a key that doesn't exist on any keyboard, so it conflicts with nothing and naturally stacks with real modifiers.
 
 If you need Karabiner's full power (mouse remapping, device-specific profiles, etc.), use Karabiner. If you mainly want vim navigation and editing everywhere with next to no setup, this might be the simpler path.
-
-## How It Works
-
-Caps Lock is remapped to F18 at the OS level via `hidutil`. The app then installs a `CGEventTap` at the HID level — a system-wide event tap that intercepts key events before any other application sees them.
-
-When F18 is held and another key is pressed, the app swallows the original event and injects the remapped key (e.g. an arrow key) into the system input stream. Injected events carry a flag to prevent feedback loops.
-
-State tracking uses lock-protected runtime state (`OSAllocatedUnfairLock` / `NSLock`) for thread safety between the tap thread, timer threads, and the UI. The hook callback does the bare minimum — integer comparisons and early returns — to avoid introducing input lag.
-
-For the full technical deep-dive, see [how_does_it_work.md](how_does_it_work.md).
 
 ## Tech Stack
 
 - **Native macOS** — SwiftUI + AppKit, Swift 5 language mode, macOS 14+
-- CoreGraphics `CGEventTap` + `hidutil` for the F18 remap; IOKit for CapsLock state; Carbon TIS for input-source switching
+- CoreGraphics `CGEventTap` + `hidutil` for the Caps Lock remap; IOKit for CapsLock state; Carbon TIS for input-source switching
 - [Sparkle](https://sparkle-project.org) for auto-update, [Yams](https://github.com/jpsim/Yams) for YAML config
 - A single, lightweight native process
+
+Curious how the event interception works under the hood? See the [technical deep-dive](how_does_it_work.md).
 
 ## Development
 

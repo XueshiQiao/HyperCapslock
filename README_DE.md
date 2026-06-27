@@ -28,9 +28,9 @@
 
 ## Die Idee
 
-Caps Lock liegt direkt an der Home-Row, tut aber so gut wie nichts. HyperCapslock bildet die Taste auf **F18** ab – eine Taste, die auf keiner Tastatur physisch existiert – und fängt dann F18 + andere Tastenkombinationen auf OS-Ebene ab, um Navigation, Bearbeitung, Eingabequellen-Wechsel, Tastenkombinationen und Shell-Befehle zu simulieren.
+Caps Lock liegt direkt an der Home-Row, tut aber so gut wie nichts. HyperCapslock bildet die Taste auf eine Taste ab, die es auf keiner Tastatur gibt – und die keine andere App je zu sehen bekommt – und fängt dann Caps + andere Tastenkombinationen auf OS-Ebene ab, um Navigation, Bearbeitung, Eingabequellen-Wechsel, Tastenkombinationen und Shell-Befehle zu simulieren.
 
-Da F18 kein echter Modifier ist (weder Cmd, Ctrl, Shift noch Alt), **lässt es sich mühelos mit allen kombinieren, ohne eigene Kombinationen zu belegen**:
+Da dieser Trigger kein echter Modifier ist (weder Cmd, Ctrl, Shift noch Alt), **lässt er sich mühelos mit allen kombinieren, ohne eigene Kombinationen zu belegen**:
 
 Wenn du also `Caps + H` auf die `←`-Pfeiltaste legst, bekommst du diese vier Verhaltensweisen ganz von selbst:
 
@@ -55,7 +55,7 @@ Ein *Mapping* besteht aus einem **Trigger** plus einer **Aktion**. Unterstützte
 
 | Trigger | Beschreibung |
 |---------|--------------|
-| **Caps + Taste** | Caps (F18) halten und eine Taste drücken, z. B. `Caps + H` |
+| **Caps + Taste** | Caps halten und eine Taste drücken, z. B. `Caps + H` |
 | **Caps + Shift + Taste** | Ein eigenständiges Mapping mit gehaltenem Shift – kann eine andere Aktion belegen als die Variante ohne Shift |
 | **Caps einfach tippen (Caps×1)** | Wird durch einmaliges Tippen von Caps ausgelöst (ersetzt das standardmäßige Caps-Lock-Umschalten) |
 | **Caps doppelt tippen (Caps×2)** | Wird durch zweimaliges schnelles Tippen von Caps ausgelöst; beeinflusst das Einfach-Tippen nicht |
@@ -196,26 +196,18 @@ Die App benötigt die Berechtigung **Bedienungshilfen (Accessibility)**, um ihre
 
 - **Konfigurations-Aufwand** – Karabiner erfordert für nicht-triviale Remappings das Bearbeiten von JSON von Hand. HyperCapslock hat eine Point-and-Click-GUI, dazu App-Regeln, eine Bibliothek eigener Aktionen und mehr.
 - **Footprint** – Karabiner installiert eine Kernel-Erweiterung und mehrere Hintergrundprozesse. HyperCapslock ist eine einzelne, leichtgewichtige native macOS-App.
-- **Das Modifier-Problem** – Karabiner bildet Caps Lock typischerweise auf eine echte Modifier-Kombination ab (z. B. Ctrl+Shift+Cmd+Opt). Dieser „Hyper-Key“-Ansatz funktioniert, kann aber mit bestehenden Shortcuts kollidieren. HyperCapslock bildet auf F18 ab, das mit nichts kollidiert und sich natürlich mit echten Modifiern kombinieren lässt.
+- **Das Modifier-Problem** – Karabiner bildet Caps Lock typischerweise auf eine echte Modifier-Kombination ab (z. B. Ctrl+Shift+Cmd+Opt). Dieser „Hyper-Key“-Ansatz funktioniert, kann aber mit bestehenden Shortcuts kollidieren. HyperCapslock bildet Caps Lock auf eine Taste ab, die es auf keiner Tastatur gibt, sodass sie mit nichts kollidiert und sich natürlich mit echten Modifiern kombinieren lässt.
 
 Wenn du den vollen Funktionsumfang von Karabiner brauchst (Maus-Remapping, gerätespezifische Profile usw.), nimm Karabiner. Wenn du hauptsächlich überall vim-Navigation und -Bearbeitung mit nahezu null Einrichtung willst, ist das hier vielleicht der einfachere Weg.
-
-## Wie es funktioniert
-
-Caps Lock wird auf OS-Ebene per `hidutil` auf F18 abgebildet. Anschließend installiert die App auf HID-Ebene einen `CGEventTap` – einen systemweiten Event-Tap, der Tastenereignisse abfängt, bevor irgendeine andere Anwendung sie sieht.
-
-Wird F18 gehalten und eine weitere Taste gedrückt, schluckt die App das ursprüngliche Ereignis und injiziert die umgemappte Taste (z. B. eine Pfeiltaste) in den System-Eingabestrom. Injizierte Ereignisse tragen ein Flag, um Rückkopplungsschleifen zu verhindern.
-
-Die Zustandsverwaltung nutzt lock-geschützten Laufzeitzustand (`OSAllocatedUnfairLock` / `NSLock`) für Thread-Sicherheit zwischen Tap-Thread, Timer-Threads und UI. Der Hook-Callback macht das absolute Minimum – Ganzzahl-Vergleiche und frühe Returns –, um keine Eingabeverzögerung zu erzeugen.
-
-Für den vollständigen technischen Deep-Dive siehe [how_does_it_work.md](how_does_it_work.md).
 
 ## Tech-Stack
 
 - **Natives macOS** – SwiftUI + AppKit, Swift-5-Sprachmodus, macOS 14+
-- CoreGraphics `CGEventTap` + `hidutil` für das F18-Remapping; IOKit für den CapsLock-Zustand; Carbon TIS für den Eingabequellen-Wechsel
+- CoreGraphics `CGEventTap` + `hidutil` für das Caps-Lock-Remapping; IOKit für den CapsLock-Zustand; Carbon TIS für den Eingabequellen-Wechsel
 - [Sparkle](https://sparkle-project.org) für Auto-Update, [Yams](https://github.com/jpsim/Yams) für die YAML-Konfiguration
 - Ein einzelner, leichtgewichtiger nativer Prozess
+
+Neugierig, wie das Abfangen der Events intern funktioniert? Siehe den [technischen Deep-Dive](how_does_it_work.md).
 
 ## Entwicklung
 
