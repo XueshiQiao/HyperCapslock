@@ -137,7 +137,7 @@ func actionPresentation(_ action: ActionConfig, _ loc: LocalizationManager) -> A
         return ActionPresentation(category: loc.t("group.command"), value: cmd, symbol: actionSymbol(action))
     case .keyCombo(let key, let ctrl, let alt, let cmd, let shift):
         var parts: [String] = []
-        if ctrl { parts.append("Ctrl") }; if alt { parts.append("Alt") }
+        if ctrl { parts.append("Ctrl") }; if alt { parts.append("Option") }
         if cmd { parts.append("Cmd") }; if shift { parts.append("Shift") }
         parts.append(keyCodeDisplay(key))
         return ActionPresentation(category: loc.t("group.key_combo"), value: parts.joined(separator: "+"), symbol: actionSymbol(action))

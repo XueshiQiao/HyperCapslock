@@ -6,7 +6,7 @@ struct HudView: View {
     @ObservedObject var model: HudViewModel
 
     private static let modWordToGlyph: [String: String] = [
-        "Cmd": "⌘", "Ctrl": "⌃", "Alt": "⌥", "Shift": "⇧",
+        "Cmd": "⌘", "Ctrl": "⌃", "Option": "⌥", "Opt": "⌥", "Alt": "⌥", "Shift": "⇧",
     ]
 
     /// Split a trigger/combo string into keycap tokens (mirrors `tokenize`).

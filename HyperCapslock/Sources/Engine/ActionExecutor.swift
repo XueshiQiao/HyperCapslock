@@ -10,7 +10,7 @@ func keyComboString(_ targetKey: UInt16, _ ctrl: Bool, _ alt: Bool, _ cmd: Bool,
     var s = ""
     if cmd { s += "Cmd+" }
     if ctrl { s += "Ctrl+" }
-    if alt { s += "Alt+" }
+    if alt { s += "Option+" }
     if shift { s += "Shift+" }
     s += KeyCodes.name(targetKey)
     return s
