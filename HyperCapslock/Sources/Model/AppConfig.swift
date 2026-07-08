@@ -31,6 +31,10 @@ struct AppConfig: Codable, Equatable {
     var hideDockIcon: Bool = false
     var showHud: Bool = false
     var hudDurationMs: Int = 1350
+    /// Max gap (ms) between two taps to register a double-tap — for both the
+    /// CapsLock and the modifier double-tap paths. User-configurable; clamped to
+    /// `EngineConstants.doubleTapWindow{Min,Max}Ms` on decode.
+    var doubleTapWindowMs: Int = Int(EngineConstants.doubleTapWindowDefaultMs)
     var themeMode: ThemeMode = .system
     var cjkvFixStrategy: CJKVFixStrategy = .none
     /// Broadcast CapsLock-hold over `DistributedNotificationCenter` so AnyDrag
@@ -54,6 +58,7 @@ struct AppConfig: Codable, Equatable {
         case hideDockIcon = "hide_dock_icon"
         case showHud = "show_hud"
         case hudDurationMs = "hud_duration_ms"
+        case doubleTapWindowMs = "double_tap_window_ms"
         case themeMode = "theme_mode"
         case cjkvFixStrategy = "cjkv_fix_strategy"
         case broadcastCapsHoldForAnyDrag = "broadcast_caps_hold_for_anydrag"
@@ -69,7 +74,8 @@ struct AppConfig: Codable, Equatable {
          mappingsViewStyle: MappingsViewStyle = .grouped,
          statsShowInline: Bool = true,
          showWindowOnLaunch: Bool = true,
-         keyRemaps: [KeyRemap] = []) {
+         keyRemaps: [KeyRemap] = [],
+         doubleTapWindowMs: Int = Int(EngineConstants.doubleTapWindowDefaultMs)) {
         self.hideDockIcon = hideDockIcon
         self.showHud = showHud
         self.hudDurationMs = hudDurationMs
@@ -80,6 +86,7 @@ struct AppConfig: Codable, Equatable {
         self.statsShowInline = statsShowInline
         self.showWindowOnLaunch = showWindowOnLaunch
         self.keyRemaps = keyRemaps
+        self.doubleTapWindowMs = doubleTapWindowMs
     }
 
     init(from decoder: Decoder) throws {
@@ -87,6 +94,10 @@ struct AppConfig: Codable, Equatable {
         self.hideDockIcon = try c.decodeIfPresent(Bool.self, forKey: .hideDockIcon) ?? false
         self.showHud = try c.decodeIfPresent(Bool.self, forKey: .showHud) ?? false
         self.hudDurationMs = try c.decodeIfPresent(Int.self, forKey: .hudDurationMs) ?? 1350
+        // Backward-compatible: an older config with no `double_tap_window_ms`
+        // decodes to the default 200; any value is clamped to the allowed range.
+        let dtw = try c.decodeIfPresent(Int.self, forKey: .doubleTapWindowMs) ?? Int(EngineConstants.doubleTapWindowDefaultMs)
+        self.doubleTapWindowMs = EngineConstants.clampDoubleTapWindow(dtw)
         self.themeMode = try c.decodeIfPresent(ThemeMode.self, forKey: .themeMode) ?? .system
         // Tolerant: an unknown future strategy value decodes back to `.none`.
         self.cjkvFixStrategy = (try? c.decodeIfPresent(CJKVFixStrategy.self, forKey: .cjkvFixStrategy)) ?? .none

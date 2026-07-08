@@ -58,6 +58,7 @@ final class AppState: ObservableObject {
         UsageStats.shared.load()
         FileLog.shared.info("bootstrap: \(config.mappings.count) mappings, \(config.customActions.count) custom actions; appConfig=\(config.appConfig)")
         applyHudSettings()
+        applyDoubleTapWindow()
         applyInputSourceSettings()
         applyKeyRemaps()
         applyActivationPolicy(hide: config.appConfig.hideDockIcon)
@@ -73,6 +74,14 @@ final class AppState: ObservableObject {
         HudCenter.shared.updateSettings(enabled: config.appConfig.showHud,
                                         durationMs: config.appConfig.hudDurationMs)
         FileLog.shared.info("HUD settings applied: enabled=\(config.appConfig.showHud) duration=\(config.appConfig.hudDurationMs)ms")
+    }
+
+    /// Push the persisted double-tap window into the engine's live state (the
+    /// single source of truth the tap thread reads). Called at launch and after
+    /// each slider change so the new value takes effect immediately.
+    private func applyDoubleTapWindow() {
+        EngineState.shared.doubleTapWindowMs = UInt64(config.appConfig.doubleTapWindowMs)
+        FileLog.shared.info("Double-tap window applied: \(config.appConfig.doubleTapWindowMs)ms")
     }
 
     // MARK: - Theme (light / dark / system)
@@ -143,6 +152,15 @@ final class AppState: ObservableObject {
     func setHudDuration(_ ms: Int) throws {
         try config.setHudDuration(ms)
         applyHudSettings()
+    }
+
+    var doubleTapWindowMs: Int { config.appConfig.doubleTapWindowMs }
+
+    /// Persist the new double-tap window and push it into the engine immediately
+    /// (no relaunch needed).
+    func setDoubleTapWindow(_ ms: Int) throws {
+        try config.setDoubleTapWindow(ms)
+        applyDoubleTapWindow()
     }
 
     var cjkvFixStrategy: CJKVFixStrategy { config.appConfig.cjkvFixStrategy }

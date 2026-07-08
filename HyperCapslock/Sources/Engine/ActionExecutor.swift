@@ -317,9 +317,12 @@ enum ActionExecutor {
         let now = nowMillis()
         let prevTap = EngineState.shared.swapLastTapAtMs(0)
         let dtAction = findDoubleTapAction(currentContext())
+        // Read the live, user-configurable window once so this whole tap uses a
+        // consistent value.
+        let window = EngineState.shared.doubleTapWindowMs
 
         // 2nd tap within the double-tap window?
-        if prevTap > 0, now &- prevTap <= EngineConstants.doubleTapWindowMs, let action = dtAction {
+        if prevTap > 0, now &- prevTap <= window, let action = dtAction {
             FileLog.shared.info("Caps(F18) DOUBLE-TAP detected (\(now &- prevTap)ms gap). Firing action.")
             UsageStats.shared.record(triggerUniqueID(.doubleTapHyper))
             let (combo, caption) = hudParts(action)
@@ -336,10 +339,10 @@ enum ActionExecutor {
         }
 
         if dtAction != nil {
-            FileLog.shared.info("Caps(F18) short tap; deferring CapsLock toggle by \(EngineConstants.doubleTapWindowMs)ms (double-tap mapping configured).")
+            FileLog.shared.info("Caps(F18) short tap; deferring CapsLock toggle by \(window)ms (double-tap mapping configured).")
             EngineState.shared.storeLastTapAtMs(now)
             let scheduledFor = now
-            let delay = Double(EngineConstants.doubleTapWindowMs + 10) / 1000.0
+            let delay = Double(window + 10) / 1000.0
             DispatchQueue.global().asyncAfter(deadline: .now() + delay) {
                 if EngineState.shared.compareExchangeLastTapAtMs(expected: scheduledFor, new: 0) {
                     if EngineState.shared.isPaused {

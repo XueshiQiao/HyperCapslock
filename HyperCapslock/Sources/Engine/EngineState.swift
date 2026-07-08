@@ -16,6 +16,10 @@ final class EngineState {
     /// Timestamp of the last short tap pending a possible 2nd tap (cancellation
     /// token for the deferred CapsLock toggle). 0 = none pending.
     private let _lastTapAtMs = OSAllocatedUnfairLock<UInt64>(initialState: 0)
+    /// User-configurable double-tap window (ms) — the single source of truth read
+    /// by the tap thread for both the Caps and modifier double-tap paths. Seeded
+    /// from `AppConfig` at launch and updated live from the settings slider.
+    private let _doubleTapWindowMs = OSAllocatedUnfairLock<UInt64>(initialState: EngineConstants.doubleTapWindowDefaultMs)
 
     var isPaused: Bool {
         get { _isPaused.withLock { $0 } }
@@ -39,6 +43,11 @@ final class EngineState {
 
     func swapCapsPressedAtMs(_ newValue: UInt64) -> UInt64 {
         _capsPressedAtMs.withLock { old in let prev = old; old = newValue; return prev }
+    }
+
+    var doubleTapWindowMs: UInt64 {
+        get { _doubleTapWindowMs.withLock { $0 } }
+        set { _doubleTapWindowMs.withLock { $0 = newValue } }
     }
 
     var didRemap: Bool {

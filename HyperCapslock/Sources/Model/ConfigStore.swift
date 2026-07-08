@@ -348,6 +348,7 @@ final class ConfigStore: ObservableObject {
     func setHideDockIcon(_ hide: Bool) throws { try mutateConfig { $0.hideDockIcon = hide } }
     func setShowHud(_ show: Bool) throws { try mutateConfig { $0.showHud = show } }
     func setHudDuration(_ ms: Int) throws { try mutateConfig { $0.hudDurationMs = min(max(ms, 300), 6000) } }
+    func setDoubleTapWindow(_ ms: Int) throws { try mutateConfig { $0.doubleTapWindowMs = EngineConstants.clampDoubleTapWindow(ms) } }
     func setThemeMode(_ mode: ThemeMode) throws { try mutateConfig { $0.themeMode = mode } }
     func setCJKVFixStrategy(_ strategy: CJKVFixStrategy) throws { try mutateConfig { $0.cjkvFixStrategy = strategy } }
     func setBroadcastCapsHoldForAnyDrag(_ on: Bool) throws { try mutateConfig { $0.broadcastCapsHoldForAnyDrag = on } }

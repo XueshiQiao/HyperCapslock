@@ -162,7 +162,7 @@ final class ModifierDoubleTap {
                 return nil
             }
             if table[slot].lastCleanTapMs != 0
-                && now &- table[slot].lastCleanTapMs <= EngineConstants.doubleTapWindowMs {
+                && now &- table[slot].lastCleanTapMs <= EngineState.shared.doubleTapWindowMs {
                 table[slot].lastCleanTapMs = 0
                 return configured
             }

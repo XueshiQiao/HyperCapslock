@@ -90,6 +90,21 @@ struct SettingsPage: View {
                         iconLabel("timer", .orange, loc.t("settings.hud_duration"))
                     }
                 }
+                VStack(alignment: .leading, spacing: 2) {
+                    LabeledContent {
+                        HStack(spacing: 10) {
+                            Text("\(config.appConfig.doubleTapWindowMs) ms")
+                                .foregroundStyle(.secondary).font(.callout).monospacedDigit()
+                            Slider(value: Binding(get: { Double(config.appConfig.doubleTapWindowMs) },
+                                                  set: { try? app.setDoubleTapWindow(Int($0)) }),
+                                   in: 100...500, step: 25).frame(width: 160)
+                                .accessibilityIdentifier("settings.double_tap_window")
+                        }
+                    } label: {
+                        iconLabel("hand.tap", .mint, loc.t("settings.double_tap_window"))
+                    }
+                    Text(loc.t("settings.double_tap_window_hint")).font(.caption).foregroundStyle(.secondary)
+                }
                 Toggle(isOn: Binding(
                     get: { config.appConfig.statsShowInline },
                     set: { v in try? app.setStatsShowInline(v) })) {
