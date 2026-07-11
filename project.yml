@@ -26,6 +26,9 @@ packages:
   Yams:
     url: https://github.com/jpsim/Yams
     from: "5.0.6"
+  Aptabase:
+    url: https://github.com/aptabase/aptabase-swift
+    from: "0.3.4"
 
 targets:
   HyperCapslock:
@@ -79,6 +82,7 @@ targets:
     dependencies:
       - package: Sparkle
       - package: Yams
+      - package: Aptabase
 
   HyperCapslockTests:
     type: bundle.unit-test

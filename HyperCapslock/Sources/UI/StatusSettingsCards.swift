@@ -113,6 +113,15 @@ struct SettingsPage: View {
                 .accessibilityIdentifier("settings.stats_inline")
                 VStack(alignment: .leading, spacing: 2) {
                     Toggle(isOn: Binding(
+                        get: { config.appConfig.analyticsEnabled },
+                        set: { v in try? app.setAnalyticsEnabled(v) })) {
+                        iconLabel("antenna.radiowaves.left.and.right", .pink, loc.t("settings.analytics"))
+                    }
+                    .accessibilityIdentifier("settings.analytics")
+                    Text(loc.t("settings.analytics_hint")).font(.caption).foregroundStyle(.secondary)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Toggle(isOn: Binding(
                         get: { config.appConfig.broadcastCapsHoldForAnyDrag },
                         set: { v in
                             do { try app.setBroadcastCapsHoldForAnyDrag(v); app.showToast(v ? loc.t("toast.anydrag_caps_hold_enabled") : loc.t("toast.anydrag_caps_hold_disabled")) }

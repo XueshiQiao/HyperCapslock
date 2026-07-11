@@ -9,6 +9,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupMainMenu()
         // Order matters: state/config first, then engine, then UI surfaces.
         AppState.shared.bootstrap()
+        // Anonymous analytics (opt-out; no-op under -uitest / when disabled). Must
+        // come after bootstrap so the persisted preference is loaded.
+        Analytics.shared.configure(enabled: AppState.shared.analyticsEnabled)
+        Analytics.shared.track("app_started")
         // Under -uitest (XCUITest), do NOT install the global keyboard hook /
         // hidutil remap — tests must never grab the host keyboard. Config is
         // already isolated to a temp dir (see ConfigStore.appDataDir).

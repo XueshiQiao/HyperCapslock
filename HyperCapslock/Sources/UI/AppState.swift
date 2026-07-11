@@ -218,6 +218,16 @@ final class AppState: ObservableObject {
         try config.setShowWindowOnLaunch(on)
     }
 
+    var analyticsEnabled: Bool { config.appConfig.analyticsEnabled }
+
+    /// Persist the anonymous-analytics opt-out and apply it live: flipping this
+    /// off stops all events immediately (and never initialized the SDK if it was
+    /// off at launch); flipping it on starts sending from now.
+    func setAnalyticsEnabled(_ on: Bool) throws {
+        try config.setAnalyticsEnabled(on)
+        Analytics.shared.setEnabled(on)
+    }
+
     private func applyInputSourceSettings() {
         InputSourceController.setFixStrategy(config.appConfig.cjkvFixStrategy)
         FileLog.shared.info("Input-source fix strategy applied: \(config.appConfig.cjkvFixStrategy.rawValue)")
@@ -282,12 +292,24 @@ final class AppState: ObservableObject {
 
     // MARK: - Mapping operations (wrap ConfigStore, surface errors as messages)
 
-    func upsertMapping(trigger: Trigger, actionId: String?, inlineAction: ActionConfig? = nil, bindings: [MappingBinding] = []) throws {
+    /// `isNew` distinguishes a genuine add (from the "add mapping" flow) from an
+    /// edit, so analytics counts adoption, not re-saves. Fired only after the
+    /// upsert succeeds. See `Analytics.mappingProps` for the PII-safe payload.
+    func upsertMapping(trigger: Trigger, actionId: String?, inlineAction: ActionConfig? = nil, bindings: [MappingBinding] = [], isNew: Bool = false) throws {
         try config.upsert(trigger: trigger, actionId: actionId, inlineAction: inlineAction, bindings: bindings)
+        if isNew {
+            Analytics.shared.track("mapping_added", Analytics.mappingProps(actionId: actionId, inlineAction: inlineAction))
+        }
     }
 
     func removeMapping(_ trigger: Trigger) {
+        // Resolve the action type BEFORE removing so the "retire" signal knows
+        // which feature was dropped.
+        let entry = config.mappings.first { $0.trigger == trigger }
         config.remove(trigger: trigger)
+        if let entry {
+            Analytics.shared.track("mapping_removed", Analytics.mappingProps(actionId: entry.actionId, inlineAction: entry.inlineAction))
+        }
     }
 
     // MARK: - Custom action operations

@@ -211,6 +211,8 @@ final class LocalizationManager: ObservableObject {
             "stats.reset_ok": "Reset", "toast.stats_reset": "Statistics reset", "stats.removed": "removed",
             "stats.page_hint": "How many times each mapping has fired. Holding a key to repeat counts as one press.",
             "settings.stats_inline": "Show press counts on mapping rows", "stats.inline_help": "Times triggered (all time)",
+            "settings.analytics": "Share anonymous usage analytics",
+            "settings.analytics_hint": "Helps improve HyperCapslock. No keystrokes, text, or personal data is ever collected — only anonymous feature-usage counts. Turn off anytime.",
             "common.cancel": "Cancel",
         ],
         .zh: [
@@ -339,6 +341,8 @@ final class LocalizationManager: ObservableObject {
             "stats.reset_ok": "重置", "toast.stats_reset": "统计已重置", "stats.removed": "已删除",
             "stats.page_hint": "每个映射被触发的次数。按住某个键持续重复只计为一次。",
             "settings.stats_inline": "在映射行上显示触发次数", "stats.inline_help": "触发次数（全部时间）",
+            "settings.analytics": "分享匿名使用统计",
+            "settings.analytics_hint": "帮助改进 HyperCapslock。绝不收集任何按键、文本或个人信息——只统计匿名的功能使用次数。可随时关闭。",
             "common.cancel": "取消",
         ],
         .ja: [
@@ -467,6 +471,8 @@ final class LocalizationManager: ObservableObject {
             "stats.reset_ok": "リセット", "toast.stats_reset": "統計をリセットしました", "stats.removed": "削除済み",
             "stats.page_hint": "各マッピングが発動した回数です。キーを押し続けて連続発動しても1回として数えます。",
             "settings.stats_inline": "マッピング行にトリガー回数を表示", "stats.inline_help": "トリガー回数（全期間）",
+            "settings.analytics": "匿名の利用統計を共有",
+            "settings.analytics_hint": "HyperCapslock の改善に役立ちます。キー入力・テキスト・個人情報は一切収集せず、匿名の機能利用回数のみを記録します。いつでもオフにできます。",
             "common.cancel": "キャンセル",
         ],
         .de: [
@@ -595,6 +601,8 @@ final class LocalizationManager: ObservableObject {
             "stats.reset_ok": "Zurücksetzen", "toast.stats_reset": "Statistik zurückgesetzt", "stats.removed": "entfernt",
             "stats.page_hint": "Wie oft jede Belegung ausgelöst wurde. Eine Taste gedrückt zu halten zählt als eine Auslösung.",
             "settings.stats_inline": "Auslösungszahlen in den Belegungszeilen anzeigen", "stats.inline_help": "Auslösungen (gesamt)",
+            "settings.analytics": "Anonyme Nutzungsstatistik teilen",
+            "settings.analytics_hint": "Hilft, HyperCapslock zu verbessern. Es werden keine Tastenanschläge, Texte oder persönlichen Daten erfasst — nur anonyme Funktionsnutzung. Jederzeit abschaltbar.",
             "common.cancel": "Abbrechen",
         ],
     ]

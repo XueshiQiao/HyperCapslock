@@ -301,11 +301,11 @@ struct AddEditMappingView: View {
                 var d = inlineDraft
                 d.kind = kind
                 guard let cfg = d.build() else { return }   // guarded by the disabled Save button
-                try app.upsertMapping(trigger: trigger, actionId: nil, inlineAction: cfg, bindings: bindings)
+                try app.upsertMapping(trigger: trigger, actionId: nil, inlineAction: cfg, bindings: bindings, isNew: !editing)
             } else if selectedActionId == keepInlineSentinel, let inline = keptInlineConfig {
-                try app.upsertMapping(trigger: trigger, actionId: nil, inlineAction: inline, bindings: bindings)
+                try app.upsertMapping(trigger: trigger, actionId: nil, inlineAction: inline, bindings: bindings, isNew: !editing)
             } else {
-                try app.upsertMapping(trigger: trigger, actionId: selectedActionId, bindings: bindings)
+                try app.upsertMapping(trigger: trigger, actionId: selectedActionId, bindings: bindings, isNew: !editing)
             }
             app.showToast(loc.t("toast.mapping_saved"))
             dismiss()
