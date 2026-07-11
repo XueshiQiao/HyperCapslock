@@ -28,6 +28,14 @@ final class Analytics {
 
   private init() {}
 
+  /// Whether analytics is currently active (thread-safe). The roll-up reads this
+  /// to decide whether to emit events or just skip-and-advance its watermark,
+  /// without touching the main-actor-isolated `AppState`.
+  var isEnabled: Bool {
+    lock.lock(); defer { lock.unlock() }
+    return enabled
+  }
+
   /// Call once at launch with the persisted opt-out preference.
   func configure(enabled: Bool) { setEnabled(enabled) }
 
@@ -46,9 +54,10 @@ final class Analytics {
   }
 
   /// Track a non-identifying event. Silently drops if analytics is disabled or
-  /// under `-uitest`. `props` values must be strings/numbers and MUST NOT carry
-  /// user content — pass only enums / stable ids (see the type doc).
-  func track(_ event: String, _ props: [String: String] = [:]) {
+  /// under `-uitest`. `props` values must be strings/numbers (Aptabase allows
+  /// only those) and MUST NOT carry user content — pass only enums / stable ids /
+  /// aggregate counts (see the type doc).
+  func track(_ event: String, _ props: [String: Any] = [:]) {
     guard !AppEnvironment.isUITest else { return }
     var send = false
     lock.lock(); send = enabled && initialized; lock.unlock()

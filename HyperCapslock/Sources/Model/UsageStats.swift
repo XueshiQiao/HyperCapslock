@@ -162,6 +162,28 @@ final class UsageStats {
         return out
     }
 
+    // MARK: - Analytics roll-up support (read-only — never touches the write path)
+
+    /// A copy of every recorded day bucket (triggerID → "yyyy-MM-dd" → count).
+    /// Read-only snapshot for the usage roll-up; mutates and persists nothing.
+    func snapshotAllDays() -> [String: [String: Int]] {
+        lock.lock(); defer { lock.unlock() }
+        return counts
+    }
+
+    /// Today's and yesterday's local-day keys, derived from a SINGLE `Date()`
+    /// sample so the roll-up's `today`/`yesterday` can never straddle midnight —
+    /// two separate samples could land on different days in the sub-millisecond
+    /// window around midnight, silently dropping that day. Same Gregorian calendar
+    /// and POSIX formatter as recording, so the keys never drift from the buckets.
+    func todayAndYesterdayKeys() -> (today: String, yesterday: String) {
+        lock.lock(); defer { lock.unlock() }
+        let cal = Self.localCalendar()
+        let start = cal.startOfDay(for: Date())
+        let yStart = cal.date(byAdding: .day, value: -1, to: start) ?? start
+        return (Self.dayFormatter.string(from: start), Self.dayFormatter.string(from: yStart))
+    }
+
     /// Whether any press has ever been recorded (drives the "nothing yet" empty
     /// state vs. the "nothing in this range" empty state).
     func hasAnyData() -> Bool {

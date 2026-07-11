@@ -13,6 +13,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // come after bootstrap so the persisted preference is loaded.
         Analytics.shared.configure(enabled: AppState.shared.analyticsEnabled)
         Analytics.shared.track("app_started")
+        // Daily aggregate roll-up of local usage counts → anonymous feature_used
+        // events (idempotent watermark; never per-keypress; no-op under -uitest).
+        UsageRollup.shared.start()
         // Under -uitest (XCUITest), do NOT install the global keyboard hook /
         // hidutil remap — tests must never grab the host keyboard. Config is
         // already isolated to a temp dir (see ConfigStore.appDataDir).
