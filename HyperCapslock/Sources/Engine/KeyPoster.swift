@@ -8,8 +8,13 @@ enum KeyPoster {
     /// Magic value stamped on injected events ("GVLN").
     static let injectedMagic: Int64 = 0x4756_4C4E
 
+    /// Single shared source for all synthesized events. Creating a fresh
+    /// `.privateState` source per event leaks its WindowServer state table —
+    /// one 16 KB shared-memory page per posted event, never unmapped.
+    private static let source = CGEventSource(stateID: .privateState)
+
     static func post(_ keycode: UInt16, keyDown: Bool, flags: CGEventFlags) {
-        guard let source = CGEventSource(stateID: .privateState),
+        guard let source,
               let event = CGEvent(keyboardEventSource: source, virtualKey: keycode, keyDown: keyDown) else { return }
         event.flags = flags
         event.setIntegerValueField(.eventSourceUserData, value: injectedMagic)
@@ -25,7 +30,7 @@ enum KeyPoster {
     /// session level) so Chinese input methods don't convert ASCII quotes into
     /// smart quotes. Used by the InsertQuotes action.
     static func insertString(_ string: String) {
-        guard let source = CGEventSource(stateID: .privateState),
+        guard let source,
               let event = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true) else { return }
         let utf16 = Array(string.utf16)
         event.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: utf16)
