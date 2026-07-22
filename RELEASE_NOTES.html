@@ -12,6 +12,18 @@
        bare form lands them in the release's Contributors avatar list and
        autolinks. Renders as plain text in Sparkle — acceptable. -->
 
+<h3>What's New in 26.07.109</h3>
+<ul>
+  <li><b>Fixed a memory leak</b> — every synthesized keystroke (vim-style navigation, key combos, quote insertion) left behind a small chunk of memory that was never reclaimed, so after days of heavy use the app's memory footprint could climb to hundreds of MB. Memory now stays flat no matter how long the app runs.</li>
+  <li><b>Anonymous usage analytics (opt-out)</b> — the app now shares anonymous feature-usage counts to help prioritize what to improve. No keystrokes, no text, no personal data is ever collected. Turn it off anytime in Settings → "Share anonymous usage analytics".</li>
+</ul>
+
+<h3>26.07.109 更新内容</h3>
+<ul>
+  <li><b>修复内存泄漏</b> —— 此前每次合成按键（vim 风格导航、组合键、引号插入等）都会残留一小块无法回收的内存，重度使用几天后 App 内存占用可能攀升到数百 MB。现在无论运行多久，内存都保持平稳。</li>
+  <li><b>匿名使用统计（可关闭）</b> —— App 现在会分享匿名的功能使用次数，帮助确定改进方向。绝不收集任何按键、文本或个人信息。可随时在「设置 → 分享匿名使用统计」中关闭。</li>
+</ul>
+
 <h3>What's New in 26.07.108</h3>
 <ul>
   <li><b>Adjustable double-tap window</b> — the time window for detecting a double-tap (double-tapping CapsLock, or double-tapping a modifier key) is now configurable under Settings, from 100 ms to 500 ms. A shorter window is harder to trigger by accident; a longer one is more forgiving. The default stays 200 ms.</li>
