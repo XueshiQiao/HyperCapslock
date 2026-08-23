@@ -474,7 +474,12 @@ enum ActionExecutor {
             }
             return true
         }
-        FileLog.shared.info("Caps remap: \(trigger) -> \(describeAction(action))")
+        // frontmost= matches the no-applicable-action line above on purpose: when a
+        // per-app binding resolves to the WRONG action, the only way to tell a bad
+        // binding from a stale frontmost read is to see which app the engine
+        // thought was in front. Reached only on a fresh press (autorepeat returns
+        // at the `cached` branch), and `ctx` is already in hand — no extra cost.
+        FileLog.shared.info("Caps remap: \(trigger) -> \(describeAction(action)) (frontmost=\(ctx.frontmostBundleID ?? "nil"))")
         let (combo, caption) = hudParts(action)
         // A hold-modifier keeps the HUD up for the whole hold: show it
         // until-dismissed and dismiss on the modifier's key-up (every release

@@ -91,7 +91,12 @@ final class FrontmostAppTracker {
     }
     guard changed else { return }
     let info = FrontmostApp(name: app.localizedName ?? "(unknown)", bundleID: bundleID)
-    FileLog.shared.info("Frontmost app → \(info.name) [\(bundleID ?? "no bundle id")]")
+    // debug, not info: this fires on every app switch all day (~440 lines/day
+    // observed over a 14-day run) and would crowd out the lines that actually
+    // explain a problem. It is effectively gone on Release (see FileLog.debug),
+    // so the diagnostic it used to carry now rides along on the Caps-remap lines
+    // themselves as `frontmost=` — those stay in the file.
+    FileLog.shared.debug("Frontmost app → \(info.name) [\(bundleID ?? "no bundle id")]")
     onChange?(info)
   }
 }

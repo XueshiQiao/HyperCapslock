@@ -1,6 +1,82 @@
 import Foundation
 import CoreGraphics
 
+/// Throttle for the Caps-chord log lines.
+///
+/// A held chord re-fires key-down at the OS autorepeat rate, and every tick used
+/// to write two lines (`Caps HELD + key: DOWN…` plus `Caps chord HANDLED…`). In a
+/// real 14-day log that came to 87% of 37.7 MB, and 95% of all key-downs were
+/// pure autorepeat — the lines that actually explain a problem were buried under
+/// hundreds of identical ones. Each of those lines also cost a string
+/// interpolation plus an open/seek/write/close on the tap thread, i.e. a
+/// synchronous file write sitting directly in the path that decides how fast a
+/// keystroke reaches the front app.
+///
+/// So: log the opening ticks verbatim, then one in every `sampleEvery`, and a
+/// single total when the run ends. A hold stays visible and countable at a
+/// fraction of the volume — and the suppressed ticks skip the interpolation and
+/// the write entirely, so the hot path gets *faster*, not slower.
+///
+/// **No lock, no allocation, no table.** The OS autorepeats exactly one key at a
+/// time — the most recently pressed — so a single (keycode, count) pair covers
+/// the entire thing this throttles; a different keycode simply starts a new run.
+/// Both variables are touched only from inside `hcTapCallback`, which the tap's
+/// run-loop source calls on one dedicated thread and nothing else ever enters.
+/// Putting a lock on the hot path for state that only affects log verbosity
+/// would cost more than it protects.
+private enum ChordLogThrottle {
+    /// Ticks logged verbatim at the start of a run, before sampling kicks in.
+    private static let verbatimHead = 3
+    /// After the head, log one tick in every this many (~3s of holding).
+    private static let sampleEvery = 100
+
+    private static var runKeycode: UInt16?
+    private static var runDowns = 0
+
+    /// Record a key-down. Returns the 1-based tick number when this one should
+    /// be logged, or nil to stay silent.
+    static func noteDown(_ keycode: UInt16) -> Int? {
+        if runKeycode != keycode {
+            emitTotalIfInteresting()   // a different key: the previous run just ended
+            runKeycode = keycode
+            runDowns = 1
+            return 1
+        }
+        runDowns += 1
+        return (runDowns <= verbatimHead || runDowns % sampleEvery == 0) ? runDowns : nil
+    }
+
+    /// Record a key-up, returning how many key-downs the finished run saw
+    /// (0 when this key wasn't the one being counted).
+    static func noteUp(_ keycode: UInt16) -> Int {
+        guard runKeycode == keycode else { return 0 }
+        let n = runDowns
+        runKeycode = nil
+        runDowns = 0
+        return n
+    }
+
+    /// Close out a run in progress, then clear.
+    ///
+    /// Called at BOTH ends of a CapsLock hold. A chord key-up can legitimately
+    /// never arrive — CapsLock may be released first, or the tap may go deaf
+    /// mid-hold — so running this when a hold *starts* as well means a missed
+    /// key-up self-heals on the next press instead of leaking a stale count into
+    /// the new hold. (That start-of-hold call is also what covers the
+    /// tap-disabled path, which deliberately stays untouched.)
+    static func endRun() {
+        emitTotalIfInteresting()
+        runKeycode = nil
+        runDowns = 0
+    }
+
+    /// A run short enough to have been logged verbatim needs no total.
+    private static func emitTotalIfInteresting() {
+        guard let keycode = runKeycode, runDowns > verbatimHead else { return }
+        FileLog.shared.info("Caps chord mac=\(keycode): run ended with no key-up after \(runDowns) key-downs (autorepeat).")
+    }
+}
+
 /// The CGEventTap callback. Must be a bare C function (captures nothing); all
 /// state lives in singletons, exactly like the Rust globals.
 ///
@@ -52,9 +128,12 @@ private func hcTapCallback(
     // F18 = physical CapsLock (remapped via hidutil) → proper KeyDown/KeyUp.
     if keycode == KeyCodes.f18 {
         if type == .keyDown {
+            // Self-heal: close out a previous hold whose key-ups never arrived.
+            ChordLogThrottle.endRun()
             beginCapsHold()
         } else if type == .keyUp {
             let wasDown = endCapsHold()
+            ChordLogThrottle.endRun()
             // Caps released → release any in-flight chord now. If the chord key is
             // still physically held, its later key-up won't be seen (capsDown is
             // false), so without this a held modifier / key stays stuck down.
@@ -124,13 +203,29 @@ private func hcTapCallback(
         let keyDown = (type == .keyDown)
         let activeMods = activeModifierFlags(flags)
         let js = KeyCodes.macToJs(keycode)
-        FileLog.shared.info("Caps HELD + key: \(keyDown ? "DOWN" : "UP") mac=\(keycode) js=\(js.map(String.init) ?? "nil") name=\(js.map(KeyCodes.name) ?? "?") mods=0x\(String(activeMods.rawValue, radix: 16))")
+        // One throttling decision per event, shared by all three lines below, so
+        // a suppressed autorepeat tick writes nothing at all rather than half a
+        // record. See ChordLogThrottle for why.
+        let tick = keyDown ? ChordLogThrottle.noteDown(keycode) : nil
+        let heldDowns = keyDown ? 0 : ChordLogThrottle.noteUp(keycode)
+        let shouldLog = keyDown ? (tick != nil) : true
+        if shouldLog {
+            let suffix: String
+            if let tick, tick > 1 { suffix = " (autorepeat, key-down #\(tick))" }
+            else if !keyDown, heldDowns > 1 { suffix = " (after \(heldDowns) key-downs)" }
+            else { suffix = "" }
+            FileLog.shared.info("Caps HELD + key: \(keyDown ? "DOWN" : "UP") mac=\(keycode) js=\(js.map(String.init) ?? "nil") name=\(js.map(KeyCodes.name) ?? "?") mods=0x\(String(activeMods.rawValue, radix: 16))\(suffix)")
+        }
         if ActionExecutor.handleCapsRemap(keycode: keycode, keyDown: keyDown, activeModifiers: activeMods) {
             state.didRemap = true
-            FileLog.shared.info("Caps chord HANDLED (mac=\(keycode)) — swallowing original event.")
+            if shouldLog {
+                FileLog.shared.info("Caps chord HANDLED (mac=\(keycode)) — swallowing original event.")
+            }
             return nil  // swallow the chord key
         } else if keyDown {
-            FileLog.shared.info("Caps chord had NO mapping (mac=\(keycode) js=\(js.map(String.init) ?? "nil")) — passing through.")
+            if shouldLog {
+                FileLog.shared.info("Caps chord had NO mapping (mac=\(keycode) js=\(js.map(String.init) ?? "nil")) — passing through.")
+            }
         }
     }
 

@@ -15,12 +15,38 @@ final class FileLog: @unchecked Sendable {
     func warn(_ message: String) { log("WARN", message) }
     func error(_ message: String) { log("ERROR", message) }
 
+    /// Diagnostic detail that fires on ordinary user activity and would
+    /// otherwise bury the interesting lines.
+    ///
+    /// The shared file is append-only with NO rotation and lives for as long as
+    /// `/tmp` does — in practice the machine's whole uptime — so anything that
+    /// ticks along with normal use has to stay out of it.
+    ///
+    /// It is still handed to the unified log, but at `debug` level, which macOS
+    /// keeps in memory and only captures once debug logging has been switched on
+    /// for the subsystem **beforehand**:
+    ///
+    ///     log stream --predicate 'subsystem == "me.xueshi.hypercapslock"' --level debug
+    ///
+    /// So treat this as effectively **lost on Release**: starting that stream
+    /// after something went wrong will not bring back what already happened. Only
+    /// route a line here once the context it carried also appears on a line that
+    /// stays in the file (see the `frontmost=` field on the Caps-remap lines).
+    func debug(_ message: String) {
+        #if DEBUG
+        log("DEBUG", message)
+        #else
+        osLog.debug("\(message, privacy: .public)")
+        #endif
+    }
+
     func log(_ level: String, _ message: String) {
         let ts = UInt64(Date().timeIntervalSince1970)
         let line = "[HYPERCAPS][macOS][\(ts)][\(level)] \(message)"
         switch level {
         case "ERROR": osLog.error("\(message, privacy: .public)")
         case "WARN": osLog.warning("\(message, privacy: .public)")
+        case "DEBUG": osLog.debug("\(message, privacy: .public)")
         default: osLog.info("\(message, privacy: .public)")
         }
 
