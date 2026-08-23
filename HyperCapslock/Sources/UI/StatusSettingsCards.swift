@@ -5,6 +5,7 @@ struct SettingsPage: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var config: ConfigStore
     @EnvironmentObject var loc: LocalizationManager
+    @EnvironmentObject var secureInput: SecureInputMonitor
 
     #if DEBUG
     @AppStorage(FrontmostAppHud.defaultsKey) private var debugFrontmostHud = false
@@ -36,11 +37,14 @@ struct SettingsPage: View {
                         }
                     }
                 }
+                secureInputRow
                 LabeledContent {
                     Button(loc.t("perm.refresh")) {
                         app.refreshPermissions()
+                        secureInput.refresh()
                         app.showToast(loc.t("toast.perm_refreshed"))
                     }
+                    .accessibilityIdentifier("settings.permissions_refresh")
                 } label: {
                     iconLabel("arrow.clockwise", .gray, loc.t("perm.refresh_label"))
                 }
@@ -290,6 +294,31 @@ struct SettingsPage: View {
         guard let src = KeyRemapSource.allCases.first(where: { !usedSrc.contains($0) }),
               let dst = KeyRemapTarget.allCases.first(where: { !usedDst.contains($0) }) else { return }
         app.setKeyRemaps(remaps + [KeyRemap(source: src, destination: dst)])
+    }
+
+    /// macOS Secure Input: shown always, not only when it fires, so the concept
+    /// is already familiar the day it silently kills every mapping. We can only
+    /// report it — clearing it means dismissing the password prompt that turned
+    /// it on, and we can't even say reliably which app that is (see `SecureInput`),
+    /// so the hint describes the kind of prompt to go looking for.
+    private var secureInputRow: some View {
+        LabeledContent {
+            if secureInput.isActive {
+                Text(loc.t("secure_input.blocked")).modifier(BadgeStyle(color: .orange))
+            } else {
+                Text(loc.t("secure_input.ok")).modifier(BadgeStyle(color: .green))
+            }
+        } label: {
+            HStack(spacing: 10) {
+                IconTile(symbol: "lock.shield", color: secureInput.isActive ? .orange : .gray)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(loc.t("secure_input.title"))
+                    Text(loc.t(secureInput.isActive ? "secure_input.hint_active" : "secure_input.hint_idle"))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .accessibilityIdentifier("settings.secure_input")
     }
 
     private var statusRow: some View {

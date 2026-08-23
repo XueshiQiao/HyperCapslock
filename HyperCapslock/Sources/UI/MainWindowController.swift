@@ -15,6 +15,7 @@ final class MainWindowController: NSObject, NSWindowDelegate {
             .environmentObject(AppState.shared)
             .environmentObject(AppState.shared.config)
             .environmentObject(AppState.shared.loc)
+            .environmentObject(SecureInputMonitor.shared)
         let hosting = NSHostingController(rootView: root)
 
         window = NSWindow(contentViewController: hosting)

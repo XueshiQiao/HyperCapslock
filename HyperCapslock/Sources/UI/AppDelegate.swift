@@ -30,6 +30,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !AppEnvironment.isUITest { FrontmostAppHud.shared.install() }
         #endif
         FrontmostAppTracker.shared.start()
+        // Watch macOS Secure Input: while it's on we receive no key events at
+        // all, so the tray must say so rather than let the user think the app
+        // broke. Started before the tray so the first icon already reflects it.
+        SecureInputMonitor.shared.start()
         tray = TrayController()
         MainWindowController.shared = MainWindowController()
         // Show the window on launch unless the user turned it off (then the app

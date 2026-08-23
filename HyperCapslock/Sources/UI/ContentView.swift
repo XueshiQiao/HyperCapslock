@@ -53,6 +53,7 @@ struct ContentView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var config: ConfigStore
     @EnvironmentObject var loc: LocalizationManager
+    @EnvironmentObject var secureInput: SecureInputMonitor
 
     // Mappings is the primary screen — it opens first and sits at the top.
     @State private var page: SidebarPage? = .mappings
@@ -140,12 +141,24 @@ struct ContentView: View {
 
     private var statusFooter: some View {
         HStack(spacing: 7) {
-            StatusDot(running: app.isRunning)
-            Text(app.isRunning ? loc.t("status.running") : loc.t("status.paused"))
-                .font(.system(size: 11)).foregroundColor(.secondary)
+            // While macOS Secure Input is on the engine is deaf no matter what
+            // the service status says, so the warning outranks "Running" here.
+            if secureInput.isActive {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 10)).foregroundColor(.orange)
+                    .frame(width: 12, height: 12)
+                Text(loc.t("secure_input.footer"))
+                    .font(.system(size: 11)).foregroundColor(.orange)
+                    .help(loc.t("secure_input.hint_active"))
+            } else {
+                StatusDot(running: app.isRunning)
+                Text(app.isRunning ? loc.t("status.running") : loc.t("status.paused"))
+                    .font(.system(size: 11)).foregroundColor(.secondary)
+            }
             Spacer()
         }
         .padding(.horizontal, 16).padding(.vertical, 9)
+        .accessibilityIdentifier("nav.status_footer")
     }
 
     private func toastView(_ toast: AppState.ToastMessage) -> some View {
