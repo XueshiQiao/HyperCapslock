@@ -1,3 +1,5 @@
+
+
 <h1 align="center">
   <img src="./docs/assets/icon.png" alt="HyperCapslock" width="96" /><br/>
   HyperCapslock
@@ -241,7 +243,7 @@ open HyperCapslock.xcodeproj   # Cmd+R to build & run
 ### Build
 
 ```bash
-xcodebuild -project HyperCapslock.xcodeproj -scheme HyperCapslock -configuration Release build
+xcodebuild -project HyperCapslock.xcodeproj -scheme HyperCapslock -configuration Release -destination 'platform=macOS' build
 ```
 
 ## Troubleshooting
