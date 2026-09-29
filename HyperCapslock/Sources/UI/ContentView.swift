@@ -136,7 +136,11 @@ struct ContentView: View {
             }
             Spacer()
         }
-        .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 12)
+        // The app icon carries ~3pt of transparent margin inside its 34pt frame;
+        // 13 instead of 16 puts its visible edge on the same line as the row
+        // icons below (measured on a 2x screenshot: both at 16pt from the
+        // window edge).
+        .padding(.leading, 13).padding(.trailing, 16).padding(.top, 16).padding(.bottom, 12)
     }
 
     private var statusFooter: some View {
