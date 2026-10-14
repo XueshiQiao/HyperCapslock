@@ -32,6 +32,71 @@ func actionCategoryColor(_ config: ActionConfig) -> Color {
     }
 }
 
+// MARK: - Keycap glyph (what a mapped key shows on its cap)
+
+/// What a mapped keycap draws in its center so the action reads at a glance.
+/// Text glyphs reuse the HUD's symbol tables (`hudParts`, `modifierHudLabel`)
+/// so a key looks the same on the keyboard as it does in the HUD when pressed.
+enum KeycapGlyph: Equatable {
+    /// A short symbol or label drawn as text (`←`, `⌥→`, `↑10`, `⌘⇧4`, `>_` …).
+    case text(String)
+    /// The app's own icon; `fallback` is drawn when the app isn't installed.
+    case appIcon(bundleID: String, fallback: String)
+    /// The input source's own icon; `fallback` is drawn when it has none.
+    case inputSource(id: String, fallback: String)
+}
+
+/// Picks the keycap glyph for an action. Pure (no UI / registry lookups) so it
+/// is unit-testable; the caller passes the localized Home/End labels and the
+/// installed input source's display name (nil when it is not installed).
+func keycapGlyph(for config: ActionConfig, homeLabel: String, endLabel: String,
+                 inputSourceName: String?) -> KeycapGlyph {
+    switch config {
+    case .directional(.home): return .text(homeLabel)
+    case .directional(.end):  return .text(endLabel)
+    case .directional, .independent:
+        return .text(hudParts(config).0)   // ← ↓ ↑ → ⌥← ⌥→ · ⌫ ↵ “” ⇪ ⊘
+    case .jump(let dir, let count):
+        return .text("\(dir == .up ? "↑" : "↓")\(count)")
+    case .inputSource(let id):
+        let fallback = inputSourceName.flatMap { $0.first.map(String.init) } ?? "⚠\u{FE0E}"
+        return .inputSource(id: id, fallback: fallback)
+    case .command:
+        return .text(">_")
+    case .keyCombo(let key, let ctrl, let alt, let cmd, let shift):
+        return .text(compactComboString(key, ctrl: ctrl, alt: alt, cmd: cmd, shift: shift))
+    case .openApp(let bid, let name):
+        return .appIcon(bundleID: bid, fallback: name.first.map(String.init) ?? "App")
+    case .modifierKey(let m):
+        return .text(modifierHudLabel(m))   // ⌥R, ⌘L, fn …
+    }
+}
+
+/// "⌘⇧4"-style combo in Apple's modifier order (⌃⌥⇧⌘), with the key itself as a
+/// glyph where one exists, so it fits on a single keycap.
+func compactComboString(_ key: UInt16, ctrl: Bool, alt: Bool, cmd: Bool, shift: Bool) -> String {
+    let keyGlyphs: [UInt16: String] = [
+        8: "⌫", 9: "⇥", 13: "↩", 27: "⎋", 32: "␣", 46: "⌦",
+        33: "⇞", 34: "⇟", 35: "↘", 36: "↖",
+    ]
+    var s = ""
+    if ctrl { s += "⌃" }; if alt { s += "⌥" }; if shift { s += "⇧" }; if cmd { s += "⌘" }
+    return s + (keyGlyphs[key] ?? keyCodeDisplay(key))
+}
+
+/// App icons for keycaps, looked up once per bundle id — the keyboard re-renders
+/// on every hover, and `NSWorkspace` lookups are not free.
+@MainActor
+private enum KeycapIconCache {
+    static var apps: [String: NSImage?] = [:]
+    static func app(_ bundleID: String) -> NSImage? {
+        if let hit = apps[bundleID] { return hit }
+        let icon = AppChooser.icon(bundleID)
+        apps[bundleID] = icon
+        return icon
+    }
+}
+
 // MARK: - Style view
 
 struct MappingsKeyboardStyleView: View {
@@ -192,7 +257,11 @@ private struct MagicKeyboardView: View {
         // and therefore no layout feedback loop (which beach-balled the app).
         .overlay { tooltipOverlay }
         .fixedSize(horizontal: true, vertical: true)
-        .frame(maxWidth: .infinity)   // center the keyboard when the pane is wider
+        // center the keyboard when the pane is wider. minWidth 0 keeps this frame at
+        // the pane's width even when the fixed-size keyboard is wider, so the width
+        // measured below can shrink and the keyboard shrinks with it (without it the
+        // keyboard never got narrower than 720 and pushed the sidebar to the left).
+        .frame(minWidth: 0, maxWidth: .infinity)
         .background(GeometryReader { g in Color.clear.preference(key: KbWidthKey.self, value: g.size.width) })
         .onPreferenceChange(KbWidthKey.self) { width = $0 }
     }
@@ -335,7 +404,7 @@ private struct MagicKeyboardView: View {
 
     private func arrowCap(_ key: KKey) -> some View {
         let info = mapInfo(key)
-        return cap(for: key, info: info)
+        return cap(for: key, info: info, compact: true)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(gap / 2)
             .contentShape(Rectangle())
@@ -379,12 +448,14 @@ private struct MagicKeyboardView: View {
     // MARK: cap visual
 
     @ViewBuilder
-    private func cap(for key: KKey, info: MapInfo) -> some View {
+    private func cap(for key: KKey, info: MapInfo, compact: Bool = false) -> some View {
         let hyper = key.role == .hyper
         let tint: Color? = hyper ? Color(red: 0.05, green: 0.52, blue: 1.0)
                                  : info.entry.map { _ in info.cfg.map(actionCategoryColor) ?? .orange }
         let labelText = hyper ? "caps" : key.label
         let radius = max(5, colW * 0.16)
+        // A mapped key shows what it does; its own legend moves small into the corner.
+        let glyph: KeycapGlyph? = info.entry == nil ? nil : glyphFor(info)
 
         ZStack {
             RoundedRectangle(cornerRadius: radius, style: .continuous)
@@ -395,18 +466,40 @@ private struct MagicKeyboardView: View {
                                      : .black.opacity(dark ? 0.30 : 0.10),
                         radius: hyper ? 7 : 1, y: hyper ? 0 : 1)
 
-            VStack(spacing: 1) {
-                Text(labelText)
-                    .font(.system(size: min(13, colW * 0.34), weight: .semibold,
-                                  design: labelText.count <= 2 ? .default : .rounded))
-                    .lineLimit(1).minimumScaleFactor(0.6)
-                    .foregroundStyle(capText(tint: tint, hyper: hyper))
-                if hyper {
-                    Text("HYPER").font(.system(size: max(6, colW * 0.17), weight: .heavy))
-                        .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
+            if let glyph {
+                glyphView(glyph, color: capText(tint: tint, hyper: false), compact: compact)
+                    .offset(y: compact ? 0 : colW * 0.04)
+                // The key's own legend, small in the top-left corner. Half-height
+                // arrow keys have no room for it — their position identifies them.
+                if !compact && !labelText.isEmpty {
+                    Text(labelText)
+                        .font(.system(size: min(10, max(7, colW * 0.2)), weight: .semibold, design: .rounded))
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                        .foregroundStyle(capText(tint: tint, hyper: false).opacity(0.6))
+                        .padding(.leading, max(3, colW * 0.09)).padding(.top, max(1.5, colW * 0.04))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
+                // Tiny dot: this key also has per-app rules (the glyph is its default).
+                if let entry = info.entry, !entry.bindings.isEmpty {
+                    Circle().fill(capText(tint: tint, hyper: false).opacity(0.55))
+                        .frame(width: compact ? 3 : 4, height: compact ? 3 : 4)
+                        .padding(.trailing, compact ? 3 : 5).padding(.top, compact ? 2.5 : 4.5)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                }
+            } else {
+                VStack(spacing: 1) {
+                    Text(labelText)
+                        .font(.system(size: min(13, colW * 0.34), weight: .semibold,
+                                      design: labelText.count <= 2 ? .default : .rounded))
+                        .lineLimit(1).minimumScaleFactor(0.6)
+                        .foregroundStyle(capText(tint: tint, hyper: hyper))
+                    if hyper {
+                        Text("HYPER").font(.system(size: max(6, colW * 0.17), weight: .heavy))
+                            .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
+                    }
+                }
+                .padding(.horizontal, 3)
             }
-            .padding(.horizontal, 3)
 
             if info.entry != nil, let tint {
                 VStack { Spacer()
@@ -416,6 +509,69 @@ private struct MagicKeyboardView: View {
             }
         }
         .opacity(key.role == .modifier ? 0.72 : 1)
+    }
+
+    // MARK: keycap glyph
+
+    /// The glyph for a mapped key's represented action (same action that sets the
+    /// tint — see `mapInfo`); a warning sign when that action no longer resolves.
+    private func glyphFor(_ info: MapInfo) -> KeycapGlyph {
+        guard let cfg = info.cfg else { return .text("⚠\u{FE0E}") }
+        var sourceName: String? = nil
+        if case .inputSource(let id) = cfg { sourceName = availableInputSources[id]?.name }
+        return keycapGlyph(for: cfg,
+                           homeLabel: loc.t("mappings.kb.glyph.home"),
+                           endLabel: loc.t("mappings.kb.glyph.end"),
+                           inputSourceName: sourceName)
+    }
+
+    @ViewBuilder
+    private func glyphView(_ glyph: KeycapGlyph, color: Color, compact: Bool) -> some View {
+        switch glyph {
+        case .text(let s):
+            glyphText(s, color: color, compact: compact)
+        case .appIcon(let bid, let fallback):
+            if let icon = KeycapIconCache.app(bid) {
+                glyphImage(icon, color: color, compact: compact)
+            } else {
+                glyphText(fallback, color: color, compact: compact)
+            }
+        case .inputSource(let id, let fallback):
+            if let icon = availableInputSources[id]?.icon {
+                glyphImage(icon, color: color, compact: compact)
+            } else {
+                glyphText(fallback, color: color, compact: compact)
+            }
+        }
+    }
+
+    /// Text glyph, sized by length so `←` reads big while `⌃⌥⇧⌘K` still fits;
+    /// anything longer shrinks (down to 45%) rather than wrapping.
+    private func glyphText(_ s: String, color: Color, compact: Bool) -> some View {
+        let size: CGFloat
+        if compact { size = min(10, colW * 0.25) }
+        else if s.count <= 1 { size = min(17, colW * 0.42) }
+        else if s.count == 2 { size = min(14, colW * 0.34) }
+        else { size = min(12, colW * 0.28) }
+        return Text(s)
+            .font(.system(size: size, weight: .semibold, design: .rounded))
+            .lineLimit(1).minimumScaleFactor(0.45).allowsTightening(true)
+            .foregroundStyle(color)
+            .padding(.horizontal, max(2, colW * 0.07))
+    }
+
+    /// Icon glyph (app icon / input source icon). Template images (most input
+    /// source icons) take the cap's text color so they read in light and dark.
+    @ViewBuilder
+    private func glyphImage(_ image: NSImage, color: Color, compact: Bool) -> some View {
+        let side = compact ? max(8, (rowH / 2 - gap) * 0.9) : max(12, (rowH - gap) * 0.58)
+        if image.isTemplate {
+            Image(nsImage: image).renderingMode(.template).resizable().interpolation(.high)
+                .scaledToFit().frame(width: side, height: side).foregroundStyle(color)
+        } else {
+            Image(nsImage: image).resizable().interpolation(.high)
+                .scaledToFit().frame(width: side, height: side)
+        }
     }
 
     // MARK: cap styling

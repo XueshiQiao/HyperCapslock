@@ -257,4 +257,41 @@ final class HyperCapslockTests: XCTestCase {
             trigger: .hyperPlusKey(key: 70, withShift: false), actionId: "builtin.move_left",
             bindings: [MappingBinding(when: term, actionId: "cust-tmux")])).actionId, "builtin.move_left")
     }
+
+    // MARK: Keyboard-view keycap glyphs
+
+    /// Every action kind gets a short glyph that fits on a keycap; Home/End use the
+    /// localized labels passed in; jumps carry their real count.
+    func testKeycapGlyphPerActionKind() throws {
+        func g(_ c: ActionConfig, source: String? = nil) -> KeycapGlyph {
+            keycapGlyph(for: c, homeLabel: "行首", endLabel: "行尾", inputSourceName: source)
+        }
+        XCTAssertEqual(g(.directional(.left)), .text("←"))
+        XCTAssertEqual(g(.directional(.down)), .text("↓"))
+        XCTAssertEqual(g(.directional(.wordBack)), .text("⌥←"))
+        XCTAssertEqual(g(.directional(.wordForward)), .text("⌥→"))
+        XCTAssertEqual(g(.directional(.home)), .text("行首"))
+        XCTAssertEqual(g(.directional(.end)), .text("行尾"))
+        XCTAssertEqual(g(.jump(direction: .up, count: 10)), .text("↑10"))
+        XCTAssertEqual(g(.jump(direction: .down, count: 5)), .text("↓5"))
+        XCTAssertEqual(g(.independent(.backspace)), .text("⌫"))
+        XCTAssertEqual(g(.independent(.nextLine)), .text("↵"))
+        XCTAssertEqual(g(.independent(.toggleCapsLock)), .text("⇪"))
+        XCTAssertEqual(g(.independent(.noop)), .text("⊘"))
+        XCTAssertEqual(g(.command("echo hi")), .text(">_"))
+        XCTAssertEqual(g(.modifierKey(.rightOption)), .text("⌥R"))
+        XCTAssertEqual(g(.openApp(bundleID: "com.apple.Safari", name: "Safari")),
+                       .appIcon(bundleID: "com.apple.Safari", fallback: "S"))
+        XCTAssertEqual(g(.inputSource(inputSourceID: "com.apple.keylayout.ABC"), source: "ABC"),
+                       .inputSource(id: "com.apple.keylayout.ABC", fallback: "A"))
+        XCTAssertEqual(g(.inputSource(inputSourceID: "gone")), .inputSource(id: "gone", fallback: "⚠\u{FE0E}"))
+    }
+
+    /// Key combos use Apple's modifier order (⌃⌥⇧⌘) and glyphs for named keys.
+    func testCompactComboString() throws {
+        XCTAssertEqual(compactComboString(52, ctrl: false, alt: false, cmd: true, shift: true), "⇧⌘4")
+        XCTAssertEqual(compactComboString(32, ctrl: true, alt: true, cmd: false, shift: false), "⌃⌥␣")
+        XCTAssertEqual(compactComboString(8, ctrl: false, alt: true, cmd: false, shift: false), "⌥⌫")
+        XCTAssertEqual(compactComboString(112, ctrl: false, alt: false, cmd: false, shift: false), "F1")
+    }
 }
