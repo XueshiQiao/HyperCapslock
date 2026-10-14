@@ -19,10 +19,14 @@ final class MainWindowController: NSObject, NSWindowDelegate {
         let hosting = NSHostingController(rootView: root)
 
         window = NSWindow(contentViewController: hosting)
-        window.title = "HyperCapslock"
+        // Keep the title visible (do NOT set titleVisibility = .hidden): in the unified
+        // toolbar the title is what pushes the page's toolbar items to the trailing
+        // edge. With it hidden, the items sat on the left on first open, and jumped
+        // right only after SwiftUI rebuilt the toolbar (style switch, button click).
+        // Start with the first page's name; each page's navigationTitle takes over.
+        window.title = AppState.shared.loc.t("nav.mappings")
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
-        window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
         window.toolbarStyle = .unified
         // Wide enough for the Mappings keyboard style to show a full Magic
