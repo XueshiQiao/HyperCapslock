@@ -223,6 +223,6 @@ jobs:
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.HOMEBREW_TAP_PAT }}
-          repository: XueshiQiao/homebrew_tap
+          repository: XueshiQiao/homebrew-tap
           event-type: update_cask
           client-payload: '{"app_token": "hypercapslock"}'

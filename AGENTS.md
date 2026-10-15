@@ -99,7 +99,7 @@ active `.defaultTap`, which macOS gates on Accessibility.)
 ## CI/CD (`.github/workflows/build.yml`)
 Universal build → Developer ID sign (inside-out, incl. embedded Sparkle.framework)
 → notarize/staple → DMG → Sparkle `sign_update` + `appcast.xml` → GitHub Release
-→ `repository-dispatch` to `XueshiQiao/homebrew_tap` and the apps gallery.
+→ `repository-dispatch` to `XueshiQiao/homebrew-tap` and the apps gallery.
 
 ### GitHub Secrets Required
 - `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD` — Developer ID signing
