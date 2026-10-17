@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raycast 键位调研</title>
+<style>
+:root {
+  --bg: #fafaf9; --card: #ffffff; --text: #1c1917; --muted: #57534e; --line: #e7e5e4;
+  --accent: #7c3aed; --accent-soft: #f3e8ff; --good: #15803d; --good-soft: #dcfce7;
+  --warn: #b45309; --warn-soft: #fef3c7; --bad: #b91c1c; --bad-soft: #fee2e2; --code: #f5f5f4;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c0a09; --card: #1c1917; --text: #f5f5f4; --muted: #a8a29e; --line: #292524;
+    --accent: #c4b5fd; --accent-soft: #2e1065; --good: #86efac; --good-soft: #052e16;
+    --warn: #fcd34d; --warn-soft: #422006; --bad: #fca5a5; --bad-soft: #450a0a; --code: #292524;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c0a09; --card: #1c1917; --text: #f5f5f4; --muted: #a8a29e; --line: #292524;
+  --accent: #c4b5fd; --accent-soft: #2e1065; --good: #86efac; --good-soft: #052e16;
+  --warn: #fcd34d; --warn-soft: #422006; --bad: #fca5a5; --bad-soft: #450a0a; --code: #292524;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.7 -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif; }
+main { max-width: 960px; margin: 0 auto; padding: 32px 16px 80px; }
+h1 { font-size: 30px; line-height: 1.3; margin: 0 0 8px; }
+h2 { font-size: 22px; margin: 48px 0 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+h3 { font-size: 18px; margin: 28px 0 8px; }
+p, li { color: var(--text); }
+.muted { color: var(--muted); font-size: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; margin: 16px 0; }
+.callout { border-left: 4px solid var(--accent); background: var(--accent-soft); border-radius: 8px; padding: 12px 16px; margin: 16px 0; }
+.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+.table-wrap { overflow-x: auto; margin: 12px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; background: var(--card); }
+th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+th { background: var(--code); font-weight: 600; white-space: nowrap; }
+code, kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+pre { background: var(--code); padding: 12px 14px; border-radius: 8px; overflow-x: auto; font-size: 14px; line-height: 1.6; }
+.tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 99px; white-space: nowrap; }
+.hi { background: var(--good-soft); color: var(--good); }
+.mid { background: var(--warn-soft); color: var(--warn); }
+.lo { background: var(--code); color: var(--muted); }
+.have { color: var(--good); font-weight: 600; }
+.no { color: var(--bad); font-weight: 600; }
+.part { color: var(--warn); font-weight: 600; }
+a { color: var(--accent); word-break: break-all; }
+nav ol { padding-left: 20px; margin: 0; }
+blockquote { margin: 8px 0; padding: 6px 14px; border-left: 3px solid var(--line); color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Raycast 用户最常用的快捷键和设置：调研报告</h1>
+<p class="muted">写于 2026-10-17。用 4 个 subagent 分头调研（英文社区、X / Hacker News / 博客、中国大陆平台、Raycast 官方资料和同类工具），一共看了大约 80 个网页。最后一部分是根据调研结果给 HyperCapslock 的建议。</p>
+
+<div class="card">
+<b>目录</b>
+<nav><ol>
+<li><a href="#tldr">一句话结论</a></li>
+<li><a href="#scope">调研范围，以及哪些平台没查到</a></li>
+<li><a href="#en">英文社区的结果（Hacker News、Mac Power Users 论坛、个人博客、Raycast 用户故事）</a></li>
+<li><a href="#cn">中国大陆平台的结果（V2EX、少数派、个人博客等）</a></li>
+<li><a href="#official">Raycast 官方资料和同类工具的默认设置</a></li>
+<li><a href="#rank">汇总：最常见的动作排名、字母对应 App 的习惯</a></li>
+<li><a href="#compare">和 HyperCapslock 现有功能对比</a></li>
+<li><a href="#suggest">建议：默认键位怎么改、要新增哪些动作和设置</a></li>
+<li><a href="#sources">主要来源</a></li>
+</ol></nav>
+</div>
+
+<h2 id="tldr">1. 一句话结论</h2>
+<div class="callout">
+<p style="margin-top:0">几乎每个 Raycast 重度用户都会做三件事：</p>
+<ol>
+<li><b>用 Hyper 键加 App 名字的首字母，一键打开或切到某个 App</b>（Hyper 键的意思是：按下 CapsLock 就相当于同时按住 ⌃⌥⌘ 或 ⌃⌥⌘⇧ 这几个修饰键，这样组合出来的快捷键几乎不会跟别的软件冲突）。HyperCapslock 已经有「打开应用」这个动作。</li>
+<li><b>窗口管理</b>：把窗口放到左半屏、右半屏、最大化、居中、移到另一块显示器。<b>HyperCapslock 目前没有这类动作</b>，这是最大的空缺。</li>
+<li><b>剪贴板历史</b>：多数人绑在 Hyper+V 或 ⌘⇧V 上。HyperCapslock 不需要自己做剪贴板历史，但可以把 Caps+V 默认绑到「发出某个剪贴板软件的快捷键」上。</li>
+</ol>
+<p style="margin-bottom:0">另外，中国用户有一个英文社区里很少见的需求：<b>按一个键直接切到指定的输入法</b>（不是在几个输入法之间轮换）。HyperCapslock 已经有这个功能，而且做得比 Raycast 自带的更完整。</p>
+</div>
+
+<h2 id="scope">2. 调研范围，以及哪些平台没查到</h2>
+<div class="callout warn">
+<p style="margin-top:0"><b>有三个平台基本没拿到内容，结论的代表性因此有限：</b></p>
+<ul style="margin-bottom:0">
+<li><b>Reddit：一条帖子也没读到。</b>搜索工具在服务器那一端就拒绝了 reddit.com；网页抓取、Reddit 的 JSON 接口、RSS、存档网站 PullPush 也都被拦了；Reddit 的镜像网站都要先过人机验证，我们没有去绕过人机验证。作为替代，用了性质最接近的几个社区：Hacker News 的评论、Mac Power Users 论坛、Raycast 官网上的用户故事、个人博客里贴出的完整配置。如果你一定要 Reddit 原帖，可以在浏览器里打开帖子把内容贴给我，或者申请 Reddit 官方 API 的密钥。</li>
+<li><b>X / Twitter：一条推文也没搜到。</b>限定在 x.com 的搜索只返回 Raycast 的官方手册和更新日志。</li>
+<li><b>小红书、知乎、B 站：基本没看到正文。</b>小红书没法检索；知乎专栏打开时返回 403（被拒绝访问）；B 站只看到视频简介，简介里没写具体按键。中文这一块的结论主要来自 V2EX、少数派和个人博客。</li>
+</ul>
+</div>
+<p>其他需要注意的地方：</p>
+<ul>
+<li><b>样本小，而且偏开发者。</b>英文这边一共大约 15 份具体配置，中文这边大约 20 个页面。愿意公开分享配置的人本来就是重度用户，普通用户可能只用 ⌘Space 呼出 Raycast 和剪贴板历史。</li>
+<li><b>下文的「很多 / 一些 / 少量」是按看到的来源数估的，不是统计结果。</b></li>
+<li><b>Raycast 官方没有公布过「全体用户最常用哪些命令」的数据。</b>Raycast 的年度回顾（Wrapped）的数据只存在每个人自己的电脑上，Raycast 公司自己也拿不到。唯一能拿到的数字是 Raycast 扩展商店里每个扩展的安装量。</li>
+<li><b>Raycast 自带 Hyper Key 是 2025 年 2 月（v1.91.0）才上线的。</b>很多「字母对应 App」的习惯来自更早的 Karabiner（改键工具）和 Hammerspoon（用脚本写快捷键的工具）用户，是同一类人的习惯，可以参考，但不完全是 Raycast 用户。</li>
+</ul>
+
+<h2 id="en">3. 英文社区的结果</h2>
+<p class="muted">来源：Hacker News 评论、Mac Power Users 论坛、Raycast 官网的用户故事、大约 10 篇个人博客（Brian Lovin、Tower 博客、Stefan Imhoff、dev.to 上的几篇等）。下面的 ✦ 表示 Hyper 键。</p>
+
+<h3>3.1 大家最常配的动作</h3>
+<div class="table-wrap"><table>
+<tr><th>动作</th><th>常见按键</th><th>出现次数</th></tr>
+<tr><td>用 Hyper+字母 打开或切到某个 App</td><td>✦ + App 名字首字母</td><td><span class="tag hi">很多</span> 几乎每份配置都有</td></tr>
+<tr><td>窗口：左半屏、右半屏、最大化、居中</td><td>⌃⌥+方向键、⌥⌘+方向键，也有人用 ✦+H/J/K/L 或 ✦+[ / ] / \</td><td><span class="tag hi">很多</span></td></tr>
+<tr><td>剪贴板历史</td><td>✦V、⌘⇧V</td><td><span class="tag hi">很多</span></td></tr>
+<tr><td>用 Raycast 替换 Spotlight</td><td>⌘Space</td><td><span class="tag hi">很多</span></td></tr>
+<tr><td>Snippets（文字片段：输入一个缩写，自动展开成一段文字）、Quicklinks（一键打开某个网址或某个网站的搜索）</td><td>多数用缩写或别名触发，不绑快捷键</td><td><span class="tag hi">很多</span> 但不靠快捷键</td></tr>
+<tr><td>把窗口移到另一块显示器、上一个或下一个桌面</td><td>⌃⌥⇧→、✦+&lt; / &gt;</td><td><span class="tag mid">一些</span></td></tr>
+<tr><td>窗口宽度在 1/2、2/3、1/3 之间轮换；把窗口调成「合适大小」「接近最大化」</td><td>连按同一个键</td><td><span class="tag mid">一些</span></td></tr>
+<tr><td>一键摆好多个窗口（例如编辑器放右边、浏览器放左边）</td><td>✦G</td><td><span class="tag mid">一些</span></td></tr>
+<tr><td>打开 AI 对话（Claude、ChatGPT、Raycast AI）</td><td>✦A</td><td><span class="tag mid">一些</span></td></tr>
+<tr><td>快速记笔记或待办（Drafts、Things 的快速输入框）</td><td>✦N、✦T</td><td><span class="tag mid">一些</span></td></tr>
+<tr><td>打开常用文件夹（下载、工作目录）</td><td>✦D、✦W</td><td><span class="tag lo">少量</span></td></tr>
+<tr><td>截图</td><td>✦1</td><td><span class="tag lo">少量</span></td></tr>
+<tr><td>开关专注模式、切换音频输入输出设备、结束进程、表情符号选择器</td><td>各不相同</td><td><span class="tag lo">少量</span></td></tr>
+<tr><td>✦+H/J/K/L 当方向键（vim 风格）</td><td>✦HJKL</td><td><span class="tag lo">少量</span></td></tr>
+</table></div>
+
+<h3>3.2 推荐打开的设置</h3>
+<ul>
+<li><b>把 CapsLock 设成 Hyper 键</b>：几乎所有人都推荐，理由基本都是「反正我从来不用 CapsLock」。</li>
+<li><b>单独轻按一下 CapsLock 时发出 Escape</b>：程序员里非常普遍，HN 上至少 5 个人提到。另一种做法是单独轻按时仍然是大小写锁定。还有一个少见的配法：轻按发出 ⌘T。</li>
+<li><b>Hyper 键要不要包含 Shift</b>：有人更喜欢不带 Shift 的 ⌃⌥⌘，这样需要时再加 Shift 就多出一层快捷键。</li>
+<li><b>把原来的大小写锁定挪到别的键上</b>，比如右 Shift。</li>
+</ul>
+
+<h3>3.3 几段原话</h3>
+<blockquote>「Hyperkey + V opens Raycast's clipboard manager (V because I'm pasting)」——Mac Power Users 论坛用户。同一个人还配了 D 打开 Dia 浏览器、N 打开 Drafts、T 打开 Things、A 打开 Claude、F 开关专注模式。</blockquote>
+<blockquote>Brian Lovin：✦S Slack、✦D Dia、✦F Figma、✦G Ghostty、✦N Notion、✦M Messages、✦P 1Password、✦C Calendar。「you'll never want to use your dock or the command + tab UI ever again」。</blockquote>
+<blockquote>James Mulholland（Raycast 用户故事）：用 ✦H/J/K/L 把窗口放到左、下、上、右半屏，✦M 最大化，「match the keybindings to Vim」。他每天用剪贴板历史大约 100 次。</blockquote>
+<blockquote>HN 用户：「I have Capslock + A assigned as the hotkey and have superfast AI at my fingertips」。</blockquote>
+<blockquote>HN 用户：「capslock key is now a hyperkey when pressed and ⌘T when tapped」（按住是 Hyper 键，轻按是 ⌘T）。</blockquote>
+
+<h2 id="cn">4. 中国大陆平台的结果</h2>
+<p class="muted">来源：V2EX、少数派、Ruby China、约十个个人博客、GitHub 上的中文配置项目。中文平台上没有找到一篇完整列出「Raycast Hyper 键 + 字母」对应表的帖子，下面「字母对应 App」的例子大多来自用 Karabiner 和 Hammerspoon 的中文帖子。</p>
+
+<h3>4.1 大家最常配的动作</h3>
+<div class="table-wrap"><table>
+<tr><th>动作</th><th>常见按键</th><th>出现次数</th></tr>
+<tr><td>呼出 Raycast</td><td>⌥Space（Raycast 默认）、⌘Space（先关掉 Spotlight 的快捷键）</td><td><span class="tag hi">很多</span></td></tr>
+<tr><td>剪贴板历史</td><td>⌘⇧V 最多，也有 ⌥⌘V、⌃Space</td><td><span class="tag hi">很多</span></td></tr>
+<tr><td>窗口：左半屏、右半屏、最大化、居中</td><td>⌃⌥+方向键、⌃⌥Enter（Magnet / Rectangle 留下的习惯）</td><td><span class="tag hi">很多</span></td></tr>
+<tr><td><b>切换中英文输入法</b></td><td>CapsLock 最多；其次 ⌘Space、⌃Space、地球键；也有人左 ⌘ 切英文、右 ⌘ 切中文</td><td><span class="tag hi">很多</span></td></tr>
+<tr><td>一键打开或切到某个 App</td><td>⌥+字母，或 Hyper+字母</td><td><span class="tag hi">很多</span></td></tr>
+<tr><td>翻译（Easydict 插件、Bob）</td><td>各自的快捷键</td><td><span class="tag mid">一些</span></td></tr>
+<tr><td>CapsLock 轻按发 Esc，按住当 ⌃</td><td>程序员</td><td><span class="tag mid">一些</span></td></tr>
+<tr><td>截图（Snipaste 用 F1 截图、F3 把截图贴在屏幕上；微信截图）</td><td>—</td><td><span class="tag lo">少量</span></td></tr>
+</table></div>
+
+<h3>4.2 字母对应 App 的中文习惯</h3>
+<ul>
+<li><b>W 几乎总是微信。</b>好几个配置都是这样（xxhk.org 的博客、Ruby China 的 Hammerspoon 指南、forecho 的博客）。这是中文社区最稳定的一个约定。</li>
+<li><b>Q 是 QQ 或企业微信</b>；企业微信有时放在 Y 或 0 上。</li>
+<li><b>C 和 G 是 Chrome</b>（C 有时也是代码编辑器），<b>S 是 Safari</b>，<b>I 和 T 是终端</b>（iTerm、Terminal）。</li>
+<li>没有看到飞书、钉钉有固定的字母。</li>
+</ul>
+
+<h3>4.3 中国用户特有的需求</h3>
+<ol>
+<li><b>按一个键直接切到指定的输入法，不来回轮换。</b>V2EX 帖子里的原话：「我们只需要中英两种输入状态」。常见做法是左 ⌘ 切英文、右 ⌘ 切中文，也有人按当前 App 自动切（终端里英文，聊天软件里中文）。有三个以上输入法时，有人用 Kawa 或 Input Source Pro 这类专门的工具。</li>
+<li><b>打开 Raycast 时自动切到英文输入法。</b>少数派的指南专门讲了 Raycast 设置里的 Auto-switch Input Source，原因是在中文输入法下搜命令很别扭。</li>
+<li><b>CapsLock 切中英文有延迟。</b>小红书上流传 <code>hidutil property --set '{"CapsLockDelayOverride":0}'</code> 这条命令来去掉延迟（这一条来自搜索摘要，原帖没打开过）。</li>
+<li><b>Raycast 的 Hyper Key 和「CapsLock 切输入法」冲突。</b>CapsLock 被 Hyper Key 占用后，轻按 CapsLock 只能选「什么都不做 / 原来的 CapsLock / Escape」，想同时用 CapsLock 切输入法的用户会很别扭。</li>
+</ol>
+
+<h3>4.4 几段原话</h3>
+<blockquote>V2EX：「CapsLock 改成 Control ⌃ 和 Esc ⎋ ……算是较为公认的最佳改键方案了」。（v2ex.com/t/565667）</blockquote>
+<blockquote>V2EX「怎样快速切换应用」：「option+字母 打开不同应用，贼快」。这一帖里 Raycast 被提到大约 8 次。（v2ex.com/t/938510）</blockquote>
+<blockquote>少数派：作者最常用的窗口命令「只有『左半屏』、『右半屏』、『最大化』以及『窗口居中』这四个」。（sspai.com/post/63929）</blockquote>
+<blockquote>V2EX「用什么快捷键切换中文输入法」：回复里用 CapsLock 的人最多，其次是 ⌘Space 和地球键。（v2ex.com/t/818939）</blockquote>
+<p class="muted">另外，V2EX 帖子 v2ex.com/t/1221569 是 HyperCapslock 作者本人发的介绍帖，不算独立的用户样本，没有计入上面的统计。</p>
+
+<h2 id="official">5. Raycast 官方资料和同类工具的默认设置</h2>
+
+<h3>5.1 Raycast 自带 Hyper Key 有哪些选项</h3>
+<div class="table-wrap"><table>
+<tr><th>选项</th><th>内容</th></tr>
+<tr><td>用哪个物理键当 Hyper 键</td><td>CapsLock、任意一个左或右修饰键、F1–F12</td></tr>
+<tr><td>Hyper 键等于哪几个修饰键</td><td>默认 <b>⌃⌥⌘（不带 Shift）</b>；打开 Include Shift 后是 ⌃⌥⌘⇧。Karabiner 和 Hyperkey 的默认是带 Shift 的四个键。</td></tr>
+<tr><td>Quick Press（单独轻按一下时做什么）</td><td>什么都不做 / 发出原来的 CapsLock / 发出 Escape</td></tr>
+<tr><td>Secure Input 兼容（默认关）</td><td>Secure Input 是 macOS 的安全输入模式，比如光标在密码框里时会打开，打开后第三方程序收不到按键。打开这个选项后，Raycast 的 Hyper 快捷键在 Secure Input 期间也能用，代价是右 Control 键被占用。</td></tr>
+<tr><td>Hyper Key 诊断面板</td><td>检查跟 Karabiner、系统设置里的 CapsLock 映射有没有冲突，可以不退出 Raycast 就重启 Hyper Key。</td></tr>
+</table></div>
+<p class="muted">和 HyperCapslock 的关系：工程里正在做的 Secure Input 提醒（<code>SecureInputMonitor.swift</code>）和 Raycast 的这两个功能方向一致，可以对照着看。</p>
+
+<h3>5.2 Raycast 内置的、常被绑快捷键的命令</h3>
+<p>Raycast 官方没有给这些命令设默认快捷键，手册里让用户自己给常用的命令绑快捷键。</p>
+<ul>
+<li><b>窗口管理</b>：左半 / 右半 / 上半 / 下半屏、最大化、接近最大化、合适大小、居中、恢复原来大小、全屏、三等分、四个角、移到上一个或下一个显示器、移到上一个或下一个桌面。</li>
+<li><b>剪贴板历史</b>：打开历史、按顺序依次粘贴、去掉格式后粘贴。</li>
+<li><b>系统命令</b>：锁屏、睡眠、关闭显示器、切换深色 / 浅色模式、显示桌面、清空废纸篓、推出所有磁盘、退出所有 App、隐藏其他 App、开关蓝牙、播放 / 暂停、上一首 / 下一首、静音、调音量。</li>
+<li><b>其他</b>：搜索当前 App 的菜单项、切换窗口（打字搜索所有窗口）、表情符号、笔记、翻译、截图、计算器。</li>
+</ul>
+
+<h3>5.3 Raycast 扩展商店安装量前 10 名</h3>
+<p class="muted">剪贴板历史、窗口管理这些是 Raycast 内置的，不在商店排行里，所以这个排行看不出它们的使用量。</p>
+<div class="table-wrap"><table>
+<tr><th>名次</th><th>扩展</th><th>安装量</th></tr>
+<tr><td>1</td><td>Kill Process（结束进程）</td><td>783,101</td></tr>
+<tr><td>2</td><td>Color Picker（取色器）</td><td>621,983</td></tr>
+<tr><td>3</td><td>Google Chrome（搜标签页、书签、历史）</td><td>575,589</td></tr>
+<tr><td>4</td><td>Google Translate</td><td>502,522</td></tr>
+<tr><td>5</td><td>Spotify Player</td><td>495,032</td></tr>
+<tr><td>6</td><td>Visual Studio Code</td><td>416,130</td></tr>
+<tr><td>7</td><td>Linear</td><td>405,771</td></tr>
+<tr><td>8</td><td>Slack</td><td>338,436</td></tr>
+<tr><td>9</td><td>Brew（Homebrew）</td><td>298,039</td></tr>
+<tr><td>10</td><td>1Password</td><td>254,615</td></tr>
+</table></div>
+
+<h3>5.4 同类工具的默认设置</h3>
+<ul>
+<li><b>Rectangle（窗口管理）的默认快捷键</b>：⌃⌥←/→/↑/↓ 放半屏，⌃⌥Enter 最大化，⌃⌥C 居中，⌃⌥⌘←/→ 移到上一个或下一个显示器，⌃⌥Delete 恢复原来大小。连按同一个键会在 1/2、2/3、1/3 之间轮换。这套快捷键就是上面中文社区说的「⌃⌥+方向键」习惯的来源。</li>
+<li><b>Karabiner 社区规则库里 CapsLock 相关的规则</b>：CapsLock 变 Hyper，单独按时发 Escape；CapsLock 变 Control，单独按时发 Escape；用 Shift+CapsLock 当真正的大小写锁定；按住 CapsLock 时 IJKL 当方向键；用 CapsLock 切换输入法；连按两次 Shift 开关大小写锁定。</li>
+<li><b>Hyperkey</b>（Rectangle 作者写的小工具）：把 CapsLock 变成 ⌃⌥⌘⇧，轻按可以发 CapsLock 或 Escape，官网承认在密码框里不能用。</li>
+</ul>
+
+<h2 id="rank">6. 汇总</h2>
+
+<h3>6.1 所有来源合在一起，最常见的动作</h3>
+<div class="table-wrap"><table>
+<tr><th>排名</th><th>动作</th><th>英文社区</th><th>中文社区</th></tr>
+<tr><td>1</td><td>一键打开或切到某个 App（Hyper+首字母）</td><td><span class="tag hi">很多</span></td><td><span class="tag hi">很多</span></td></tr>
+<tr><td>2</td><td>窗口管理：左右半屏、最大化、居中</td><td><span class="tag hi">很多</span></td><td><span class="tag hi">很多</span></td></tr>
+<tr><td>3</td><td>剪贴板历史</td><td><span class="tag hi">很多</span></td><td><span class="tag hi">很多</span></td></tr>
+<tr><td>4</td><td>切换到指定的输入法</td><td><span class="tag lo">少量</span></td><td><span class="tag hi">很多</span></td></tr>
+<tr><td>5</td><td>CapsLock 轻按发 Escape</td><td><span class="tag hi">很多</span>（程序员）</td><td><span class="tag mid">一些</span></td></tr>
+<tr><td>6</td><td>窗口移到另一块显示器 / 另一个桌面</td><td><span class="tag mid">一些</span></td><td><span class="tag lo">少量</span></td></tr>
+<tr><td>7</td><td>打开 AI 对话</td><td><span class="tag mid">一些</span></td><td><span class="tag lo">少量</span></td></tr>
+<tr><td>8</td><td>翻译</td><td><span class="tag lo">少量</span></td><td><span class="tag mid">一些</span></td></tr>
+<tr><td>9</td><td>快速记笔记 / 待办</td><td><span class="tag mid">一些</span></td><td><span class="tag lo">少量</span></td></tr>
+<tr><td>10</td><td>截图、打开常用文件夹、系统命令（锁屏、深色模式等）、媒体控制</td><td><span class="tag lo">少量</span></td><td><span class="tag lo">少量</span></td></tr>
+</table></div>
+
+<h3>6.2 字母对应 App：哪些约定比较稳定</h3>
+<div class="table-wrap"><table>
+<tr><th>字母</th><th>英文社区</th><th>中文社区</th><th>稳定程度</th></tr>
+<tr><td><kbd>T</kbd></td><td>终端（Ghostty、Warp、iTerm）；少数人是待办 App</td><td>终端（iTerm、Terminal）</td><td><span class="tag hi">稳定</span></td></tr>
+<tr><td><kbd>V</kbd></td><td>剪贴板历史（「V 就是粘贴」）</td><td>剪贴板历史</td><td><span class="tag hi">稳定</span></td></tr>
+<tr><td><kbd>B</kbd></td><td>浏览器（Chrome、Brave 等）</td><td>—</td><td><span class="tag hi">稳定</span></td></tr>
+<tr><td><kbd>W</kbd></td><td>WhatsApp、WebStorm，不统一</td><td><b>微信</b></td><td><span class="tag hi">中文稳定</span></td></tr>
+<tr><td><kbd>N</kbd></td><td>笔记（Notes、Notion、Drafts）</td><td>—</td><td><span class="tag hi">稳定</span></td></tr>
+<tr><td><kbd>A</kbd></td><td>AI（Claude、ChatGPT）</td><td>—</td><td><span class="tag mid">较稳定</span></td></tr>
+<tr><td><kbd>S</kbd></td><td>Slack 或 Safari</td><td>Safari</td><td><span class="tag mid">两派</span></td></tr>
+<tr><td><kbd>C</kbd></td><td>VS Code、日历、ChatGPT，不统一</td><td>Chrome 或代码编辑器</td><td><span class="tag mid">两派</span></td></tr>
+<tr><td><kbd>F</kbd></td><td>Figma、Finder、Firefox、专注模式</td><td>—</td><td><span class="tag lo">分散</span></td></tr>
+<tr><td><kbd>Q</kbd></td><td>—</td><td>QQ 或企业微信</td><td><span class="tag mid">中文较稳定</span></td></tr>
+<tr><td><kbd>X</kbd></td><td>Xcode（Raycast 官方手册里的例子）</td><td>—</td><td><span class="tag mid">较稳定</span></td></tr>
+</table></div>
+
+<h2 id="compare">7. 和 HyperCapslock 现有功能对比</h2>
+<p>HyperCapslock 现在能做的动作：光标移动（上下左右、按单词、行首行尾）、跳 10 行、删除、新起一行、插入引号、开关大小写锁定、切换到指定输入法、发出组合键、运行 shell 命令、打开应用、按住某个修饰键。触发方式有 Caps+键、Caps+Shift+键、轻按 Caps、连按两次 Caps、连按两次某个修饰键，并且可以按当前 App 给同一个键配不同的动作。</p>
+<div class="table-wrap"><table>
+<tr><th>大家常用的功能</th><th>HyperCapslock 现在</th><th>说明</th></tr>
+<tr><td>Hyper+字母 打开 App</td><td class="have">已有</td><td>「打开应用」动作。App 没装时只写一行日志，什么都不发生，界面上也不报错。</td></tr>
+<tr><td>打开 App 时，如果它已经在最前面就把它隐藏（中文帖子里「打开或隐藏微信」）</td><td class="no">没有</td><td>现在只会把 App 切到前面，再按一次不会隐藏。</td></tr>
+<tr><td>窗口管理（半屏、最大化、居中、移到另一块显示器）</td><td class="no">没有</td><td>只能通过「发出组合键」去触发 Rectangle 之类的另一个软件。这是最大的空缺。</td></tr>
+<tr><td>剪贴板历史</td><td class="part">间接可以</td><td>可以用「发出组合键」触发别的剪贴板软件（比如你的 PastePaw）。不建议自己做一个剪贴板历史。</td></tr>
+<tr><td>切换到指定输入法</td><td class="have">已有，而且比 Raycast 强</td><td>Raycast 只能在打开 Raycast 时自动切英文；HyperCapslock 可以把任意键绑到任意输入法，还处理了中日韩输入法切换不生效的问题。</td></tr>
+<tr><td>轻按 CapsLock 发 Escape</td><td class="part">能配，但不好找</td><td>现在轻按 CapsLock 默认是开关大小写锁定。<b>更正：</b>HyperCapslock 运行时，系统设置里的「用 CapsLock 切换输入法」不会生效，因为 CapsLock 已经被改成 F18，系统收不到 CapsLock 按键（Frank 核实，见工程提交 1e3f462 的实验记录）。用户可以给「轻按 Caps」这个触发方式绑一个「发出组合键 Esc」，但需要自己去找，不像 Raycast 那样是一个现成选项。</td></tr>
+<tr><td>Caps+没有映射的键 → 发出 ⌃⌥⌘+这个键（让别的软件也能用 Hyper 快捷键）</td><td class="no">没有</td><td>现在 Caps+没有映射的键会把这个键原样放过去。Raycast、Karabiner、Hyperkey 的 Hyper 键都是这样工作的，用户可以在任何软件里设置 Hyper 快捷键。</td></tr>
+<tr><td>系统命令（锁屏、睡眠、深色模式、清空废纸篓、媒体控制、音量）</td><td class="part">部分可以</td><td>锁屏可以用组合键 ⌃⌘Q，其他的可以用 shell 命令凑出来，但没有现成的动作。</td></tr>
+<tr><td>截图</td><td class="have">已有</td><td>刚加的默认键位 Caps+4 → ⇧⌘4。</td></tr>
+<tr><td>打开某个文件夹或网址</td><td class="part">能凑出来</td><td>用 shell 命令 <code>open ~/Downloads</code> 可以做到，但没有现成的动作。</td></tr>
+</table></div>
+
+<h2 id="suggest">8. 建议</h2>
+
+<h3>8.1 默认键位（新用户第一次安装时的映射）怎么调整</h3>
+<p>和刚才提交的那一版默认键位（C Chrome、F Finder、T Terminal、X Xcode、N Notes、S Safari、4 截图）对比：</p>
+<div class="table-wrap"><table>
+<tr><th>按键</th><th>建议</th><th>理由</th></tr>
+<tr><td><kbd>Caps+B</kbd></td><td><b>新增：打开系统默认浏览器</b></td><td>上次你提到 B 但没说对应哪个 App。调研里「B = 浏览器」是很稳定的约定。可以在第一次生成默认配置时，查一下用户的默认浏览器是哪个，把它的 bundle id 写进去，这样不需要新增动作类型。</td></tr>
+<tr><td><kbd>Caps+W</kbd></td><td><b>新增：打开微信</b>（<code>com.tencent.xinWeChat</code>）</td><td>中文社区最稳定的约定。没装微信时按了什么都不发生，界面上也不报错，对外国用户没有坏处。</td></tr>
+<tr><td><kbd>Caps+T</kbd></td><td>保留：终端</td><td>两边社区都最稳定。</td></tr>
+<tr><td><kbd>Caps+N</kbd></td><td>保留：备忘录</td><td>「N = 笔记」很稳定。</td></tr>
+<tr><td><kbd>Caps+X</kbd></td><td>保留：Xcode</td><td>Raycast 官方手册就是用这个当例子的。</td></tr>
+<tr><td><kbd>Caps+C</kbd>、<kbd>Caps+S</kbd>、<kbd>Caps+F</kbd></td><td>保留</td><td>C 和 S 各有两派说法，但 Chrome、Safari、Finder 是最大众的选择。</td></tr>
+<tr><td><kbd>Caps+4</kbd></td><td>保留：截图</td><td>—</td></tr>
+<tr><td><kbd>Caps+V</kbd></td><td>先不放默认</td><td>大家都习惯 V 是剪贴板历史，但 HyperCapslock 自己没有剪贴板历史，不知道用户用的是哪个剪贴板软件。建议把 V 留空，等用户自己绑。</td></tr>
+</table></div>
+
+<h3>8.2 新增动作（按优先级排）</h3>
+<div class="card">
+<p style="margin-top:0"><b>优先级 1：窗口管理动作。</b>这是调研里最常用、而 HyperCapslock 完全没有的功能。用 macOS 的辅助功能接口（Accessibility API）移动和缩放当前窗口；HyperCapslock 本来就需要辅助功能权限，不需要用户再多授权一次。</p>
+<p>第一批只做最常用的几个（少数派作者原话：常用的「只有左半屏、右半屏、最大化以及窗口居中这四个」）：</p>
+<ul>
+<li>左半屏、右半屏、最大化、居中</li>
+<li>移到下一个显示器</li>
+<li>恢复原来大小</li>
+<li>（可选）连按同一个键在 1/2、2/3、1/3 宽度之间轮换（Rectangle 的做法）</li>
+</ul>
+<p>默认键位的问题：英文社区有人用 Caps+H/J/K/L 管窗口，但 HyperCapslock 的 H/J/K/L 已经是方向键，而且这是核心功能，不能动。建议用 <b>Caps+Shift+H/L</b>（左右半屏）、<b>Caps+Shift+K</b>（最大化）、<b>Caps+Shift+J</b>（居中），或者用 <b>Caps+[ / ] / \</b>（英文社区里也有人这样配）。窗口管理的默认键位要不要放，建议你先试用一下再定。</p>
+<p>注意：新增的动作要加新的 <code>builtin.*</code> 编号，按工程规则这些编号以后不能改名也不能删。</p>
+</div>
+
+<div class="card">
+<p style="margin-top:0"><b>优先级 2：把「轻按 CapsLock 做什么」做成设置页里的一个现成选项。</b></p>
+<p>现在的逻辑（<code>ActionExecutor.fireCapsShortTap</code>）：</p>
+<pre>如果 用户给「轻按 Caps」配了动作:
+    执行这个动作
+否则:
+    开关大小写锁定（通过 IOKit；系统设置里的「用 CapsLock 切换输入法」此时不会生效）</pre>
+<p>建议在设置页加一个选项，可选：开关大小写锁定（默认，保持现在的行为）/ 发出 Escape / 什么都不做。不建议把默认改成 Escape。更重要的是：中文用户里最多的人用 CapsLock 切中英文，而 HyperCapslock 运行时系统原生的这个切换是失效的，所以应该另外提供「轻按 Caps 切换中英文」的选项（Raycast v0.55 也是自己实现的）。</p>
+</div>
+
+<div class="card">
+<p style="margin-top:0"><b>优先级 3：「打开应用」加一个「如果已经在最前面就隐藏」的开关。</b></p>
+<pre>按下 Caps+W 时:
+    如果 微信已经是最前面的 App 并且打开了这个开关:
+        隐藏微信
+    否则:
+        打开微信或切到微信</pre>
+<p>中文帖子里多次提到「打开或隐藏微信」，Hammerspoon 的配置也常这样写。</p>
+</div>
+
+<div class="card">
+<p style="margin-top:0"><b>优先级 4：Caps+没有映射的键 → 发出 ⌃⌥⌘（或 ⌃⌥⌘⇧）+这个键（做成可选设置，默认关）。</b></p>
+<p>这样用户可以在 Raycast、Alfred 或者任何软件里设置「Hyper 快捷键」，HyperCapslock 就同时具备了 Raycast Hyper Key 的能力。从 Raycast Hyper Key 换过来的用户也不用重新配快捷键。默认关的原因是：有用户可能依赖现在「没有映射的键原样放过去」的行为。</p>
+</div>
+
+<div class="card">
+<p style="margin-top:0"><b>优先级 5：一组现成的系统动作。</b>锁屏、睡眠、关闭显示器、切换深色 / 浅色模式、显示桌面、播放 / 暂停、上一首 / 下一首、静音、调音量、清空废纸篓。这些现在都能用组合键或 shell 命令凑出来，但普通用户不会写。做成内置动作后，在动作列表里直接选就行。</p>
+</div>
+
+<div class="card">
+<p style="margin-top:0"><b>优先级 6：「打开文件夹」和「打开网址」动作。</b>英文社区有人用 ✦D 打开下载文件夹、✦W 打开工作目录；Quicklinks（一键打开网址）是 Raycast 最常被谈论的功能之一。现在可以用 shell 命令 <code>open</code> 做到，做成内置动作只是更方便。</p>
+</div>
+
+<h3>8.3 不建议做的</h3>
+<ul>
+<li><b>剪贴板历史、Snippets、翻译、AI 对话</b>：这些是 Raycast、PastePaw、Easydict 这类软件的本职工作，HyperCapslock 自己做会变成另一个 Raycast。更好的做法是让 HyperCapslock 用「发出组合键」去触发这些软件。</li>
+<li><b>把 H/J/K/L 让给窗口管理</b>：H/J/K/L 当方向键是 HyperCapslock 的核心功能。</li>
+</ul>
+
+<h2 id="sources">9. 主要来源</h2>
+<p class="muted">都是 subagent 实际打开过或在搜索结果里看到的页面。标了「摘要」的是只在搜索结果摘要里看到、没有打开原页面核实过的。</p>
+<h3>英文社区</h3>
+<ul>
+<li><a href="https://talk.macpowerusers.com/t/what-im-using-raycast-for/45061">talk.macpowerusers.com/t/what-im-using-raycast-for/45061</a></li>
+<li><a href="https://brianlovin.com/writing/use-the-hyper-key-o5ozwGC">brianlovin.com/writing/use-the-hyper-key-o5ozwGC</a></li>
+<li><a href="https://brianlovin.com/computer/hyperkeys-me9hIdP">brianlovin.com/computer/hyperkeys-me9hIdP</a></li>
+<li><a href="https://git-tower.com/blog/mastering-raycast">git-tower.com/blog/mastering-raycast</a></li>
+<li><a href="https://stefanimhoff.de/raycast/">stefanimhoff.de/raycast/</a></li>
+<li><a href="https://alexpolonsky.com/posts/hyper-key/">alexpolonsky.com/posts/hyper-key/</a></li>
+<li><a href="https://vishnugopal.com/2025/08/31/using-space-for-hyper-key-shortcuts-on-macos/">vishnugopal.com/2025/08/31/using-space-for-hyper-key-shortcuts-on-macos/</a></li>
+<li><a href="https://dev.to/blqke/remapping-caps-lock-to-hyper-key-c7g">dev.to/blqke/remapping-caps-lock-to-hyper-key-c7g</a></li>
+<li><a href="https://dev.to/selfteachme/the-most-productive-customization-i-ve-made-to-my-computer-this-year-55j3">dev.to/selfteachme/the-most-productive-customization-…</a></li>
+<li><a href="https://hulry.com/raycast-tips/">hulry.com/raycast-tips/</a></li>
+<li><a href="https://information-overload.net/hyper-key">information-overload.net/hyper-key</a></li>
+<li><a href="https://raycast.com/community-stories/james-mulholland">raycast.com/community-stories/james-mulholland</a></li>
+<li><a href="https://www.raycast.com/community-stories/pawel-grzybek">raycast.com/community-stories/pawel-grzybek</a></li>
+<li><a href="https://www.raycast.com/community-stories/simon-kubica">raycast.com/community-stories/simon-kubica</a></li>
+<li>Hacker News：<a href="https://news.ycombinator.com/item?id=30876934">30876934</a>、<a href="https://news.ycombinator.com/item?id=34761139">34761139</a>、<a href="https://news.ycombinator.com/item?id=34757898">34757898</a>、<a href="https://news.ycombinator.com/item?id=36465324">36465324</a>、<a href="https://news.ycombinator.com/item?id=45560319">45560319</a>、<a href="https://news.ycombinator.com/item?id=45630456">45630456</a>、<a href="https://news.ycombinator.com/item?id=47743387">47743387</a>、<a href="https://news.ycombinator.com/item?id=47711004">47711004</a>、<a href="https://news.ycombinator.com/item?id=48643848">48643848</a></li>
+</ul>
+<h3>中国大陆平台</h3>
+<ul>
+<li><a href="https://www.v2ex.com/t/565667">v2ex.com/t/565667</a>（改键方案、左右 ⌘ 切输入法）</li>
+<li><a href="https://v2ex.com/t/818939">v2ex.com/t/818939</a>（用什么键切中文输入法）</li>
+<li><a href="https://www.v2ex.com/t/938510">v2ex.com/t/938510</a>（怎样快速切换应用）</li>
+<li><a href="https://sspai.com/post/97194">sspai.com/post/97194</a>、<a href="https://sspai.com/post/63929">sspai.com/post/63929</a>、<a href="https://sspai.com/post/72540">sspai.com/post/72540</a>、<a href="https://sspai.com/post/73827">sspai.com/post/73827</a>、<a href="https://sspai.com/post/79769">sspai.com/post/79769</a></li>
+<li><a href="https://yuluyao.com/tools/raycast">yuluyao.com/tools/raycast</a>、<a href="https://yelog.org/2023/05/17/mac-raycast/">yelog.org/2023/05/17/mac-raycast/</a></li>
+<li><a href="https://ruby-china.org/topics/44401">ruby-china.org/topics/44401</a>、<a href="https://github.com/boomker/spacehammer">github.com/boomker/spacehammer</a>、<a href="https://blog.forecho.com/use-hammerspoon.html">blog.forecho.com/use-hammerspoon.html</a>、xxhk.org/mac-quick-switch-applications</li>
+</ul>
+<h3>官方资料和同类工具</h3>
+<ul>
+<li><a href="https://manual.raycast.com/hyper-key.md">manual.raycast.com/hyper-key.md</a></li>
+<li><a href="https://manual.raycast.com/window-management">manual.raycast.com/window-management</a>、<a href="https://manual.raycast.com/clipboard-history">clipboard-history</a>、<a href="https://manual.raycast.com/system-commands.md">system-commands</a>、<a href="https://manual.raycast.com/navigation">navigation</a></li>
+<li><a href="https://www.raycast.com/store">raycast.com/store</a>（安装量）</li>
+<li><a href="https://www.raycast.com/changelog/macos-v1/1-104-0">raycast.com/changelog/macos-v1/1-104-0</a>（Wrapped 的数据只存在本地）</li>
+<li><a href="https://raw.githubusercontent.com/rxhanson/Rectangle/main/Rectangle/Defaults.swift">Rectangle 源码 Defaults.swift</a>、<a href="https://www.pie-menu.com/shortcuts/rectangle">pie-menu.com/shortcuts/rectangle</a>（第三方整理的快捷键表）</li>
+<li><a href="https://hyperkey.app/">hyperkey.app</a></li>
+<li><a href="https://github.com/pqrs-org/KE-complex_modifications/tree/main/public/json">Karabiner 社区规则库</a></li>
+</ul>
+
+</main>
+</body>
+</html>
