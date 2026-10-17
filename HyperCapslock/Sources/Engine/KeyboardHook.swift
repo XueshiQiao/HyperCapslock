@@ -153,8 +153,14 @@ private func hcTapCallback(
         return nil  // swallow F18
     }
 
-    // Raw CapsLock FlagsChanged (in case hidutil isn't active) → swallow.
-    if type == .flagsChanged && keycode == KeyCodes.capsLock {
+    // Raw CapsLock FlagsChanged (in case hidutil isn't active) → swallow, so a
+    // failed remap can't leave CapsLock acting as a plain caps key.
+    //
+    // Unless we removed that remap ON PURPOSE: under Secure Input we hand the
+    // key back to macOS precisely so the user can turn capitals off at a
+    // password prompt. Swallowing it there would hide the very change we just
+    // enabled from the app that needs to see it.
+    if type == .flagsChanged && keycode == KeyCodes.capsLock && state.capsLockRemapActive {
         return nil
     }
 

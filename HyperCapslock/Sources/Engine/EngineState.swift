@@ -20,6 +20,12 @@ final class EngineState {
     /// by the tap thread for both the Caps and modifier double-tap paths. Seeded
     /// from `AppConfig` at launch and updated live from the settings slider.
     private let _doubleTapWindowMs = OSAllocatedUnfairLock<UInt64>(initialState: EngineConstants.doubleTapWindowDefaultMs)
+    /// Whether the CapsLock→F18 hidutil remap is currently installed. False only
+    /// while macOS Secure Input is on, where we hand the key back to the system
+    /// on purpose (see AppState.applySecureInputRemapPolicy). Read on the raw
+    /// CapsLock FlagsChanged path so we stop swallowing an event we now WANT the
+    /// front app to see.
+    private let _capsLockRemapActive = OSAllocatedUnfairLock(initialState: true)
 
     var isPaused: Bool {
         get { _isPaused.withLock { $0 } }
@@ -48,6 +54,11 @@ final class EngineState {
     var doubleTapWindowMs: UInt64 {
         get { _doubleTapWindowMs.withLock { $0 } }
         set { _doubleTapWindowMs.withLock { $0 = newValue } }
+    }
+
+    var capsLockRemapActive: Bool {
+        get { _capsLockRemapActive.withLock { $0 } }
+        set { _capsLockRemapActive.withLock { $0 = newValue } }
     }
 
     var didRemap: Bool {

@@ -14,17 +14,27 @@ enum HidUtil {
     /// single `--set` (hidutil replaces the whole `UserKeyMapping`, so everything
     /// must go in one call). Idempotent — safe to call again whenever the list
     /// changes.
+    ///
+    /// `capsLock: false` leaves the CapsLock→F18 entry out and keeps only the
+    /// user's own remaps. That is for the window where macOS Secure Input is on:
+    /// the event tap is deaf then, so nothing turns an F18 back into a CapsLock
+    /// toggle, and a remapped CapsLock becomes a key that physically cannot
+    /// change the CapsLock state — which strands the user at a password prompt
+    /// that is stuck in capitals. Dropping just that one entry restores the
+    /// native key without disturbing the remaps that still work.
     @discardableResult
-    static func setupRemap(extra: [KeyRemap] = []) -> Bool {
-        run(["property", "--set", buildPayload(extra: extra)],
-            onSuccess: "hidutil remap applied (CapsLock→F18 + \(extra.count) user remap(s)).",
+    static func setupRemap(extra: [KeyRemap] = [], capsLock: Bool = true) -> Bool {
+        run(["property", "--set", buildPayload(extra: extra, capsLock: capsLock)],
+            onSuccess: "hidutil remap applied (\(capsLock ? "CapsLock→F18 + " : "CapsLock→F18 OMITTED, ")\(extra.count) user remap(s)).",
             onFail: "hidutil remap failed")
     }
 
     /// Build the `UserKeyMapping` JSON: the base remap first, then the user
     /// remaps (deduped by source, so a hand-edited config can't emit a key twice).
-    private static func buildPayload(extra: [KeyRemap]) -> String {
-        var pairs: [(src: UInt64, dst: UInt64)] = [(capsLockUsage, f18Usage)]
+    private static func buildPayload(extra: [KeyRemap], capsLock: Bool = true) -> String {
+        var pairs: [(src: UInt64, dst: UInt64)] = capsLock ? [(capsLockUsage, f18Usage)] : []
+        // CapsLock stays reserved either way: a user remap must never be able to
+        // claim it as a source, or restoring the base remap would fight it.
         var seenSrc: Set<UInt64> = [capsLockUsage]
         for r in extra where seenSrc.insert(r.source.hidUsage).inserted {
             pairs.append((r.source.hidUsage, r.destination.hidUsage))

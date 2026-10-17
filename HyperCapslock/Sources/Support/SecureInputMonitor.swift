@@ -17,7 +17,10 @@ final class SecureInputMonitor: ObservableObject {
 
   @Published private(set) var isActive = false
 
-  private static let pollInterval: TimeInterval = 2.0
+  /// 0.9µs per check (measured), so 2 checks/sec costs ~2µs/sec — and the lag
+  /// here is felt directly: it is how long a password prompt keeps a CapsLock
+  /// key that does nothing.
+  private static let pollInterval: TimeInterval = 0.5
   private var timer: Timer?
 
   private init() {}
@@ -30,7 +33,7 @@ final class SecureInputMonitor: ObservableObject {
     let t = Timer(timeInterval: Self.pollInterval, repeats: true) { [weak self] _ in
       MainActor.assumeIsolated { self?.refresh() }
     }
-    t.tolerance = 0.5
+    t.tolerance = 0.2
     // .common, NOT the default mode Timer.scheduledTimer would use: AppKit puts
     // the run loop in event-tracking mode while a menu is open, which would
     // freeze polling for exactly as long as the tray menu is on screen — i.e.
