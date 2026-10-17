@@ -9,8 +9,8 @@ enum ThemeMode: String, Codable, CaseIterable {
 /// themselves are identical across styles. Persisted in `app_config.yml` so the
 /// chosen style survives relaunch.
 enum MappingsViewStyle: String, Codable, CaseIterable, Equatable {
-    case grouped   // sectioned by trigger category (default)
-    case keyboard  // a visual keyboard map
+    case grouped   // sectioned by trigger category
+    case keyboard  // a visual keyboard map (default)
 }
 
 /// Reliability workaround applied when a `Caps+key → input source` mapping
@@ -41,7 +41,7 @@ struct AppConfig: Codable, Equatable {
     /// can arm its "hold CapsLock and drag a window" gesture. Off by default —
     /// users who don't run AnyDrag emit zero cross-app chatter.
     var broadcastCapsHoldForAnyDrag: Bool = false
-    var mappingsViewStyle: MappingsViewStyle = .grouped
+    var mappingsViewStyle: MappingsViewStyle = .keyboard
     /// Show each mapping's all-time press count inline on the Mappings page rows.
     /// On by default; the full breakdown always lives on the Statistics page.
     var statsShowInline: Bool = true
@@ -77,7 +77,7 @@ struct AppConfig: Codable, Equatable {
     init(hideDockIcon: Bool = false, showHud: Bool = false, hudDurationMs: Int = 1350,
          themeMode: ThemeMode = .system, cjkvFixStrategy: CJKVFixStrategy = .none,
          broadcastCapsHoldForAnyDrag: Bool = false,
-         mappingsViewStyle: MappingsViewStyle = .grouped,
+         mappingsViewStyle: MappingsViewStyle = .keyboard,
          statsShowInline: Bool = true,
          showWindowOnLaunch: Bool = true,
          analyticsEnabled: Bool = true,
@@ -110,9 +110,10 @@ struct AppConfig: Codable, Equatable {
         // Tolerant: an unknown future strategy value decodes back to `.none`.
         self.cjkvFixStrategy = (try? c.decodeIfPresent(CJKVFixStrategy.self, forKey: .cjkvFixStrategy)) ?? .none
         self.broadcastCapsHoldForAnyDrag = try c.decodeIfPresent(Bool.self, forKey: .broadcastCapsHoldForAnyDrag) ?? false
-        // Tolerant: a missing value, or the now-removed legacy "list" value,
-        // decodes back to `.grouped`.
-        self.mappingsViewStyle = (try? c.decodeIfPresent(MappingsViewStyle.self, forKey: .mappingsViewStyle)) ?? .grouped
+        // Tolerant: the now-removed legacy "list" value decodes to `.grouped`
+        // (its closest successor); a missing or unknown value → `.keyboard`.
+        let rawStyle = try? c.decodeIfPresent(String.self, forKey: .mappingsViewStyle)
+        self.mappingsViewStyle = rawStyle == "list" ? .grouped : (rawStyle.flatMap(MappingsViewStyle.init(rawValue:)) ?? .keyboard)
         self.statsShowInline = try c.decodeIfPresent(Bool.self, forKey: .statsShowInline) ?? true
         self.showWindowOnLaunch = try c.decodeIfPresent(Bool.self, forKey: .showWindowOnLaunch) ?? true
         // Opt-out analytics: absent (older config) → on by default.
