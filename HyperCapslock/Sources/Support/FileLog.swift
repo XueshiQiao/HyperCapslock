@@ -1,15 +1,31 @@
 import Foundation
 import os
 
-/// Append-only file logger. Keeps the original engine log path
-/// (`/tmp/hypercapslock-macos.log`) and `[HYPERCAPS][macOS][ts][LEVEL] msg`
-/// line format so existing troubleshooting docs and `tail -f` habits still work.
+/// Append-only file logger: `hypercapslock.log` in the app's data dir
+/// (`AppEnvironment.appSupportDirectory`, so Dev and Release log separately),
+/// `[HYPERCAPS][macOS][ts][LEVEL] msg` lines. Unlike the old `/tmp` path it
+/// survives reboots, so it is capped: past `maxBytes` at launch, the file is
+/// moved to `hypercapslock.old.log` (replacing the previous one).
 final class FileLog: @unchecked Sendable {
     static let shared = FileLog()
 
-    private let path = "/tmp/hypercapslock-macos.log"
+    private static let maxBytes: UInt64 = 5 * 1024 * 1024
+    let path: String
     private let lock = NSLock()
     private let osLog = Logger(subsystem: "me.xueshi.hypercapslock", category: "engine")
+
+    private init() {
+        let dir = AppEnvironment.appSupportDirectory
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("hypercapslock.log")
+        path = url.path
+        if let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? UInt64,
+           size > Self.maxBytes {
+            let old = dir.appendingPathComponent("hypercapslock.old.log")
+            try? FileManager.default.removeItem(at: old)
+            try? FileManager.default.moveItem(at: url, to: old)
+        }
+    }
 
     func info(_ message: String) { log("INFO", message) }
     func warn(_ message: String) { log("WARN", message) }
@@ -18,9 +34,9 @@ final class FileLog: @unchecked Sendable {
     /// Diagnostic detail that fires on ordinary user activity and would
     /// otherwise bury the interesting lines.
     ///
-    /// The shared file is append-only with NO rotation and lives for as long as
-    /// `/tmp` does — in practice the machine's whole uptime — so anything that
-    /// ticks along with normal use has to stay out of it.
+    /// The file is append-only and only trimmed at launch once it passes
+    /// `maxBytes`, so anything that ticks along with normal use has to stay
+    /// out of it.
     ///
     /// It is still handed to the unified log, but at `debug` level, which macOS
     /// keeps in memory and only captures once debug logging has been switched on

@@ -45,13 +45,13 @@ it**:
   physical keyboard work immediately.)
 - Press CapsLock on a keyboard **physically attached to the target** (not through
   the Screen Sharing window).
-- Watch the target's log at `/tmp/hypercapslock-macos.log`:
+- Watch the target's log at `~/Library/Application Support/me.xueshi.hypercapslock/hypercapslock.log`:
   - `Caps(F18) down` → remap effective + tap healthy (working).
   - raw CapsLock seen / nothing → remap not effective or tap not receiving.
 
 ## Telltale signature of the artifact
 
-On the remote (target) machine: `/tmp/hypercapslock-macos.log` shows the tap
+On the remote (target) machine: `~/Library/Application Support/me.xueshi.hypercapslock/hypercapslock.log` shows the tap
 `INSTALLED` and the `hidutil` remap applied, yet **zero `Caps(F18)`** events ever
 — while the *controller's* log shows the full `Caps(F18) down` / `toggling
 CapsLock` / `Caps+J -> directional down` sequence at the exact same time. That

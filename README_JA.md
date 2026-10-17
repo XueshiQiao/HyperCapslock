@@ -237,7 +237,7 @@ xcodebuild -project HyperCapslock.xcodeproj -scheme HyperCapslock -configuration
 
 ## トラブルシューティング
 
-- **ホットキーが効かなくなった**：ログは `/tmp/hypercapslock-macos.log` に出力されます。アクセシビリティ権限から本アプリを一度削除して再追加し、アプリを再起動してみてください。
+- **ホットキーが効かなくなった**：ログは `~/Library/Application Support/me.xueshi.hypercapslock/hypercapslock.log` に出力されます。アクセシビリティ権限から本アプリを一度削除して再追加し、アプリを再起動してみてください。
 - **Gaming Mode**：メニューバーのアイコンから一時停止／再開すると、すべてのリマップを一時的に無効化できます。
 - **中国語／日本語の入力切り替えが反映されない**：「入力ソース」ページで「ショートカットのシミュレーション」または「フォーカスの切り替え」対策を試してください。
 

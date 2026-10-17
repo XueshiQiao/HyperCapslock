@@ -237,7 +237,7 @@ xcodebuild -project HyperCapslock.xcodeproj -scheme HyperCapslock -configuration
 
 ## 故障排查
 
-- **热键失效**：日志写在 `/tmp/hypercapslock-macos.log`。可以尝试在「辅助功能」权限里移除并重新添加本应用，然后重启应用。
+- **热键失效**：日志写在 `~/Library/Application Support/me.xueshi.hypercapslock/hypercapslock.log`。可以尝试在「辅助功能」权限里移除并重新添加本应用，然后重启应用。
 - **游戏模式（Gaming Mode）**：通过菜单栏图标暂停/恢复，可临时禁用全部重映射。
 - **中文/日文输入法切换不生效**：到「输入法」页面试试「模拟快捷键」或「切换焦点」修复策略。
 

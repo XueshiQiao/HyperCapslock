@@ -63,4 +63,4 @@ key combos, and shell commands (spawned off the tap thread).
 - **Minimal overhead:** the callback does integer comparisons and early returns
   to avoid system-wide input lag.
 - **Logging:** the engine writes a detailed trace to
-  `/tmp/hypercapslock-macos.log` for troubleshooting.
+  `~/Library/Application Support/me.xueshi.hypercapslock/hypercapslock.log` for troubleshooting.

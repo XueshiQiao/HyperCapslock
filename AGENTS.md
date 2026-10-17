@@ -25,8 +25,12 @@ sleep 1
 pgrep -lf "HyperCapslock.app/Contents/MacOS"   # confirm NONE remain
 open "<DerivedData>/Build/Products/Debug/HyperCapslock-Dev.app"
 sleep 1
-pgrep -lf "HyperCapslock-Dev"   # confirm exactly one fresh PID
+pgrep -lf "HyperCapslock-Dev"   # confirm one fresh app PID (+ its --capslock-watchdog helper)
 ```
+Each instance also runs a `--capslock-watchdog <pid>` copy of itself (#28) that
+removes the CapsLock remap if the app dies without cleaning up; the `pkill`
+pattern above matches it too. Only `open` again once the old app PID is gone —
+an `open` while it is still shutting down is a no-op.
 This is standard procedure — the user should never have to ask for it. (Restart
 the user's Release app yourself only if they ask; the point is the Dev test must
 run with no competing instance.)
@@ -79,6 +83,9 @@ editing a mapping migrates it to an id. Export writes the whole self-contained d
   `UpdaterManager`, `HudCenter`
 - `HyperCapslock/Sources/Localization/L10n.swift` — en/zh/ja/de
 - Config persisted to `~/Library/Application Support/me.xueshi.hypercapslock/`
+- Log file: `hypercapslock.log` in the same data dir — so the **Dev** build logs to
+  `~/Library/Application Support/me.xueshi.hypercapslock.debug/hypercapslock.log`
+  (moved to `hypercapslock.old.log` once it passes 5 MB at launch)
 
 ## Build & Run
 ```bash

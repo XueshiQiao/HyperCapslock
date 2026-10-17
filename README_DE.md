@@ -237,7 +237,7 @@ xcodebuild -project HyperCapslock.xcodeproj -scheme HyperCapslock -configuration
 
 ## Fehlerbehebung
 
-- **Hotkeys funktionieren nicht mehr**: Logs werden nach `/tmp/hypercapslock-macos.log` geschrieben. Entferne die App aus den Bedienungshilfen-Berechtigungen, füge sie wieder hinzu und starte sie neu.
+- **Hotkeys funktionieren nicht mehr**: Logs werden nach `~/Library/Application Support/me.xueshi.hypercapslock/hypercapslock.log` geschrieben. Entferne die App aus den Bedienungshilfen-Berechtigungen, füge sie wieder hinzu und starte sie neu.
 - **Gaming Mode**: über das Menüleisten-Symbol pausieren/fortsetzen, um alle Remappings vorübergehend zu deaktivieren.
 - **Chinesisch-/Japanisch-Eingabewechsel greift nicht**: probiere auf der Seite **Eingabequelle** die Strategie **Tastenkürzel simulieren** oder **Fokus wechseln**.
 
