@@ -2,8 +2,10 @@ import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var tray: TrayController?
+    private var signalSources: [DispatchSourceSignal] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installTerminationSignalHandlers()
         // A pure-AppKit app (main.swift, no nib) has no main menu, so text fields
         // wouldn't get the standard Cmd-A/C/V/X/Z editing shortcuts. Install one.
         setupMainMenu()
@@ -79,6 +81,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         endCapsHold()
         KeyboardHook.shared.releaseHeldChordsSerialized(wait: true)
         KeyboardHook.shared.cleanup()
+    }
+
+    /// Turn SIGTERM / SIGINT / SIGHUP (`kill <pid>`, scripts, uninstallers) into
+    /// a normal quit. AppKit doesn't do this by itself, so without it the process
+    /// just dies and `applicationWillTerminate` never removes the CapsLock→F18
+    /// remap — leaving a CapsLock key that does nothing. (Crash / SIGKILL can't
+    /// be caught in-process; see the watchdog, #28.)
+    private func installTerminationSignalHandlers() {
+        for sig in [SIGTERM, SIGINT, SIGHUP] {
+            signal(sig, SIG_IGN)   // let the dispatch source, not the default action, handle it
+            let src = DispatchSource.makeSignalSource(signal: sig, queue: .main)
+            src.setEventHandler {
+                FileLog.shared.info("Received signal \(sig) — quitting normally so the remap is cleaned up.")
+                NSApp.terminate(nil)
+            }
+            src.resume()
+            signalSources.append(src)
+        }
     }
 
     /// Standard main menu so NSTextField gets the system editing shortcuts
