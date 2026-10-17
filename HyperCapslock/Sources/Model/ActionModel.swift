@@ -59,7 +59,9 @@ enum ActionConfig: Equatable {
     case inputSource(inputSourceID: String)
     case command(String)
     case keyCombo(targetKey: UInt16, withCtrl: Bool, withAlt: Bool, withCmd: Bool, withTargetShift: Bool)
-    case openApp(bundleID: String, name: String)
+    /// `hideIfFrontmost`: when the app is already frontmost, pressing the key
+    /// hides it instead (toggle). Default on; only `false` is written to YAML.
+    case openApp(bundleID: String, name: String, hideIfFrontmost: Bool = true)
     /// Hold a single modifier key down for as long as the (hold-type) trigger is
     /// held; release it when the trigger is released. For push-to-talk apps that
     /// listen while a modifier is pressed. Only one such modifier is ever held at
@@ -101,6 +103,7 @@ extension ActionConfig: Codable {
         case withTargetShift = "with_target_shift"
         case bundleID = "bundle_id"
         case appName = "app_name"
+        case hideIfFrontmost = "hide_if_frontmost"
         case modifier
     }
 
@@ -128,7 +131,8 @@ extension ActionConfig: Codable {
                 withTargetShift: try c.decodeIfPresent(Bool.self, forKey: .withTargetShift) ?? false)
         case "open_app":
             self = .openApp(bundleID: try c.decode(String.self, forKey: .bundleID),
-                            name: try c.decodeIfPresent(String.self, forKey: .appName) ?? "")
+                            name: try c.decodeIfPresent(String.self, forKey: .appName) ?? "",
+                            hideIfFrontmost: try c.decodeIfPresent(Bool.self, forKey: .hideIfFrontmost) ?? true)
         case "hold_modifier":
             self = .modifierKey(try c.decode(ModifierKey.self, forKey: .modifier))
         default:
@@ -158,9 +162,11 @@ extension ActionConfig: Codable {
             try c.encode(alt, forKey: .withAlt)
             try c.encode(cmd, forKey: .withCmd)
             try c.encode(shift, forKey: .withTargetShift)
-        case .openApp(let bid, let name):
+        case .openApp(let bid, let name, let hideIfFrontmost):
             try c.encode(bid, forKey: .bundleID)
             try c.encode(name, forKey: .appName)
+            // Omit the default so existing configs stay byte-identical.
+            if !hideIfFrontmost { try c.encode(false, forKey: .hideIfFrontmost) }
         case .modifierKey(let m):
             try c.encode(m, forKey: .modifier)
         }

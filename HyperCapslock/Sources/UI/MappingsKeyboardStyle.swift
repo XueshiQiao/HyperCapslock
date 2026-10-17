@@ -65,7 +65,7 @@ func keycapGlyph(for config: ActionConfig, homeLabel: String, endLabel: String,
         return .text(">_")
     case .keyCombo(let key, let ctrl, let alt, let cmd, let shift):
         return .text(compactComboString(key, ctrl: ctrl, alt: alt, cmd: cmd, shift: shift))
-    case .openApp(let bid, let name):
+    case .openApp(let bid, let name, _):
         return .appIcon(bundleID: bid, fallback: name.first.map(String.init) ?? "App")
     case .modifierKey(let m):
         return .text(modifierHudLabel(m))   // ⌥R, ⌘L, fn …

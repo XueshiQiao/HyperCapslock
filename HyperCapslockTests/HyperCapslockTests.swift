@@ -126,6 +126,25 @@ final class HyperCapslockTests: XCTestCase {
         XCTAssertFalse(defaults.contains { if case .inputSource = $0.inlineAction { return true }; return false })
     }
 
+    // MARK: open_app hide_if_frontmost
+
+    func testOpenAppHideIfFrontmostDefaultsOnAndIsOmitted() throws {
+        // Absent key (every config written before this option) → on.
+        let legacy = "kind: open_app\nbundle_id: com.apple.Safari\napp_name: Safari\n"
+        XCTAssertEqual(try YAMLDecoder().decode(ActionConfig.self, from: legacy),
+                       .openApp(bundleID: "com.apple.Safari", name: "Safari", hideIfFrontmost: true))
+        // Default value is not written, so existing configs stay byte-identical.
+        let on = try YAMLEncoder().encode(ActionConfig.openApp(bundleID: "com.apple.Safari", name: "Safari"))
+        XCTAssertFalse(on.contains("hide_if_frontmost"))
+    }
+
+    func testOpenAppHideIfFrontmostOffRoundTrips() throws {
+        let off = ActionConfig.openApp(bundleID: "com.apple.Safari", name: "Safari", hideIfFrontmost: false)
+        let yaml = try YAMLEncoder().encode(off)
+        XCTAssertTrue(yaml.contains("hide_if_frontmost: false"))
+        XCTAssertEqual(try YAMLDecoder().decode(ActionConfig.self, from: yaml), off)
+    }
+
     // MARK: Per-app scoped mappings (bindings)
 
     func testBindingsRoundTrip() throws {

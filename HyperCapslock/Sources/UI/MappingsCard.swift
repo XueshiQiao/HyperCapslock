@@ -141,7 +141,7 @@ func actionPresentation(_ action: ActionConfig, _ loc: LocalizationManager) -> A
         if cmd { parts.append("Cmd") }; if shift { parts.append("Shift") }
         parts.append(keyCodeDisplay(key))
         return ActionPresentation(category: loc.t("group.key_combo"), value: parts.joined(separator: "+"), symbol: actionSymbol(action))
-    case .openApp(let bid, let name):
+    case .openApp(let bid, let name, _):
         return ActionPresentation(category: loc.t("group.open_app"), value: name.isEmpty ? bid : name, symbol: actionSymbol(action))
     case .modifierKey(let m):
         return ActionPresentation(category: loc.t("group.hold_modifier"),

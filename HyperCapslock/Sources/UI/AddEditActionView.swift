@@ -98,6 +98,7 @@ struct ActionConfigDraft {
     var tCtrl = false, tAlt = false, tCmd = false, tShift = false
     var appBundleID = ""
     var appName = ""
+    var appHideIfFrontmost = true
     var modifier: ModifierKey = .leftOption
 
     mutating func load(_ config: ActionConfig) {
@@ -109,8 +110,8 @@ struct ActionConfigDraft {
         case .command(let c): kind = "command"; command = c
         case .keyCombo(let k, let ctrl, let alt, let cmd, let shift):
             kind = "key_combo"; targetKey = k; tCtrl = ctrl; tAlt = alt; tCmd = cmd; tShift = shift
-        case .openApp(let bid, let name):
-            kind = "open_app"; appBundleID = bid; appName = name
+        case .openApp(let bid, let name, let hide):
+            kind = "open_app"; appBundleID = bid; appName = name; appHideIfFrontmost = hide
         case .modifierKey(let m):
             kind = "hold_modifier"; modifier = m
         }
@@ -134,7 +135,8 @@ struct ActionConfigDraft {
             return .keyCombo(targetKey: k, withCtrl: tCtrl, withAlt: tAlt, withCmd: tCmd, withTargetShift: tShift)
         case "open_app":
             let bid = appBundleID.trimmingCharacters(in: .whitespaces)
-            return bid.isEmpty ? nil : .openApp(bundleID: bid, name: appName.isEmpty ? bid : appName)
+            return bid.isEmpty ? nil : .openApp(bundleID: bid, name: appName.isEmpty ? bid : appName,
+                                               hideIfFrontmost: appHideIfFrontmost)
         case "hold_modifier":
             return .modifierKey(modifier)
         default: return nil
@@ -196,9 +198,15 @@ struct ActionConfigDetail: View {
                     }
                     Text(draft.appName.isEmpty ? loc.t("actions.no_app") : draft.appName)
                         .foregroundStyle(draft.appName.isEmpty ? .secondary : .primary)
-                    Button(loc.t("actions.choose_app")) { chooseApp() }
+                    AppPickerButton(browse: browseForApp, onPick: { picked in
+                        draft.appBundleID = picked.bundleID
+                        draft.appName = picked.name
+                    }) { Text(loc.t("actions.choose_app")) }
+                    .accessibilityIdentifier("action.open_app.choose")
                 }
             }
+            Toggle(loc.t("actions.hide_if_frontmost"), isOn: $draft.appHideIfFrontmost)
+                .accessibilityIdentifier("action.open_app.hide_if_frontmost")
         case "key_combo":
             HStack {
                 Text(loc.t("group.key_combo"))
@@ -229,21 +237,20 @@ struct ActionConfigDetail: View {
 
     /// Let the user pick any installed .app; store its bundle id (stable if the
     /// app later moves) plus a display name for the UI/HUD.
-    private func chooseApp() {
+    private func browseForApp() -> AppRef? {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
         panel.allowedContentTypes = [.application]
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
         guard let bid = Bundle(url: url)?.bundleIdentifier, !bid.isEmpty else {
             app.showToast(loc.t("toast.app_no_bundle_id"), isError: true)
-            return
+            return nil
         }
-        draft.appBundleID = bid
         let display = FileManager.default.displayName(atPath: url.path)
-        draft.appName = display.hasSuffix(".app") ? String(display.dropLast(4)) : display
+        return AppRef(bundleID: bid, name: display.hasSuffix(".app") ? String(display.dropLast(4)) : display)
     }
 
     private func appIcon(_ bundleID: String) -> NSImage? {

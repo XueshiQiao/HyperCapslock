@@ -25,7 +25,7 @@ func describeAction(_ action: ActionConfig) -> String {
     case .independent(let a): return "independent \(a.rawValue)"
     case .inputSource(let id): return "input source \(id)"
     case .command(let cmd): return "command: \(cmd)"
-    case .openApp(let bid, let name): return "open app \(name) (\(bid))"
+    case .openApp(let bid, let name, let hide): return "open app \(name) (\(bid))\(hide ? " [hide if frontmost]" : "")"
     case .modifierKey(let m): return "hold modifier \(m.rawValue)"
     }
 }
@@ -63,7 +63,7 @@ func hudParts(_ action: ActionConfig) -> (String, String) {
         return ("\u{2328}", id)
     case .command(let cmd):
         return ("Shell", cmd)
-    case .openApp(_, let name):
+    case .openApp(_, let name, _):
         return ("App", name)
     case .modifierKey(let m):
         return (modifierHudLabel(m), "Hold Modifier")
@@ -156,6 +156,29 @@ enum ActionExecutor {
         }
     }
 
+    /// Launch the app, or (if running) send it Launch Services' reopen, which
+    /// makes it show a window like a Dock click on a windowless app.
+    static func launchOrReopen(_ bundleID: String) {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+            FileLog.shared.error("Open-app: no application found for bundle id \(bundleID)")
+            return
+        }
+        let cfg = NSWorkspace.OpenConfiguration()
+        cfg.activates = true
+        NSWorkspace.shared.openApplication(at: url, configuration: cfg) { _, error in
+            if let error { FileLog.shared.error("Open-app failed for \(bundleID): \(error.localizedDescription)") }
+        }
+    }
+
+    /// Whether the process owns a normal (layer 0) window on the current Space.
+    static func hasOnScreenWindow(_ pid: pid_t) -> Bool {
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+                as? [[String: Any]] else { return false }
+        return list.contains {
+            ($0[kCGWindowOwnerPID as String] as? pid_t) == pid && ($0[kCGWindowLayer as String] as? Int) == 0
+        }
+    }
+
     static func execute(_ action: ActionConfig, keyDown: Bool, activeModifiers: CGEventFlags) {
         switch action {
         case .directional(let a):
@@ -235,22 +258,38 @@ enum ActionExecutor {
             if cmd { flags.insert(.maskCommand) }
             if shift { flags.insert(.maskShift) }
             KeyPoster.post(mac, keyDown: keyDown, flags: flags)
-        case .openApp(let bundleID, _):
+        case .openApp(let bundleID, _, let hideIfFrontmost):
             if keyDown {
                 FileLog.shared.info("Open-app mapping triggered: bundleID=\(bundleID)")
-                // Launch Services lookup + launch off the CGEventTap callback thread
-                // (same reason `.command` dispatches): don't block the hot path.
-                DispatchQueue.global().async {
-                    guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
-                        FileLog.shared.error("Open-app: no application found for bundle id \(bundleID)")
+                // Already running → behave like the user's own ⌘H / ⌘Tab. The
+                // NSRunningApplication.hide() / NSWorkspace.openApplication paths
+                // play a window zoom animation in some apps (WeChat) that the
+                // native gestures don't.
+                if let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
+                    if hideIfFrontmost, FrontmostAppTracker.shared.currentBundleID() == bundleID {
+                        // It's frontmost, so a posted ⌘H goes to it (tap skips injected events).
+                        FileLog.shared.info("Open-app: \(bundleID) is frontmost — hiding it via ⌘H.")
+                        if let h = KeyCodes.jsToMac(72) { KeyPoster.postTap(h, flags: .maskCommand) }
                         return
                     }
-                    let cfg = NSWorkspace.OpenConfiguration()
-                    cfg.activates = true
-                    NSWorkspace.shared.openApplication(at: url, configuration: cfg) { _, error in
-                        if let error { FileLog.shared.error("Open-app failed for \(bundleID): \(error.localizedDescription)") }
+                    DispatchQueue.main.async {
+                        if running.isHidden { running.unhide() }
+                        let ax = AXUIElementCreateApplication(running.processIdentifier)
+                        let raised = AXUIElementSetAttributeValue(ax, kAXFrontmostAttribute as CFString, kCFBooleanTrue) == .success
+                        if raised && Self.hasOnScreenWindow(running.processIdentifier) {
+                            FileLog.shared.info("Open-app: brought running \(bundleID) to front (AX).")
+                            return
+                        }
+                        // No visible window (all closed / minimized) or AX refused:
+                        // fall back to Launch Services, which reopens a window.
+                        FileLog.shared.info("Open-app: \(bundleID) raised=\(raised) but no on-screen window — reopening via Launch Services.")
+                        Self.launchOrReopen(bundleID)
                     }
+                    return
                 }
+                // Launch Services lookup + launch off the CGEventTap callback thread
+                // (same reason `.command` dispatches): don't block the hot path.
+                DispatchQueue.global().async { launchOrReopen(bundleID) }
             }
         case .modifierKey(let m):
             // Hold the modifier down while the chord is held, release on key-up.

@@ -414,13 +414,13 @@ private struct RuleRowView: View {
                         ForEach(rule.apps) { app in
                             appChip(app)
                         }
-                        Button {
-                            if let picked = AppChooser.choose(),
-                               !rule.apps.contains(where: { $0.bundleID.lowercased() == picked.bundleID.lowercased() }) {
+                        AppPickerButton(onPick: { picked in
+                            if !rule.apps.contains(where: { $0.bundleID.lowercased() == picked.bundleID.lowercased() }) {
                                 rule.apps.append(picked)
                             }
-                        } label: { Label(loc.t("mappings.add_app"), systemImage: "plus") }
+                        }) { Label(loc.t("mappings.add_app"), systemImage: "plus") }
                             .buttonStyle(.borderless)
+                            .accessibilityIdentifier("mapping.rule.add_app")
                     }
                 }
                 Picker(loc.t("mappings.rule_action"), selection: $rule.actionId) {
