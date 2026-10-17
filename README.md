@@ -134,8 +134,6 @@ These are the defaults on a fresh install — **all of them are customizable in 
 | `Caps + H / J / K / L` | ← ↓ ↑ → Arrow keys |
 | `Caps + A` | Home (start of line) |
 | `Caps + E` | End (end of line) |
-| `Caps + Y` | Previous word |
-| `Caps + P` | Next word |
 | `Caps + U` | Jump up 10 lines |
 | `Caps + D` | Jump down 10 lines |
 
@@ -145,14 +143,20 @@ These are the defaults on a fresh install — **all of them are customizable in 
 |-------|--------|
 | `Caps + I` | Backspace |
 | `Caps + O` | New line below (line end + Return) |
-| `Caps + N` | Insert a pair of quotes with the cursor centered |
 
-### Input-Source Switching
+### Apps & Screenshot
 
 | Combo | Action |
 |-------|--------|
-| `Caps + ,` | Switch to ABC (English) |
-| `Caps + .` | Switch to WeChat pinyin |
+| `Caps + C` | Open Chrome |
+| `Caps + F` | Open Finder |
+| `Caps + T` | Open Terminal |
+| `Caps + X` | Open Xcode |
+| `Caps + N` | Open Notes |
+| `Caps + S` | Open Safari |
+| `Caps + 4` | `⇧⌘4` (screenshot of a selected area) |
+
+Pressing an app key while that app is already in front hides it. If the app isn't installed, the key does nothing.
 
 > These are just defaults. You can add, remove, and rebind keys, and bind any key to any of the actions listed above.
 

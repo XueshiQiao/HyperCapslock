@@ -134,8 +134,6 @@ Das sind die Standards bei einer frischen Installation – **alle davon lassen s
 | `Caps + H / J / K / L` | ← ↓ ↑ → Pfeiltasten |
 | `Caps + A` | Home (Zeilenanfang) |
 | `Caps + E` | End (Zeilenende) |
-| `Caps + Y` | Vorheriges Wort |
-| `Caps + P` | Nächstes Wort |
 | `Caps + U` | 10 Zeilen nach oben springen |
 | `Caps + D` | 10 Zeilen nach unten springen |
 
@@ -145,14 +143,20 @@ Das sind die Standards bei einer frischen Installation – **alle davon lassen s
 |-------------|--------|
 | `Caps + I` | Backspace |
 | `Caps + O` | Neue Zeile darunter (Zeilenende + Return) |
-| `Caps + N` | Ein Paar Anführungszeichen einfügen und den Cursor mittig setzen |
 
-### Eingabequellen-Wechsel
+### Apps & Bildschirmfoto
 
 | Kombination | Aktion |
 |-------------|--------|
-| `Caps + ,` | Zu ABC (Englisch) wechseln |
-| `Caps + .` | Zu WeChat-Pinyin wechseln |
+| `Caps + C` | Chrome öffnen |
+| `Caps + F` | Finder öffnen |
+| `Caps + T` | Terminal öffnen |
+| `Caps + X` | Xcode öffnen |
+| `Caps + N` | Notizen öffnen |
+| `Caps + S` | Safari öffnen |
+| `Caps + 4` | `⇧⌘4` (Bildschirmfoto eines Bereichs) |
+
+Ist die App schon im Vordergrund, blendet ein erneuter Druck sie aus. Ist die App nicht installiert, passiert nichts.
 
 > Das sind nur die Standards. Du kannst Tasten hinzufügen, entfernen und neu belegen und jede Taste auf jede der oben aufgeführten Aktionen legen.
 
