@@ -61,6 +61,12 @@ final class AppState: ObservableObject {
         applyHudSettings()
         applyDoubleTapWindow()
         applyInputSourceSettings()
+        if !AppEnvironment.isUITest {
+            // Lock first: a watchdog of a just-dead instance may be mid-cleanup,
+            // and our remap must land after it, not be wiped by it.
+            CapsLockWatchdog.holdInstanceLock()
+            CapsLockWatchdog.spawn()
+        }
         applyKeyRemaps()
         applyActivationPolicy(hide: config.appConfig.hideDockIcon)
         applyAppearance(config.appConfig.themeMode)
