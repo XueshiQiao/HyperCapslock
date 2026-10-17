@@ -134,8 +134,11 @@ struct AddEditMappingView: View {
     @State private var showCreateAction = false
     @State private var createActionSentinel = "__create_action__-" + UUID().uuidString
     @State private var rules: [BindingDraft] = []
+    @State private var showDeleteConfirm = false
 
     private var editing: Bool { if case .edit = mode { return true }; return false }
+    /// Opened by clicking a key on the keyboard map — the key is already chosen.
+    private var openedFromKey: Bool { if case .addForTrigger = mode { return true }; return false }
     private var triggerNeedsKey: Bool { triggerSel == "plain" || triggerSel == "with_shift" }
     private var triggerNeedsModifier: Bool { triggerSel == "dtm" }
 
@@ -158,7 +161,8 @@ struct AddEditMappingView: View {
                             Text(loc.t("mappings.key"))
                             Spacer()
                             KeyCaptureField(jsKeyCode: $key, enabled: !editing, placeholder: loc.t("mappings.press_key"),
-                                            accessibilityID: "mapping.key_field")
+                                            accessibilityID: "mapping.key_field",
+                                            focusOnClickOnly: openedFromKey)
                                 .frame(width: 140, height: 28)
                         }
                     } else if triggerNeedsModifier {
@@ -227,6 +231,22 @@ struct AddEditMappingView: View {
 
             Divider()
             HStack {
+                // Delete only exists for an existing mapping; confirmed first.
+                if case .edit(let entry) = mode {
+                    Button(role: .destructive) { showDeleteConfirm = true } label: {
+                        Label(loc.t("mappings.delete"), systemImage: "trash")
+                    }
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier("mapping.delete")
+                    .confirmationDialog(loc.t("mappings.delete_title"), isPresented: $showDeleteConfirm,
+                                        titleVisibility: .visible) {
+                        Button(loc.t("mappings.delete"), role: .destructive) { delete(entry) }
+                            .accessibilityIdentifier("mapping.delete.confirm")
+                        Button(loc.t("common.cancel"), role: .cancel) {}
+                    } message: {
+                        Text(loc.t("mappings.delete_msg", ["trigger": ConfigStore.triggerLabel(entry.trigger)]))
+                    }
+                }
                 Spacer()
                 Button(loc.t("update.cancel")) { dismiss() }
                 Button(loc.t("mappings.save")) { save() }
@@ -286,6 +306,12 @@ struct AddEditMappingView: View {
             guard let key else { return nil }
             return .hyperPlusKey(key: key, withShift: triggerSel == "with_shift")
         }
+    }
+
+    private func delete(_ entry: ActionMappingEntry) {
+        app.removeMapping(entry.trigger)
+        app.showToast(loc.t("toast.mapping_removed"))
+        dismiss()
     }
 
     private func save() {

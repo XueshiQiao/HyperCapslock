@@ -12,11 +12,16 @@ struct KeyCaptureField: NSViewRepresentable {
     /// XCUITest suite can find + focus this custom capture control (SwiftUI's
     /// `.accessibilityIdentifier` doesn't reliably reach a bare NSViewRepresentable).
     var accessibilityID: String? = nil
+    /// Only start capturing after an explicit click — never as the window's
+    /// automatic initial first responder (or via Tab). Use when the key is
+    /// pre-filled, so typing elsewhere in the sheet can't silently replace it.
+    var focusOnClickOnly: Bool = false
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeNSView(context: Context) -> CaptureView {
         let v = CaptureView()
+        v.focusOnClickOnly = focusOnClickOnly
         v.onCapture = { mac in
             if let js = KeyCodes.macToJs(mac) { context.coordinator.parent.jsKeyCode = js }
         }
@@ -32,6 +37,7 @@ struct KeyCaptureField: NSViewRepresentable {
     func updateNSView(_ view: CaptureView, context: Context) {
         context.coordinator.parent = self
         view.enabled = enabled
+        view.focusOnClickOnly = focusOnClickOnly
         view.placeholder = placeholder
         view.displayText = jsKeyCode.map { keyCodeDisplay($0) } ?? ""
         view.needsDisplay = true
@@ -47,14 +53,18 @@ struct KeyCaptureField: NSViewRepresentable {
         var displayText = ""
         var placeholder = ""
         var enabled = true
+        var focusOnClickOnly = false
         private var capturing = false
+        private var clicking = false
 
-        override var acceptsFirstResponder: Bool { enabled }
+        override var acceptsFirstResponder: Bool { enabled && (!focusOnClickOnly || clicking) }
         override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: 28) }
 
         override func mouseDown(with event: NSEvent) {
             guard enabled else { return }
+            clicking = true
             window?.makeFirstResponder(self)
+            clicking = false
         }
 
         override func becomeFirstResponder() -> Bool {
