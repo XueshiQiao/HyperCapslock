@@ -19,17 +19,23 @@ import Darwin
 ///   succeeds — holding it while cleaning, so an instance starting at that
 ///   moment waits for the cleanup before installing its own remap.
 /// Dev and Release share the file because they share the same global hidutil
-/// state.
+/// state, so it lives in the Release data dir even for Dev. Not in /tmp: a file
+/// deleted there while instances run (cleaner apps) would split the instances
+/// onto different inodes that can't see each other's locks.
 enum CapsLockWatchdog {
   static let argument = "--capslock-watchdog"
-  private static let lockPath = "/tmp/me.xueshi.hypercapslock.remap.lock"
+  private static let lockDir: URL = {
+    let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+      ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
+    return base.appendingPathComponent("me.xueshi.hypercapslock", isDirectory: true)
+  }()
+  private static let lockPath = lockDir.appendingPathComponent("remap.lock").path
   /// Kept open for the process lifetime; closing it would drop the lock.
   private static var instanceLockFD: Int32 = -1
 
   private static func openLockFile() -> Int32 {
-    let fd = open(lockPath, O_CREAT | O_RDWR | O_CLOEXEC, 0o666)
-    if fd >= 0 { _ = fchmod(fd, 0o666) }  // umask would otherwise lock out other users
-    return fd
+    try? FileManager.default.createDirectory(at: lockDir, withIntermediateDirectories: true)
+    return open(lockPath, O_CREAT | O_RDWR | O_CLOEXEC, 0o644)
   }
 
   // MARK: App side
