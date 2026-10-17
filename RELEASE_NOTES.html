@@ -12,6 +12,34 @@
        bare form lands them in the release's Contributors avatar list and
        autolinks. Renders as plain text in Sparkle — acceptable. -->
 
+<h3>What's New in 26.10.110</h3>
+<ul>
+  <li><b>Fixed: CapsLock stopped working on the lock screen</b> — after waking the Mac from sleep, the CapsLock key could do nothing at all. If Caps Lock happened to be on, the password came out in capitals and you couldn't log in. HyperCapslock now gives the CapsLock key back to macOS whenever it can't handle the key itself: on the lock screen, while the screen saver runs, before the Mac goes to sleep, when you switch to another user, while a password field is open (Secure Input), and while HyperCapslock is paused. When that situation ends, CapsLock mappings come back on their own. (Before, pausing HyperCapslock also left the CapsLock key dead.)</li>
+  <li><b>Fixed: CapsLock stopped working after HyperCapslock was force-quit or crashed</b> — the CapsLock key stayed dead until HyperCapslock was started again or the Mac restarted. Quitting with <code>kill</code> now goes through a normal quit. For a force-quit or a crash, a small helper process watches HyperCapslock and gives the CapsLock key back to macOS within about a second. In Activity Monitor you'll see this helper as a second HyperCapslock process; it just waits and uses no CPU.</li>
+  <li><b>Secure Input warning</b> — when a password prompt somewhere (a password manager, a <code>sudo</code> prompt in Terminal, a browser password box) turns on macOS Secure Input, every mapping is blocked. The menu bar and the main window now tell you so, and tell you to close that prompt.</li>
+  <li><b>Open App: press again to hide</b> — if the app is already in front, pressing its key hides it, so one key switches back and forth. This is on by default and can be turned off for each Open App action. Switching to and hiding apps now works like ⌘Tab and ⌘H, without the window zoom animation some apps (such as WeChat) used to play.</li>
+  <li><b>Easier app picking</b> — "Choose…" now lists the apps that are running right now. "Choose from Finder…" opens the Applications folder for any other app.</li>
+  <li><b>Delete a mapping from its edit window</b> — a Delete button sits at the bottom-left of the edit window and asks for confirmation first.</li>
+  <li><b>Keyboard map is the default view</b> — the Mappings page now opens as a keyboard. Keycaps show compact symbols (⇧⌘4, arrows, ⌫), and the keyboard shrinks to fit a narrow window. When you open a key from the keyboard map, the key field is no longer selected right away, so typing elsewhere in the window can't replace the key by accident.</li>
+  <li><b>New default mappings for new installs</b> — Caps + C / F / T / X / N / S open Chrome, Finder, Terminal, Xcode, Notes and Safari, and Caps + 4 takes a screenshot of a selected area (⇧⌘4). Pressing the key for an app that isn't installed does nothing. The input-source keys (Caps + , and Caps + .), the word-jump keys (Caps + Y / P) and quote insertion (Caps + N) are no longer set up by default. Existing configurations are not changed.</li>
+  <li><b>Log file moved</b> — the log is now <code>~/Library/Application Support/me.xueshi.hypercapslock/hypercapslock.log</code> instead of <code>/tmp</code>, so it survives a restart. Once it grows past 5 MB, it is moved to <code>hypercapslock.old.log</code> at the next launch. Holding a key down no longer floods the log.</li>
+  <li><b>Smaller fixes</b> — toolbar buttons sit on the right from the first time the window opens; the sidebar logo lines up with the page icons below it.</li>
+</ul>
+
+<h3>26.10.110 更新内容</h3>
+<ul>
+  <li><b>修复：锁屏界面上 CapsLock 键失灵</b> —— 以前 Mac 从睡眠中唤醒后，CapsLock 键可能按了没有任何反应。如果当时正好开着大写锁定，输入的密码全是大写，就无法登录。现在只要 HyperCapslock 处理不了 CapsLock 键，就会把这个键交还给 macOS，包括：锁屏时、屏幕保护程序运行时、Mac 进入睡眠之前、切换到别的用户时、有密码输入框打开时（安全输入），以及 HyperCapslock 暂停时。这些情况结束后，CapsLock 的组合键会自动恢复。（以前暂停 HyperCapslock 也会让 CapsLock 键失灵。）</li>
+  <li><b>修复：HyperCapslock 被强制退出或崩溃后 CapsLock 键失灵</b> —— 以前要等重新打开 HyperCapslock 或者重启 Mac，CapsLock 键才能恢复。现在用 <code>kill</code> 结束 HyperCapslock，会走正常的退出流程。如果被强制退出或者崩溃，一个小的辅助进程会在大约一秒内把 CapsLock 键交还给 macOS。在「活动监视器」里会看到第二个 HyperCapslock 进程，就是这个辅助进程，它只是在等待，不占 CPU。</li>
+  <li><b>安全输入提醒</b> —— 当某处的密码输入框（密码管理器的解锁界面、终端里的 <code>sudo</code> 密码提示、浏览器的密码框）打开了 macOS 的安全输入时，所有组合键都会失效。现在菜单栏和主窗口会提示这件事，并提醒你关掉那个密码输入框。</li>
+  <li><b>打开应用：再按一次就隐藏</b> —— 如果这个应用已经在最前面，再按一次它的组合键会把它隐藏，同一个键就能来回切换。这个功能默认打开，每个「打开应用」动作都可以单独关掉。切换和隐藏应用的方式现在和 ⌘Tab、⌘H 一样，不会再出现某些应用（比如微信）以前那种窗口缩放动画。</li>
+  <li><b>选择应用更方便</b> —— 点「选择…」会列出当前正在运行的应用；要选别的应用，可以点「从 Finder 中选择…」，会直接打开「应用程序」文件夹。</li>
+  <li><b>在编辑窗口里删除映射</b> —— 编辑窗口左下角新增「删除」按钮，删除前会再确认一次。</li>
+  <li><b>默认用键盘视图显示映射</b> —— 「映射」页面现在默认显示成一个键盘。键帽上显示简洁的符号（⇧⌘4、方向箭头、⌫），窗口变窄时键盘会跟着缩小。从键盘视图点开某个键时，上方的按键输入框不会自动选中，在窗口里别处打字时不会误把这个键换掉。</li>
+  <li><b>新安装时的默认映射</b> —— Caps + C / F / T / X / N / S 分别打开 Chrome、Finder、终端、Xcode、备忘录和 Safari，Caps + 4 截取选中区域（⇧⌘4）。如果没有安装对应的应用，按下去什么也不会发生。切换输入法（Caps + , 和 Caps + .）、按单词跳转（Caps + Y / P）和插入引号（Caps + N）不再是默认映射。已有的配置不会被改动。</li>
+  <li><b>日志文件换了位置</b> —— 日志现在写在 <code>~/Library/Application Support/me.xueshi.hypercapslock/hypercapslock.log</code>，不再放在 <code>/tmp</code>，重启 Mac 后也还在。日志超过 5 MB 后，下次启动时会被改名为 <code>hypercapslock.old.log</code>。按住一个键不放时，也不会再往日志里刷大量重复的记录。</li>
+  <li><b>其他小修复</b> —— 窗口第一次打开时，工具栏按钮就在右侧，不会先出现在左边；侧边栏的图标和下面各页面的图标对齐了。</li>
+</ul>
+
 <h3>What's New in 26.07.109</h3>
 <ul>
   <li><b>Fixed a memory leak</b> — every synthesized keystroke (vim-style navigation, key combos, quote insertion) left behind a small chunk of memory that was never reclaimed, so after days of heavy use the app's memory footprint could climb to hundreds of MB. Memory now stays flat no matter how long the app runs.</li>
