@@ -56,14 +56,12 @@ final class ConfigStore: ObservableObject {
     // MARK: Default keycodes (JavaScript keyCode values)
     private enum JS {
         static let h: UInt16 = 72, j: UInt16 = 74, k: UInt16 = 75, l: UInt16 = 76
-        static let p: UInt16 = 80, y: UInt16 = 89, a: UInt16 = 65, e: UInt16 = 69
+        static let a: UInt16 = 65, e: UInt16 = 69
         static let u: UInt16 = 85, d: UInt16 = 68, i: UInt16 = 73, n: UInt16 = 78
         static let o: UInt16 = 79
-        static let abc: UInt16 = 188      // ',' → ABC layout
-        static let wechat: UInt16 = 190   // '.' → WeChat pinyin
+        static let c: UInt16 = 67, f: UInt16 = 70, t: UInt16 = 84, x: UInt16 = 88, s: UInt16 = 83
+        static let digit4: UInt16 = 52
     }
-    private static let abcInputSourceID = "com.apple.keylayout.ABC"
-    private static let wechatInputSourceID = "com.tencent.inputmethod.wetype.pinyin"
 
     // MARK: - Paths
 
@@ -541,7 +539,7 @@ final class ConfigStore: ObservableObject {
         m = deduped
     }
 
-    // MARK: - Defaults (bind to built-in action ids; ABC/WeChat stay inline)
+    // MARK: - Defaults (bind to built-in action ids; app launches / combos stay inline)
 
     static func defaultMappings() -> [ActionMappingEntry] {
         func ref(_ key: UInt16, _ actionId: String) -> ActionMappingEntry {
@@ -555,17 +553,22 @@ final class ConfigStore: ObservableObject {
             ref(JS.j, "builtin.move_down"),
             ref(JS.k, "builtin.move_up"),
             ref(JS.l, "builtin.move_right"),
-            ref(JS.p, "builtin.word_forward"),
-            ref(JS.y, "builtin.word_back"),
             ref(JS.a, "builtin.line_start"),
             ref(JS.e, "builtin.line_end"),
             ref(JS.u, "builtin.jump_up_10"),
             ref(JS.d, "builtin.jump_down_10"),
             ref(JS.i, "builtin.backspace"),
-            ref(JS.n, "builtin.insert_quotes"),
             ref(JS.o, "builtin.new_line"),
-            inline(JS.abc, .inputSource(inputSourceID: abcInputSourceID)),
-            inline(JS.wechat, .inputSource(inputSourceID: wechatInputSourceID)),
+            // An app that isn't installed just logs and no-ops on press.
+            inline(JS.c, .openApp(bundleID: "com.google.Chrome", name: "Google Chrome")),
+            inline(JS.f, .openApp(bundleID: "com.apple.finder", name: "Finder")),
+            inline(JS.t, .openApp(bundleID: "com.apple.Terminal", name: "Terminal")),
+            inline(JS.x, .openApp(bundleID: "com.apple.dt.Xcode", name: "Xcode")),
+            inline(JS.n, .openApp(bundleID: "com.apple.Notes", name: "Notes")),
+            inline(JS.s, .openApp(bundleID: "com.apple.Safari", name: "Safari")),
+            // Shift+Cmd+4 — macOS area screenshot.
+            inline(JS.digit4, .keyCombo(targetKey: JS.digit4, withCtrl: false, withAlt: false,
+                                        withCmd: true, withTargetShift: true)),
         ]
     }
 

@@ -118,10 +118,12 @@ final class HyperCapslockTests: XCTestCase {
         let defaults = ConfigStore.defaultMappings()
         let h = defaults.first { $0.trigger == .hyperPlusKey(key: 72, withShift: false) }
         XCTAssertEqual(h?.actionId, "builtin.move_left")
-        // ABC input-source default stays inline (machine-specific, not a built-in).
-        let abc = defaults.first { $0.trigger == .hyperPlusKey(key: 188, withShift: false) }
-        XCTAssertNil(abc?.actionId)
-        if case .inputSource = abc?.inlineAction {} else { XCTFail("ABC default should be inline input_source") }
+        // App-launch defaults stay inline (not built-ins).
+        let chrome = defaults.first { $0.trigger == .hyperPlusKey(key: 67, withShift: false) }
+        XCTAssertNil(chrome?.actionId)
+        XCTAssertEqual(chrome?.inlineAction, .openApp(bundleID: "com.google.Chrome", name: "Google Chrome"))
+        // No input-source defaults: the target IME may not be installed.
+        XCTAssertFalse(defaults.contains { if case .inputSource = $0.inlineAction { return true }; return false })
     }
 
     // MARK: Per-app scoped mappings (bindings)
