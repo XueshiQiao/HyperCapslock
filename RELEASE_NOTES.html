@@ -12,6 +12,16 @@
        bare form lands them in the release's Contributors avatar list and
        autolinks. Renders as plain text in Sparkle — acceptable. -->
 
+<h3>What's New in 26.11.111</h3>
+<ul>
+  <li><b>Fixed: CapsLock mappings sometimes stayed off after unlocking the Mac</b> — if the screen saver was running when the Mac locked, macOS sometimes didn't report that the screen saver had ended. HyperCapslock then kept the CapsLock key handed back to macOS, and every CapsLock mapping stayed off until HyperCapslock was restarted. Now, when you unlock the Mac, CapsLock mappings come back on their own.</li>
+</ul>
+
+<h3>26.11.111 更新内容</h3>
+<ul>
+  <li><b>修复：解锁 Mac 后，CapsLock 组合键有时一直不能用</b> —— 如果锁屏时屏幕保护程序正在运行，macOS 有时不会通知屏保已经结束。HyperCapslock 就会一直把 CapsLock 键交给 macOS 处理，所有 CapsLock 组合键都不能用，直到重新打开 HyperCapslock。现在只要解锁 Mac，CapsLock 组合键就会自动恢复。</li>
+</ul>
+
 <h3>What's New in 26.10.110</h3>
 <ul>
   <li><b>Fixed: CapsLock stopped working on the lock screen</b> — after waking the Mac from sleep, the CapsLock key could do nothing at all. If Caps Lock happened to be on, the password came out in capitals and you couldn't log in. HyperCapslock now gives the CapsLock key back to macOS whenever it can't handle the key itself: on the lock screen, while the screen saver runs, before the Mac goes to sleep, when you switch to another user, while a password field is open (Secure Input), and while HyperCapslock is paused. When that situation ends, CapsLock mappings come back on their own. (Before, pausing HyperCapslock also left the CapsLock key dead.)</li>
