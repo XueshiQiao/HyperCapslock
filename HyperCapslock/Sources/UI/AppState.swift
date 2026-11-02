@@ -317,6 +317,32 @@ final class AppState: ObservableObject {
         reconcileCapsLockRemap()
     }
 
+    /// Reasons an unlock proves are over: the user is back at their desktop, so
+    /// no screen saver is running and the Mac is awake. Not `paused` (the user's
+    /// choice), `secureInput` (polled on its own and may still be on, e.g. a
+    /// password field in some app) nor `sessionInactive` (a background session
+    /// can be unlocked over Screen Sharing while another user is at the console;
+    /// the hidutil remap is global, so restoring it would break their CapsLock).
+    private static let endedByUnlock: Set<CapsLockHandBackReason> =
+        [.screenLocked, .screenSaver, .asleep]
+
+    /// Don't rely on every "on" getting its matching "off": macOS doesn't always
+    /// post them (a screen saver dismissed by the lock screen's password prompt
+    /// never posts `screensaver.didstop`), and a missed one leaves the remap
+    /// removed until relaunch. An unlock clears everything it implies has ended.
+    private func handleScreenUnlocked() {
+        // The lock screen's password field had Secure Input on; sample it now
+        // rather than waiting up to a poll interval for it to clear.
+        SecureInputMonitor.shared.refresh()
+        let before = capsLockHandBackReasons.isEmpty
+        let stale = capsLockHandBackReasons.intersection(Self.endedByUnlock).subtracting([.screenLocked])
+        capsLockHandBackReasons.subtract(Self.endedByUnlock)
+        let note = stale.isEmpty ? "" : " (also cleared \(stale.map(\.rawValue).sorted()))"
+        FileLog.shared.info("CapsLock hand-back screen_locked=false\(note) → reasons=\(capsLockHandBackReasons.map(\.rawValue).sorted())")
+        guard capsLockHandBackReasons.isEmpty != before else { return }
+        reconcileCapsLockRemap()
+    }
+
     /// Install or remove CapsLock→F18 to match `capsLockHandBackReasons`.
     private func reconcileCapsLockRemap() {
         let want = capsLockHandBackReasons.isEmpty
@@ -358,7 +384,11 @@ final class AppState: ObservableObject {
             handBackObservers.append((center, o))
         }
         on(dnc, Notification.Name("com.apple.screenIsLocked"), .screenLocked, true)
-        on(dnc, Notification.Name("com.apple.screenIsUnlocked"), .screenLocked, false)
+        let unlocked = dnc.addObserver(forName: Notification.Name("com.apple.screenIsUnlocked"),
+                                       object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { AppState.shared.handleScreenUnlocked() }
+        }
+        handBackObservers.append((dnc, unlocked))
         on(dnc, Notification.Name("com.apple.screensaver.didstart"), .screenSaver, true)
         on(dnc, Notification.Name("com.apple.screensaver.didstop"), .screenSaver, false)
         on(ws, NSWorkspace.willSleepNotification, .asleep, true)
