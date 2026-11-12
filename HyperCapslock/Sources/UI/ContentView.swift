@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 enum SidebarPage: Hashable, CaseIterable {
-    case settings, mappings, actions, statistics, inputSource, about
+    case settings, mappings, actions, statistics, inputSource, aiSkill, about
 
     /// Stable, language-independent id stem for accessibility identifiers:
     /// `nav.<axID>` on the sidebar row, `page.<axID>` on the detail root. These
@@ -15,6 +15,7 @@ enum SidebarPage: Hashable, CaseIterable {
         case .actions: return "actions"
         case .statistics: return "statistics"
         case .inputSource: return "input_source"
+        case .aiSkill: return "ai_skill"
         case .about: return "about"
         }
     }
@@ -65,6 +66,7 @@ struct ContentView: View {
                 sidebarRow(.actions, loc.t("nav.actions"), "bolt.fill", .orange)
                 sidebarRow(.statistics, loc.t("nav.statistics"), "chart.bar.fill", .purple)
                 sidebarRow(.inputSource, loc.t("nav.input_source"), "globe", .green)
+                sidebarRow(.aiSkill, loc.t("nav.ai_skill"), "sparkles", .teal)
                 sidebarRow(.settings, loc.t("nav.settings"), "gearshape.fill", .indigo)
                 sidebarRow(.about, loc.t("nav.about"), "info.circle.fill", .pink)
             }
@@ -80,6 +82,7 @@ struct ContentView: View {
                 case .actions: ActionsPage().accessibilityIdentifier("page.actions")
                 case .statistics: StatisticsPage().accessibilityIdentifier("page.statistics")
                 case .inputSource: InputSourcePage().accessibilityIdentifier("page.input_source")
+                case .aiSkill: AISkillPage().accessibilityIdentifier("page.ai_skill")
                 case .about: AboutPage().accessibilityIdentifier("page.about")
                 }
             }

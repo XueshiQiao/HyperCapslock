@@ -4,7 +4,7 @@
 </h1>
 
 <p align="center">
-  <b>Caps Lock を、本来の大文字ロック機能はそのままに、システム全体で使える vim 風のナビゲーション＆編集レイヤーに変えるアプリ。</b>
+  <b>AI ネイティブ macOS Hyper キーエンジン —— 本来の Caps Lock 機能はそのままに、システム全体の vim ナビゲーション・CJKV 入力切替・アプリ別ショートカット層へ進化。</b>
 </p>
 
 <p align="center">
@@ -19,6 +19,7 @@
   <a href="https://github.com/XueshiQiao/HyperCapslock/releases/latest"><img src="https://img.shields.io/github/v/release/XueshiQiao/HyperCapslock" alt="Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL%20v3.0-blue" alt="License" /></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple&logoColor=white" alt="macOS 14+" />
+  <img src="https://img.shields.io/badge/AI--Native-Agent%20Skill%20%2B%20CLI-0d9488" alt="AI-Native Agent Skill + CLI" />
   <a href="https://github.com/XueshiQiao/HyperCapslock/stargazers"><img src="https://img.shields.io/github/stars/XueshiQiao/HyperCapslock?style=social" alt="GitHub stars" /></a>
 </p>
 
@@ -45,9 +46,23 @@ Caps Lock はホームポジションのすぐそばにありながら、ほと�
 
 そして、何も押さずに Caps Lock を**ポンと一度だけ押して**離せば、これまでどおり Caps Lock のオン／オフが切り替わります。
 
+## ✨ AI ネイティブ設定（組み込み Agent Skill + ライブ・ホットリロード CLI）
+
+ネイティブ GUI での直感的な操作に加え、普段使っているローカル AI コーディングエージェントに自然言語で伝えるだけでも設定が完了します —— **API キーの設定は一切不要です**。
+
+- **アプリ内のワンクリック AI 設定（`✨ AI 設定`）**：実行環境の正確なパス（`SKILL.md` / `SKILL.zh.md`、CLI バイナリ、現在の設定ディレクトリ）を自動挿入したブートストラップ・プロンプトや、そのまま使える 6 つの実践サンプルをワンクリックでコピーし、**Claude Code、Codex、Cursor、Antigravity、Windsurf** などのローカル AI エージェントへ貼り付けるだけで実行できます。ローカルエージェントのスキルフォルダへの一括リンクにも対応しています。
+- **リポジトリからの単体 Skill インストール（任意）**：
+  ```bash
+  npx skills add XueshiQiao/HyperCapslock
+  ```
+- **決定論的 CLI バリデーション・自動バックアップ・IPC ホットリロード**：
+  - **事前検証（`cli validate`）**：YAML 構文（行・列番号付き）、JS keyCode、15 個の組み込みアクション ID、カスタムアクション UUID、対象アプリ／入力ソースを書き込み前に厳密チェック。
+  - **`<timestamp>-<UUID>` 自動スナップショット（`cli backups` / `cli rollback`）**：変更前の設定を `backups/` に自動保存し、いつでもワンコマンドでロールバック可能。
+  - **再起動不要のライブ反映（`cli apply` / `cli reload`）**：ローカル IPC 経由で稼働中のエンジンへ即座にホットリロードし、未知のフィールドも欠落なく保持します。
+
 ## ✨ 機能一覧
 
-以下は現行バージョンがサポートする機能の全リストです。すべて GUI から設定でき、設定ファイルを手で編集する必要はありません。
+以下は現行バージョンがサポートする機能の全リストです。すべてネイティブ GUI からでも、組み込みの AI Agent Skill と CLI からでも自在に設定できます。
 
 ### 🎹 トリガー（Triggers）
 

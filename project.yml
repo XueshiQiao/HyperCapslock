@@ -37,6 +37,9 @@ targets:
     sources:
       - path: HyperCapslock/Sources
       - path: HyperCapslock/Resources/Assets.xcassets
+      - path: skills
+        type: folder
+        buildPhase: resources
     info:
       path: HyperCapslock/Resources/Info.plist
       properties:

@@ -83,4 +83,48 @@ final class BehaviorUITests: XCTestCase {
                       "creating the mapping should surface the success toast")
         attach(app, "mapping-created")
     }
+
+    /// Verify the top-level AI Setup page (`nav.ai_skill` → `page.ai_skill`) exposes its
+    /// hero + curated example accessibility identifiers, copies prompts on click, and
+    /// confirm Settings (`page.settings`) no longer contains the old `settings.ai_skill.section`.
+    func testAISkillSectionAndCopyPrompt() throws {
+        let app = launchedApp()
+
+        let aiNav = app.descendants(matching: .any)["nav.ai_skill"]
+        XCTAssertTrue(aiNav.waitForExistence(timeout: 10),
+                      "Sidebar should expose 'nav.ai_skill'")
+        aiNav.click()
+
+        let aiPage = app.descendants(matching: .any)["page.ai_skill"]
+        XCTAssertTrue(aiPage.waitForExistence(timeout: 5),
+                      "AI Skill detail root 'page.ai_skill' should appear")
+
+        let aiBadge = app.descendants(matching: .any)["ai_skill.badge"]
+        XCTAssertTrue(aiBadge.waitForExistence(timeout: 5),
+                      "AI Skill page should expose 'ai_skill.badge'")
+
+        let copyButton = app.descendants(matching: .any)["ai_skill.copy_prompt"]
+        XCTAssertTrue(copyButton.waitForExistence(timeout: 5),
+                      "AI Skill page should expose 'ai_skill.copy_prompt'")
+
+        let vimExampleCopy = app.descendants(matching: .any)["ai_skill.example.vim_nav.copy"]
+        XCTAssertTrue(vimExampleCopy.waitForExistence(timeout: 5),
+                      "AI Skill page should expose 'ai_skill.example.vim_nav.copy'")
+
+        copyButton.click()
+        vimExampleCopy.click()
+        attach(app, "ai-skill-page-copied")
+
+        // Verify Settings exposes `settings.about.tagline` and no longer contains `settings.ai_skill.section`.
+        let settingsNav = app.descendants(matching: .any)["nav.settings"]
+        XCTAssertTrue(settingsNav.waitForExistence(timeout: 5))
+        settingsNav.click()
+
+        let settingsPage = app.descendants(matching: .any)["page.settings"]
+        XCTAssertTrue(settingsPage.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["settings.about.tagline"].waitForExistence(timeout: 5),
+                      "Settings should expose 'settings.about.tagline'")
+        XCTAssertFalse(app.descendants(matching: .any)["settings.ai_skill.section"].exists,
+                       "Settings should no longer expose 'settings.ai_skill.section'")
+    }
 }

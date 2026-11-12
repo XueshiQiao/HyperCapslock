@@ -4,7 +4,7 @@
 </h1>
 
 <p align="center">
-  <b>Turn your Caps Lock into a system-wide vim-style navigation and editing layer — without losing its original Caps Lock function.</b>
+  <b>AI-Native macOS Hyper Key Engine — turn your Caps Lock into a system-wide vim navigation, CJKV input-source, and per-app shortcut layer without losing Caps Lock.</b>
 </p>
 
 <p align="center">
@@ -19,6 +19,7 @@
   <a href="https://github.com/XueshiQiao/HyperCapslock/releases/latest"><img src="https://img.shields.io/github/v/release/XueshiQiao/HyperCapslock" alt="Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL%20v3.0-blue" alt="License" /></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple&logoColor=white" alt="macOS 14+" />
+  <img src="https://img.shields.io/badge/AI--Native-Agent%20Skill%20%2B%20CLI-0d9488" alt="AI-Native Agent Skill + CLI" />
   <a href="https://github.com/XueshiQiao/HyperCapslock/stargazers"><img src="https://img.shields.io/github/stars/XueshiQiao/HyperCapslock?style=social" alt="GitHub stars" /></a>
 </p>
 
@@ -45,9 +46,23 @@ No extra configuration — system modifiers pass straight through.
 
 And if you just **tap** Caps Lock and release without pressing anything else, it still toggles Caps Lock on/off as usual.
 
+## ✨ AI-Native Configuration (Built-in Agent Skill + Live-Reload CLI)
+
+Configure HyperCapslock visually in the native macOS UI **or** simply describe what you want to your favorite local coding agent — **zero API keys required**:
+
+- **One-click AI Setup inside the app (`✨ AI Setup`)**: Copies a localized bootstrap prompt populated with your exact runtime paths (`SKILL.md` / `SKILL.zh.md`, CLI binary, and active config directory) — or pick from 6 ready-to-send example prompts — and paste directly into **Claude Code, Codex, Cursor, Antigravity, Windsurf**, or any local AI agent. You can also link the bundled skill into local agent skill folders in one click.
+- **Optional standalone Agent Skill install**:
+  ```bash
+  npx skills add XueshiQiao/HyperCapslock
+  ```
+- **Deterministic CLI, automatic backups & live IPC hot-reload**:
+  - **Pre-flight validation (`cli validate`)** checks YAML syntax (with exact line/column), JS keyCodes, the 15 built-in action IDs, custom action UUIDs, and app/input-source references before touching disk.
+  - **Automatic `<timestamp>-<UUID>` snapshots (`cli backups` / `cli rollback`)** preserve every outgoing configuration in `backups/` for instant one-command rollback.
+  - **Zero-restart live reload (`cli apply` / `cli reload`)** hot-swaps mappings and settings in the running menu-bar engine over local IPC while losslessly preserving unknown fields.
+
 ## ✨ Feature Overview
 
-Here is the complete set of capabilities in the current version. Everything is configurable through the GUI — there are no config files to hand-edit.
+Here is the complete set of capabilities in the current version. Everything can be configured point-and-click in the native GUI or conversationally via the built-in AI Agent Skill & CLI.
 
 ### 🎹 Triggers
 

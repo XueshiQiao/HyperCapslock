@@ -4,7 +4,7 @@
 </h1>
 
 <p align="center">
-  <b>Macht aus deiner Caps-Lock-Taste eine systemweite Navigations- und Bearbeitungsebene im vim-Stil – ohne die ursprüngliche Caps-Lock-Funktion zu verlieren.</b>
+  <b>KI-native macOS Hyper-Key-Engine – verwandelt Caps Lock in eine systemweite Ebene für vim-Navigation, CJKV-Eingabewechsel und App-spezifische Kurzbefehle, ohne die Caps-Lock-Funktion zu verlieren.</b>
 </p>
 
 <p align="center">
@@ -19,6 +19,7 @@
   <a href="https://github.com/XueshiQiao/HyperCapslock/releases/latest"><img src="https://img.shields.io/github/v/release/XueshiQiao/HyperCapslock" alt="Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL%20v3.0-blue" alt="License" /></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple&logoColor=white" alt="macOS 14+" />
+  <img src="https://img.shields.io/badge/AI--Native-Agent%20Skill%20%2B%20CLI-0d9488" alt="AI-Native Agent Skill + CLI" />
   <a href="https://github.com/XueshiQiao/HyperCapslock/stargazers"><img src="https://img.shields.io/github/stars/XueshiQiao/HyperCapslock?style=social" alt="GitHub stars" /></a>
 </p>
 
@@ -45,9 +46,23 @@ Keine zusätzliche Konfiguration nötig – die System-Modifier werden unveränd
 
 Und wenn du Caps Lock nur **kurz antippst** und loslässt, ohne etwas anderes zu drücken, schaltet es Caps Lock weiterhin ganz normal ein und aus.
 
+## ✨ KI-native Konfiguration (Integrierter Agent Skill + Live-Reload-CLI)
+
+Konfiguriere HyperCapslock bequem per Mausklick in der nativen macOS-GUI **oder** beschreibe einfach in natürlicher Sprache deinem lokalen Coding-Agenten, was du möchtest – **komplett ohne API-Keys**:
+
+- **Ein-Klick-KI-Konfiguration in der App (`✨ KI-Konfiguration`)**: Kopiert einen lokalisierten Bootstrap-Prompt inklusive aller Laufzeitpfade (`SKILL.md` / `SKILL.zh.md`, CLI-Binary und aktives Konfigurationsverzeichnis) – oder eines von 6 sofort einsetzbaren Praxisbeispielen – direkt für **Claude Code, Codex, Cursor, Antigravity, Windsurf** und andere lokale KI-Agenten. Auf Wunsch verknüpft ein Klick den integrierten Skill direkt mit deinen lokalen Agenten-Ordnern.
+- **Optionale eigenständige Skill-Installation aus dem Repo**:
+  ```bash
+  npx skills add XueshiQiao/HyperCapslock
+  ```
+- **Deterministisches CLI, automatische Backups & Live-IPC-Hot-Reload**:
+  - **Vorab-Validierung (`cli validate`)**: Prüft YAML-Syntax (mit Zeilen-/Spaltenangabe), JS-keyCodes, die 15 eingebauten Action-IDs, Custom-Action-UUIDs sowie App- und Eingabequellen-Referenzen vor dem Speichern.
+  - **Automatische `<timestamp>-<UUID>`-Backups (`cli backups` / `cli rollback`)**: Sichert jede vorherige Konfiguration automatisch unter `backups/` für sofortiges Rollback per Befehl.
+  - **Live-Hot-Reload ohne Neustart (`cli apply` / `cli reload`)**: Lädt Änderungen per lokalem IPC sofort in die laufende Engine neu und erhält unbekannte YAML-Felder verlustfrei.
+
 ## ✨ Funktionsübersicht
 
-Hier ist die vollständige Liste der Fähigkeiten der aktuellen Version. Alles lässt sich über die GUI konfigurieren – es gibt keine Konfigurationsdateien, die man von Hand bearbeiten müsste.
+Hier ist die vollständige Liste der Fähigkeiten der aktuellen Version. Alles lässt sich sowohl komfortabel in der nativen GUI als auch per natürlicher Sprache über den integrierten KI-Agent-Skill und das CLI konfigurieren.
 
 ### 🎹 Trigger
 

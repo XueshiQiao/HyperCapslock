@@ -10,6 +10,9 @@ if let i = args.firstIndex(of: CapsLockWatchdog.argument), i + 1 < args.count,
    let parent = pid_t(args[i + 1]) {
   CapsLockWatchdog.run(watching: parent)
 }
+if CLIRunner.shouldHandle(arguments: args) {
+  exit(CLIRunner.run(arguments: Array(args.dropFirst())))
+}
 
 let app = NSApplication.shared
 let delegate = AppDelegate()

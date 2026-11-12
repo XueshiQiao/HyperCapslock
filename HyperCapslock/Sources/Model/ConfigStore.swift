@@ -37,6 +37,21 @@ final class ConfigStore: ObservableObject {
     @Published private(set) var customActions: [Action] = []
     @Published private(set) var appConfig = AppConfig()
 
+    /// Raw bytes of the currently active `action_mappings.yml` and `app_config.yml`
+    /// in memory, captured on `load()`, `save*()`, and `reloadFromDisk()` so any
+    /// external replacement (even direct YAML edits + `cli reload`) can back up the
+    /// outgoing active version before switching in-memory state.
+    private(set) var lastActiveMappingsData: Data?
+    private(set) var lastActiveAppConfigData: Data?
+
+    private let customDataDirectory: URL?
+    private let syncRegistries: Bool
+
+    init(dataDirectory: URL? = nil, syncRegistries: Bool = true) {
+        self.customDataDirectory = dataDirectory?.standardizedFileURL
+        self.syncRegistries = syncRegistries
+    }
+
     /// Lossless preservation: unknown top-level keys + per-entry raw nodes
     /// (keyed by trigger / action id), re-emitted on save.
     private var preservedTopLevel: [(Node, Node)] = []
@@ -68,15 +83,35 @@ final class ConfigStore: ObservableObject {
     // Single source of truth: `AppEnvironment.appSupportDirectory` owns the
     // -uitest temp-dir isolation + the bundle-id data dir (shared with UsageStats
     // so the path can't drift). An empty dir makes ConfigStore seed defaults.
-    private var appDataDir: URL { AppEnvironment.appSupportDirectory }
-    private var mappingsURL: URL { appDataDir.appendingPathComponent("action_mappings.yml") }
-    private var appConfigURL: URL { appDataDir.appendingPathComponent("app_config.yml") }
+    var dataDirectory: URL { (customDataDirectory ?? AppEnvironment.appSupportDirectory).standardizedFileURL }
+    private var appDataDir: URL { dataDirectory }
+    var mappingsURL: URL { appDataDir.appendingPathComponent("action_mappings.yml") }
+    var appConfigURL: URL { appDataDir.appendingPathComponent("app_config.yml") }
+    var backupsDirectoryURL: URL { appDataDir.appendingPathComponent("backups", isDirectory: true) }
 
     // MARK: - Load
 
     func load() {
         loadDocument()
         loadAppConfig()
+    }
+
+    private struct ParsedMappingsState {
+        var mappings: [ActionMappingEntry] = []
+        var actions: [Action] = []
+        var preservedTopLevel: [(Node, Node)] = []
+        var preservedMappingNodes: [String: Node] = [:]
+        var preservedActionNodes: [String: Node] = [:]
+        var unknownMappingNodes: [Node] = []
+        var unknownActionNodes: [Node] = []
+    }
+
+    private func applyPreserved(from state: ParsedMappingsState) {
+        preservedTopLevel = state.preservedTopLevel
+        preservedMappingNodes = state.preservedMappingNodes
+        preservedActionNodes = state.preservedActionNodes
+        unknownMappingNodes = state.unknownMappingNodes
+        unknownActionNodes = state.unknownActionNodes
     }
 
     private func loadDocument() {
@@ -108,6 +143,7 @@ final class ConfigStore: ObservableObject {
                 FileLog.shared.error("action_mappings.yml parse error: \(error) — leaving the file untouched (not overwriting).")
             }
         }
+        lastActiveMappingsData = rawData
 
         // Any parse trouble — a hard failure OR entries we had to skip/preserve —
         // means the in-memory view is lossy vs. the file. Snapshot the original
@@ -132,8 +168,10 @@ final class ConfigStore: ObservableObject {
         // Register actions BEFORE mappings so the tap thread never resolves a
         // mapping/binding against a stale action registry (matters on import,
         // which runs while the tap is live).
-        ActionsRegistry.shared.setCustom(loadedActions)
-        MappingsRegistry.shared.set(loadedMappings)
+        if syncRegistries {
+            ActionsRegistry.shared.setCustom(loadedActions)
+            MappingsRegistry.shared.set(loadedMappings)
+        }
 
         // Persist only when we seeded into a fresh/empty file — never overwrite
         // an existing file we couldn't parse.
@@ -177,65 +215,80 @@ final class ConfigStore: ObservableObject {
         unknownActionNodes = []
     }
 
-    /// Parse the new structured doc or the legacy bare-list. Captures unknown
-    /// top-level keys and per-entry nodes for lossless re-emit. Throws on a
-    /// malformed entry (so the caller leaves the file untouched).
-    private func parseDocument(_ node: Node, into mappings: inout [ActionMappingEntry], actions: inout [Action]) throws {
-        resetPreserved()
+    /// Parse the new structured doc or the legacy bare-list into a value struct
+    /// without mutating `self` until validation succeeds.
+    private static func parseDocumentPure(_ node: Node) throws -> ParsedMappingsState {
+        var state = ParsedMappingsState()
         switch node {
         case .sequence(let seq):
-            mappings = try captureMappings(seq)
-            FileLog.shared.info("Loaded legacy bare-list config (\(mappings.count) mappings).")
+            state.mappings = try captureMappingsPure(seq, preserved: &state.preservedMappingNodes, unknown: &state.unknownMappingNodes)
+            FileLog.shared.info("Loaded legacy bare-list config (\(state.mappings.count) mappings).")
         case .mapping(let map):
             for (key, value) in map {
                 guard let k = key.string else { continue }
                 switch k {
                 case "mappings":
                     guard case .sequence(let seq) = value else { continue }
-                    mappings = try captureMappings(seq)
+                    state.mappings = try captureMappingsPure(seq, preserved: &state.preservedMappingNodes, unknown: &state.unknownMappingNodes)
                 case "actions":
                     guard case .sequence(let seq) = value else { continue }
-                    actions = try captureActions(seq)
+                    state.actions = try captureActionsPure(seq, preserved: &state.preservedActionNodes, unknown: &state.unknownActionNodes)
                 default:
-                    preservedTopLevel.append((key, value))
+                    state.preservedTopLevel.append((key, value))
                     FileLog.shared.info("Preserving unrecognized top-level config key: \(k)")
                 }
             }
-            FileLog.shared.info("Loaded structured config: \(mappings.count) mappings, \(actions.count) custom actions, \(preservedTopLevel.count) preserved key(s).")
+            FileLog.shared.info("Loaded structured config: \(state.mappings.count) mappings, \(state.actions.count) custom actions, \(state.preservedTopLevel.count) preserved key(s).")
         default:
             throw ConfigError.io("Unexpected top-level YAML node")
         }
+        return state
     }
 
-    private func captureMappings(_ seq: Node.Sequence) throws -> [ActionMappingEntry] {
+    private func parseDocument(_ node: Node, into mappings: inout [ActionMappingEntry], actions: inout [Action]) throws {
+        let state = try Self.parseDocumentPure(node)
+        applyPreserved(from: state)
+        mappings = state.mappings
+        actions = state.actions
+    }
+
+    private static func captureMappingsPure(
+        _ seq: Node.Sequence,
+        preserved: inout [String: Node],
+        unknown: inout [Node]
+    ) throws -> [ActionMappingEntry] {
         var result: [ActionMappingEntry] = []
         for elem in seq {
             do {
                 let yaml = try Yams.serialize(node: elem)
                 let entry = try YAMLDecoder().decode(ActionMappingEntry.self, from: yaml)
-                preservedMappingNodes[triggerUniqueID(entry.trigger)] = elem
+                preserved[triggerUniqueID(entry.trigger)] = elem
                 result.append(entry)
             } catch {
                 // An entry this build can't represent (e.g. a newer action kind).
                 // Skip it in memory but keep the raw node so it round-trips on
                 // save — one unknown entry must not drop the whole config.
-                unknownMappingNodes.append(elem)
+                unknown.append(elem)
                 FileLog.shared.warn("Skipping unparseable mapping entry (preserved verbatim for save): \(error)")
             }
         }
         return result
     }
 
-    private func captureActions(_ seq: Node.Sequence) throws -> [Action] {
+    private static func captureActionsPure(
+        _ seq: Node.Sequence,
+        preserved: inout [String: Node],
+        unknown: inout [Node]
+    ) throws -> [Action] {
         var result: [Action] = []
         for elem in seq {
             do {
                 let yaml = try Yams.serialize(node: elem)
                 let action = try YAMLDecoder().decode(Action.self, from: yaml)
-                preservedActionNodes[action.id] = elem
+                preserved[action.id] = elem
                 result.append(action)
             } catch {
-                unknownActionNodes.append(elem)
+                unknown.append(elem)
                 FileLog.shared.warn("Skipping unparseable action entry (preserved verbatim for save): \(error)")
             }
         }
@@ -243,12 +296,97 @@ final class ConfigStore: ObservableObject {
     }
 
     private func loadAppConfig() {
-        guard let content = try? String(contentsOf: appConfigURL, encoding: .utf8) else { return }
+        guard FileManager.default.fileExists(atPath: appConfigURL.path),
+              let data = try? Data(contentsOf: appConfigURL) else {
+            lastActiveAppConfigData = nil
+            return
+        }
+        lastActiveAppConfigData = data
+        guard let content = String(data: data, encoding: .utf8) else { return }
         do {
             appConfig = try YAMLDecoder().decode(AppConfig.self, from: content)
         } catch {
             FileLog.shared.error("app_config.yml parse error: \(error)")
         }
+    }
+
+    /// Hot-reload both `action_mappings.yml` and `app_config.yml` from disk.
+    ///
+    /// If `lastActiveMappingsData` (or `lastActiveAppConfigData`) exists, differs
+    /// from the new disk bytes, and its SHA256 hex does NOT match `backedUp*SHA256`,
+    /// the outgoing in-memory bytes are first backed up to
+    /// `<dataDir>/backups/<prefix>-<yyyyMMdd-HHmmss>-<uuid>.yml` before switching
+    /// in-memory state. Preserves lossless Yams AST nodes and syncs
+    /// `ActionsRegistry` BEFORE `MappingsRegistry`.
+    @discardableResult
+    func reloadFromDisk(
+        backedUpMappingsSHA256: String? = nil,
+        backedUpAppConfigSHA256: String? = nil
+    ) throws -> [URL] {
+        // 1. Read & parse candidate mappings from disk into temporary state first.
+        var newMappingsData: Data?
+        var parsedState = ParsedMappingsState()
+        if FileManager.default.fileExists(atPath: mappingsURL.path) {
+            let data = try Data(contentsOf: mappingsURL)
+            newMappingsData = data
+            guard let content = String(data: data, encoding: .utf8) else {
+                throw ConfigError.io("action_mappings.yml is not valid UTF-8")
+            }
+            if let node = try Yams.compose(yaml: content) {
+                parsedState = try Self.parseDocumentPure(node)
+            }
+        }
+        if parsedState.mappings.isEmpty && parsedState.actions.isEmpty
+            && parsedState.unknownMappingNodes.isEmpty && parsedState.unknownActionNodes.isEmpty
+            && (newMappingsData == nil || isFilePresentButEmpty()) {
+            parsedState.mappings = Self.defaultMappings()
+        }
+        Self.normalize(&parsedState.mappings)
+
+        // 2. Read & parse candidate app_config.yml from disk into temporary state.
+        var newAppConfigData: Data?
+        var newAppConfig = AppConfig()
+        if FileManager.default.fileExists(atPath: appConfigURL.path) {
+            let data = try Data(contentsOf: appConfigURL)
+            newAppConfigData = data
+            guard let content = String(data: data, encoding: .utf8) else {
+                throw ConfigError.io("app_config.yml is not valid UTF-8")
+            }
+            if !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                newAppConfig = try YAMLDecoder().decode(AppConfig.self, from: content)
+            }
+        }
+
+        // 3. Back up outgoing active bytes if changed and not already backed up by CLI.
+        let backupManager = ConfigBackupManager(dataDirectory: dataDirectory)
+        var createdBackups: [URL] = []
+        if let prevMappings = lastActiveMappingsData,
+           !prevMappings.isEmpty,
+           prevMappings != newMappingsData,
+           ConfigBackupManager.sha256Hex(prevMappings) != backedUpMappingsSHA256 {
+            let url = try backupManager.createBackup(data: prevMappings, kind: .mappings)
+            createdBackups.append(url)
+        }
+        if let prevApp = lastActiveAppConfigData,
+           !prevApp.isEmpty,
+           prevApp != newAppConfigData,
+           ConfigBackupManager.sha256Hex(prevApp) != backedUpAppConfigSHA256 {
+            let url = try backupManager.createBackup(data: prevApp, kind: .appConfig)
+            createdBackups.append(url)
+        }
+
+        // 4. Switch in-memory state and registries atomically (actions BEFORE mappings).
+        applyPreserved(from: parsedState)
+        lastActiveMappingsData = newMappingsData
+        lastActiveAppConfigData = newAppConfigData
+        customActions = parsedState.actions
+        mappings = parsedState.mappings
+        appConfig = newAppConfig
+        if syncRegistries {
+            ActionsRegistry.shared.setCustom(parsedState.actions)
+            MappingsRegistry.shared.set(parsedState.mappings)
+        }
+        return createdBackups
     }
 
     // MARK: - Mapping mutations
@@ -260,7 +398,10 @@ final class ConfigStore: ObservableObject {
         if actionId == nil, let inline = inlineAction {
             try Self.validate(inline)
         }
-        if let id = actionId, ActionsRegistry.shared.action(byID: id) == nil {
+        if let id = actionId,
+           !BuiltinActions.isBuiltinID(id),
+           !customActions.contains(where: { $0.id == id }),
+           ActionsRegistry.shared.action(byID: id) == nil {
             throw ConfigError.invalidEntry("Unknown action id: \(id)")
         }
         try bindings.forEach { try Self.validate($0) }
@@ -286,7 +427,9 @@ final class ConfigStore: ObservableObject {
 
     private func commitMappings(_ m: [ActionMappingEntry]) {
         mappings = m
-        MappingsRegistry.shared.set(m)
+        if syncRegistries {
+            MappingsRegistry.shared.set(m)
+        }
         saveToDisk()
     }
 
@@ -337,7 +480,9 @@ final class ConfigStore: ObservableObject {
 
     private func commitActions(_ a: [Action]) {
         customActions = a
-        ActionsRegistry.shared.setCustom(a)
+        if syncRegistries {
+            ActionsRegistry.shared.setCustom(a)
+        }
         saveToDisk()
     }
 
@@ -411,8 +556,10 @@ final class ConfigStore: ObservableObject {
         customActions = merged
         // Actions before mappings: the tap is live during import, so a binding
         // referencing a newly-imported custom action must find it registered.
-        ActionsRegistry.shared.setCustom(merged)
-        MappingsRegistry.shared.set(importedMappings)
+        if syncRegistries {
+            ActionsRegistry.shared.setCustom(merged)
+            MappingsRegistry.shared.set(importedMappings)
+        }
         saveToDisk()
         return importedMappings.count
     }
@@ -422,8 +569,10 @@ final class ConfigStore: ObservableObject {
     private func saveToDisk() {
         do {
             let content = try renderDocument()
+            let data = Data(content.utf8)
             try FileManager.default.createDirectory(at: appDataDir, withIntermediateDirectories: true)
-            try content.write(to: mappingsURL, atomically: true, encoding: .utf8)
+            try data.write(to: mappingsURL, options: .atomic)
+            lastActiveMappingsData = data
         } catch {
             FileLog.shared.error("Failed to write action_mappings.yml: \(error)")
         }
@@ -482,8 +631,10 @@ final class ConfigStore: ObservableObject {
     private func persistAppConfig() throws {
         do {
             let content = try YAMLEncoder().encode(appConfig)
+            let data = Data(content.utf8)
             try FileManager.default.createDirectory(at: appDataDir, withIntermediateDirectories: true)
-            try content.write(to: appConfigURL, atomically: true, encoding: .utf8)
+            try data.write(to: appConfigURL, options: .atomic)
+            lastActiveAppConfigData = data
         } catch {
             throw ConfigError.io("Failed to write app config: \(error.localizedDescription)")
         }
@@ -574,7 +725,7 @@ final class ConfigStore: ObservableObject {
 
     // MARK: - Helpers
 
-    static func triggerLabel(_ t: Trigger) -> String {
+    nonisolated static func triggerLabel(_ t: Trigger) -> String {
         switch t {
         case .singleTapHyper: return "Caps×1"
         case .doubleTapHyper: return "Caps×2"

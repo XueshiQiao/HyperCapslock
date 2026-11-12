@@ -15,7 +15,11 @@ struct AboutPage: View {
                         .clipShape(RoundedRectangle(cornerRadius: 19))
                     Text("HyperCapslock").font(.title2).fontWeight(.bold)
                     Text("\(loc.t("about.version")) \(app.appVersion)").font(.callout).foregroundStyle(.secondary)
-                    Text(loc.t("app.subtitle")).font(.callout).foregroundStyle(.secondary)
+                    Text(loc.t("about.tagline"))
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("about.tagline")
+                    Text(loc.t("app.subtitle")).font(.caption).foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)

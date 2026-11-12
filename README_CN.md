@@ -4,7 +4,7 @@
 </h1>
 
 <p align="center">
-  <b>把 Caps Lock 变成全局可用的 vim 风格导航与编辑层，同时保留它原本的大小写切换功能。</b>
+  <b>AI 原生 macOS 超级键引擎 —— 把 Caps Lock 变成全局可用的 vim 导航、输入法秒切与按应用快捷键层，同时保留原本的大小写切换。</b>
 </p>
 
 <p align="center">
@@ -19,6 +19,7 @@
   <a href="https://github.com/XueshiQiao/HyperCapslock/releases/latest"><img src="https://img.shields.io/github/v/release/XueshiQiao/HyperCapslock" alt="Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL%20v3.0-blue" alt="License" /></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple&logoColor=white" alt="macOS 14+" />
+  <img src="https://img.shields.io/badge/AI--Native-Agent%20Skill%20%2B%20CLI-0d9488" alt="AI-Native Agent Skill + CLI" />
   <a href="https://github.com/XueshiQiao/HyperCapslock/stargazers"><img src="https://img.shields.io/github/stars/XueshiQiao/HyperCapslock?style=social" alt="GitHub stars" /></a>
 </p>
 
@@ -45,9 +46,23 @@ Caps Lock 就在主键盘行（home row）上，却几乎没什么用。HyperCap
 
 如果你只是**轻点**一下 Caps Lock 然后松开、中间不按其它键，它仍然会像往常一样切换 Caps Lock 的开关状态。
 
+## ✨ AI 原生配置（内置 Agent Skill + 实时热重载 CLI）
+
+既可以在原生图形界面中点选配置，也可以直接用自然语言让本地 AI 编程助手帮你配好一切 —— **全程无需配置任何 API Key**：
+
+- **应用内一键 AI 辅助配置（`✨ AI 辅助配置`）**：自动生成填入本机精确运行路径（`SKILL.zh.md` / `SKILL.md`、CLI 可执行文件与当前配置目录）的引导提示词，并提供 6 个开箱即用的实战场景示例，一键复制即可粘贴到 **Claude Code、Codex、Cursor、Antigravity、Windsurf** 等任意本地 Agent；还支持一键将内置 Skill 软链接到本地各 Agent 技能目录。
+- **可选通过命令行独立安装仓库 Skill**：
+  ```bash
+  npx skills add XueshiQiao/HyperCapslock
+  ```
+- **确定性 CLI 校验、版本备份与实时 IPC 热重载**：
+  - **预检校验（`cli validate`）**：落盘前严格校验 YAML 语法（精确到行列号）、JS keyCode 键码、15 个内置动作 ID、自定义动作 UUID 以及应用与输入法引用。
+  - **自动 `<时间戳>-<UUID>` 历史备份（`cli backups` / `cli rollback`）**：每次变更自动在 `backups/` 下留存快照，随时一键无损回滚。
+  - **免重启实时热生效（`cli apply` / `cli reload`）**：通过本地 IPC 通知运行中的引擎即时热加载最新映射与设置，并无损保留未知扩展字段。
+
 ## ✨ 功能总览
 
-下面这一份是当前版本支持的完整能力清单。所有内容都可以通过图形界面配置，无需手写任何配置文件。
+下面这一份是当前版本支持的完整能力清单。所有内容既可以通过原生图形界面可视化配置，也可以通过内置 AI Agent Skill 与 CLI 一句话完成配置。
 
 ### 🎹 触发方式（Triggers）
 

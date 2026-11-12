@@ -328,6 +328,10 @@ struct SettingsPage: View {
                 .clipShape(RoundedRectangle(cornerRadius: 9))
             VStack(alignment: .leading, spacing: 3) {
                 Text("HyperCapslock").font(.headline)
+                Text(loc.t("about.tagline"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("settings.about.tagline")
                 HStack(spacing: 6) {
                     StatusDot(running: app.isRunning)
                     Text(loc.t("status.\(app.status.rawValue)")).font(.callout).foregroundStyle(.secondary)

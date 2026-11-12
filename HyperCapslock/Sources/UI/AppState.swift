@@ -76,6 +76,7 @@ final class AppState: ObservableObject {
         applyAnyDragIntegration(config.appConfig.broadcastCapsHoldForAnyDrag)
         observeSecureInput()
         observeCapsLockHandBackEvents()
+        observeReloadIPC()
         refreshPermissions()
     }
 
@@ -449,5 +450,163 @@ final class AppState: ObservableObject {
 
     func removeCustomAction(id: String) throws {
         try config.removeCustomAction(id: id)
+    }
+
+    // MARK: - Live Hot-Reload IPC (CLI ↔ Running App)
+
+    private var reloadIPCObservers: [NSObjectProtocol] = []
+
+    /// Observe `ReloadIPC` channels scoped strictly to `config.dataDirectory`.
+    private func observeReloadIPC() {
+        guard reloadIPCObservers.isEmpty else { return }
+        let dnc = DistributedNotificationCenter.default()
+
+        let pingObs = dnc.addObserver(
+            forName: ReloadIPC.Wire.ping,
+            object: nil,
+            queue: .main
+        ) { note in
+            MainActor.assumeIsolated {
+                AppState.shared.handleIPCPing(note)
+            }
+        }
+
+        let reloadObs = dnc.addObserver(
+            forName: ReloadIPC.Wire.reloadConfig,
+            object: nil,
+            queue: .main
+        ) { note in
+            MainActor.assumeIsolated {
+                AppState.shared.handleIPCReload(note)
+            }
+        }
+
+        reloadIPCObservers = [pingObs, reloadObs]
+    }
+
+    private func handleIPCPing(_ note: Notification) {
+        let myDir = ReloadIPC.canonicalPath(config.dataDirectory)
+        guard let targetDir = note.userInfo?["targetDataDir"] as? String,
+              targetDir == myDir,
+              let req = ReloadIPC.decodePayload(ReloadIPC.PingRequest.self, from: note) else {
+            return
+        }
+        let pong = ReloadIPC.PongResponse(
+            requestId: req.requestId,
+            targetDataDir: myDir,
+            pid: ProcessInfo.processInfo.processIdentifier,
+            appVersion: appVersion,
+            bundleIdentifier: Bundle.main.bundleIdentifier ?? "me.xueshi.hypercapslock",
+            status: status.rawValue,
+            mappingsCount: config.mappings.count,
+            customActionsCount: config.customActions.count
+        )
+        if let info = ReloadIPC.makeUserInfo(pong, requestId: req.requestId, targetDataDir: myDir) {
+            ReloadIPC.post(ReloadIPC.Wire.pong, userInfo: info)
+        }
+    }
+
+    private func handleIPCReload(_ note: Notification) {
+        let myDir = ReloadIPC.canonicalPath(config.dataDirectory)
+        guard let targetDir = note.userInfo?["targetDataDir"] as? String,
+              targetDir == myDir,
+              let req = ReloadIPC.decodePayload(ReloadIPC.ReloadRequest.self, from: note) else {
+            return
+        }
+
+        let report = ConfigValidator.validateDataDirectory(config.dataDirectory)
+        let warningMessages = report.warnings.map { "[\($0.path)] \($0.message)" }
+        if !report.errors.isEmpty {
+            let errorMessages = report.errors.map { "[\($0.path)] \($0.message)" }
+            FileLog.shared.warn("IPC reloadConfig rejected (\(report.errors.count) validation error(s)): \(errorMessages.joined(separator: "; "))")
+            let ack = ReloadIPC.ReloadAck(
+                requestId: req.requestId,
+                targetDataDir: myDir,
+                ok: false,
+                pid: ProcessInfo.processInfo.processIdentifier,
+                mappingsCount: config.mappings.count,
+                customActionsCount: config.customActions.count,
+                backupFilesCreated: [],
+                errors: errorMessages,
+                warnings: warningMessages
+            )
+            if let info = ReloadIPC.makeUserInfo(ack, requestId: req.requestId, targetDataDir: myDir) {
+                ReloadIPC.post(ReloadIPC.Wire.reloadConfigAck, userInfo: info)
+            }
+            return
+        }
+
+        do {
+            let backups = try reloadExternalConfiguration(
+                backedUpMappingsSHA256: req.backedUpMappingsSHA256,
+                backedUpAppConfigSHA256: req.backedUpAppConfigSHA256
+            )
+            let ack = ReloadIPC.ReloadAck(
+                requestId: req.requestId,
+                targetDataDir: myDir,
+                ok: true,
+                pid: ProcessInfo.processInfo.processIdentifier,
+                mappingsCount: config.mappings.count,
+                customActionsCount: config.customActions.count,
+                backupFilesCreated: backups.map(\.path),
+                errors: [],
+                warnings: warningMessages
+            )
+            if let info = ReloadIPC.makeUserInfo(ack, requestId: req.requestId, targetDataDir: myDir) {
+                ReloadIPC.post(ReloadIPC.Wire.reloadConfigAck, userInfo: info)
+            }
+        } catch {
+            FileLog.shared.error("IPC reloadExternalConfiguration failed: \(error.localizedDescription)")
+            let ack = ReloadIPC.ReloadAck(
+                requestId: req.requestId,
+                targetDataDir: myDir,
+                ok: false,
+                pid: ProcessInfo.processInfo.processIdentifier,
+                mappingsCount: config.mappings.count,
+                customActionsCount: config.customActions.count,
+                backupFilesCreated: [],
+                errors: [error.localizedDescription],
+                warnings: warningMessages
+            )
+            if let info = ReloadIPC.makeUserInfo(ack, requestId: req.requestId, targetDataDir: myDir) {
+                ReloadIPC.post(ReloadIPC.Wire.reloadConfigAck, userInfo: info)
+            }
+        }
+    }
+
+    /// Reloads `ConfigStore` from disk and reconciles all live engine & UI side effects.
+    @discardableResult
+    func reloadExternalConfiguration(
+        backedUpMappingsSHA256: String? = nil,
+        backedUpAppConfigSHA256: String? = nil
+    ) throws -> [URL] {
+        let prevAppConfig = config.appConfig
+        let backups = try config.reloadFromDisk(
+            backedUpMappingsSHA256: backedUpMappingsSHA256,
+            backedUpAppConfigSHA256: backedUpAppConfigSHA256
+        )
+
+        applyHudSettings()
+        applyDoubleTapWindow()
+        applyInputSourceSettings()
+
+        let wantCapsRemap = !isPaused && capsLockHandBackReasons.isEmpty
+        if prevAppConfig.keyRemaps != config.appConfig.keyRemaps || EngineState.shared.capsLockRemapActive != wantCapsRemap {
+            let ok = applyKeyRemaps(capsLockRemap: wantCapsRemap)
+            if ok { EngineState.shared.capsLockRemapActive = wantCapsRemap }
+        }
+
+        if prevAppConfig.hideDockIcon != config.appConfig.hideDockIcon {
+            applyActivationPolicy(hide: config.appConfig.hideDockIcon)
+        }
+        if prevAppConfig.themeMode != config.appConfig.themeMode {
+            applyAppearance(config.appConfig.themeMode)
+        }
+        Analytics.shared.setEnabled(config.appConfig.analyticsEnabled)
+        applyAnyDragIntegration(config.appConfig.broadcastCapsHoldForAnyDrag)
+
+        objectWillChange.send()
+        FileLog.shared.info("External config hot-reloaded: \(config.mappings.count) mappings, \(config.customActions.count) custom actions, \(backups.count) backup(s) created.")
+        return backups
     }
 }

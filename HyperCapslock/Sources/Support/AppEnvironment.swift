@@ -11,12 +11,33 @@ enum AppEnvironment {
         CommandLine.arguments.contains("-uitest")
         || ProcessInfo.processInfo.environment["HC_UITEST"] == "1"
 
-    /// The app's per-process Application Support directory: an isolated temp dir
-    /// under `-uitest` (so tests never touch the user's data), else
-    /// `…/Application Support/<bundle id>`. Single source of truth for the data
-    /// directory — both `ConfigStore` and `UsageStats` resolve their files from
-    /// here so the path (and the uitest isolation) can never drift between them.
+    /// Custom data directory passed via `--data-dir <dir>` or `HC_DATA_DIR`, if any.
+    static var customDataDirectory: URL? {
+        let args = CommandLine.arguments
+        if let idx = args.firstIndex(of: "--data-dir"), idx + 1 < args.count {
+            let raw = args[idx + 1].trimmingCharacters(in: .whitespacesAndNewlines)
+            if !raw.isEmpty {
+                let expanded = NSString(string: raw).expandingTildeInPath
+                return URL(fileURLWithPath: expanded, isDirectory: true).standardizedFileURL
+            }
+        }
+        if let env = ProcessInfo.processInfo.environment["HC_DATA_DIR"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !env.isEmpty {
+            let expanded = NSString(string: env).expandingTildeInPath
+            return URL(fileURLWithPath: expanded, isDirectory: true).standardizedFileURL
+        }
+        return nil
+    }
+
+    /// The app's per-process Application Support directory: an explicit `--data-dir`
+    /// override if passed, an isolated temp dir under `-uitest` (so tests never
+    /// touch the user's data), else `…/Application Support/<bundle id>`. Single
+    /// source of truth for the data directory — both `ConfigStore` and `UsageStats`
+    /// resolve their files from here so the path (and isolation) can never drift.
     static var appSupportDirectory: URL {
+        if let custom = customDataDirectory {
+            return custom
+        }
         if isUITest {
             return FileManager.default.temporaryDirectory
                 .appendingPathComponent("hypercapslock-uitest-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
