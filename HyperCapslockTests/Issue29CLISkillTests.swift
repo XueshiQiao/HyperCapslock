@@ -494,11 +494,22 @@ final class Issue29CLISkillTests: XCTestCase {
       XCTAssertTrue(enExamplePrompt.hasSuffix("My request: \(vimExample.enRequest)"), "Failed for \(locale)")
     }
 
-    // 3. AI-Native badge & About tagline localized across all 4 supported locales
+    // 3. AI-Native badge, open agent label, reference examples title & About tagline localized across all 4 supported locales
     XCTAssertEqual(LocalizationManager.tables[.en]?["about.tagline"], "AI-Native macOS Hyper Key Engine")
     XCTAssertEqual(LocalizationManager.tables[.zh]?["about.tagline"], "AI 原生 macOS 超级键引擎")
     XCTAssertEqual(LocalizationManager.tables[.ja]?["about.tagline"], "AI ネイティブ macOS Hyper キーエンジン")
     XCTAssertEqual(LocalizationManager.tables[.de]?["about.tagline"], "KI-native macOS Hyper-Key-Engine")
+
+    XCTAssertEqual(LocalizationManager.tables[.zh]?["ai_skill.step2.agents_label"], "可使用你喜欢的任意 AI 助手")
+    XCTAssertEqual(LocalizationManager.tables[.en]?["ai_skill.step2.agents_label"], "Use any AI agent you prefer")
+    XCTAssertEqual(LocalizationManager.tables[.ja]?["ai_skill.step2.agents_label"], "お好みの AI エージェントで利用可能")
+    XCTAssertEqual(LocalizationManager.tables[.de]?["ai_skill.step2.agents_label"], "Mit jedem bevorzugten KI-Assistenten nutzbar")
+
+    XCTAssertEqual(LocalizationManager.tables[.zh]?["ai_skill.examples.title"], "参考配置案例")
+    XCTAssertEqual(LocalizationManager.tables[.en]?["ai_skill.examples.title"], "Reference Examples")
+    XCTAssertEqual(LocalizationManager.tables[.ja]?["ai_skill.examples.title"], "参考設定例")
+    XCTAssertEqual(LocalizationManager.tables[.de]?["ai_skill.examples.title"], "Konfigurationsbeispiele")
+
     for locale in AppLocale.allCases {
       XCTAssertEqual(LocalizationManager.tables[locale]?["ai_skill.badge"], "AI-NATIVE")
     }

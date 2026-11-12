@@ -1,0 +1,1929 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HyperCapslock ·「AI 辅助配置」竖排主卡 + 底部微露重设计方案</title>
+<style>
+  :root {
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
+    --rounded: "SF Pro Rounded", -apple-system, "PingFang SC", system-ui, sans-serif;
+    --mono: "SF Mono", ui-monospace, Menlo, Monaco, monospace;
+    --accent: #007AFF;
+    --accent-hover: #0068DB;
+    --green-ink: #17832B;
+    --teal: #0D9488;
+  }
+
+  body[data-theme="light"] {
+    --canvas-bg: #DDDDE2;
+    --canvas-dot: rgba(0, 0, 0, 0.045);
+    --float-bar: rgba(255, 255, 255, 0.84);
+    --float-brd: rgba(0, 0, 0, 0.09);
+    --float-shadow: 0 10px 30px rgba(0, 0, 0, 0.10), 0 1px 3px rgba(0, 0, 0, 0.06);
+
+    --win-bg: #F5F5F7;
+    --win-brd: rgba(0, 0, 0, 0.16);
+    --win-shadow: 0 32px 84px rgba(0, 0, 0, 0.24), 0 4px 14px rgba(0, 0, 0, 0.10);
+    --sidebar-bg: rgba(235, 235, 240, 0.94);
+    --toolbar-bg: rgba(246, 246, 248, 0.90);
+    --detail-bg: #F2F3F6;
+    --aurora-1: rgba(0, 122, 255, 0.048);
+    --aurora-2: rgba(13, 148, 136, 0.052);
+
+    --card-bg: #FFFFFF;
+    --card-subtle: rgba(255, 255, 255, 0.76);
+    --card-soft: #F7F8FA;
+    --card-soft-hi: #F1F6FF;
+    --card-brd: rgba(0, 0, 0, 0.075);
+    --card-brd-hi: rgba(0, 122, 255, 0.22);
+    --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.03);
+    --sep: rgba(0, 0, 0, 0.075);
+    --sep-soft: rgba(0, 0, 0, 0.055);
+    --track-line: rgba(0, 0, 0, 0.09);
+
+    --txt: #1D1D1F;
+    --txt-2: #48484F;
+    --txt-3: #86868B;
+    --txt-4: #AEAEB2;
+
+    --agent-bg: #F3F4F7;
+    --agent-brd: rgba(0, 0, 0, 0.07);
+    --agent-txt: #3A3A40;
+
+    --step-circle-bg: #F2F4F8;
+    --step-circle-brd: rgba(0, 0, 0, 0.09);
+    --step-circle-txt: #3A3A40;
+
+    --row-hover: rgba(0, 0, 0, 0.026);
+    --seg-track: rgba(0, 0, 0, 0.065);
+    --seg-thumb: #FFFFFF;
+    --toast-bg: rgba(28, 28, 30, 0.90);
+    --toast-txt: #FFFFFF;
+    --peek-fade: linear-gradient(180deg, rgba(242,243,246,0) 0%, rgba(242,243,246,0.88) 100%);
+  }
+
+  body[data-theme="dark"] {
+    --canvas-bg: #111113;
+    --canvas-dot: rgba(255, 255, 255, 0.04);
+    --float-bar: rgba(38, 38, 42, 0.86);
+    --float-brd: rgba(255, 255, 255, 0.12);
+    --float-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+
+    --win-bg: #1E1E20;
+    --win-brd: rgba(255, 255, 255, 0.14);
+    --win-shadow: 0 32px 86px rgba(0, 0, 0, 0.65), 0 2px 10px rgba(0, 0, 0, 0.4);
+    --sidebar-bg: rgba(37, 37, 40, 0.95);
+    --toolbar-bg: rgba(34, 34, 37, 0.92);
+    --detail-bg: #1B1B1E;
+    --aurora-1: rgba(10, 132, 255, 0.075);
+    --aurora-2: rgba(45, 212, 191, 0.06);
+
+    --card-bg: #27272A;
+    --card-subtle: rgba(44, 44, 48, 0.76);
+    --card-soft: #202024;
+    --card-soft-hi: rgba(10, 132, 255, 0.11);
+    --card-brd: rgba(255, 255, 255, 0.085);
+    --card-brd-hi: rgba(10, 132, 255, 0.36);
+    --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    --sep: rgba(255, 255, 255, 0.09);
+    --sep-soft: rgba(255, 255, 255, 0.065);
+    --track-line: rgba(255, 255, 255, 0.12);
+
+    --txt: #F5F5F7;
+    --txt-2: #C7C7CC;
+    --txt-3: #8E8E93;
+    --txt-4: #636366;
+
+    --agent-bg: rgba(255, 255, 255, 0.06);
+    --agent-brd: rgba(255, 255, 255, 0.10);
+    --agent-txt: #E5E5EA;
+
+    --step-circle-bg: rgba(255, 255, 255, 0.07);
+    --step-circle-brd: rgba(255, 255, 255, 0.14);
+    --step-circle-txt: #F5F5F7;
+
+    --row-hover: rgba(255, 255, 255, 0.04);
+    --seg-track: rgba(255, 255, 255, 0.09);
+    --seg-thumb: #48484D;
+    --toast-bg: rgba(245, 245, 247, 0.94);
+    --toast-txt: #1D1D1F;
+    --teal: #2DD4BF;
+    --green-ink: #32D74B;
+    --peek-fade: linear-gradient(180deg, rgba(27,27,30,0) 0%, rgba(27,27,30,0.90) 100%);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    background-color: var(--canvas-bg);
+    background-image: radial-gradient(var(--canvas-dot) 1px, transparent 1px);
+    background-size: 18px 18px;
+    color: var(--txt);
+    -webkit-font-smoothing: antialiased;
+    padding: 16px 20px 48px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* ================= FLOATING TOP SWITCHER BAR ================= */
+  .switcher-wrap {
+    max-width: 1000px;
+    margin: 0 auto 10px;
+    position: sticky;
+    top: 12px;
+    z-index: 100;
+  }
+  .switcher-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 13px;
+    background: var(--float-bar);
+    backdrop-filter: blur(22px) saturate(180%);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    border: 0.5px solid var(--float-brd);
+    box-shadow: var(--float-shadow);
+    flex-wrap: wrap;
+  }
+  .seg-tabs {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    background: var(--seg-track);
+    padding: 3px;
+    border-radius: 9px;
+    flex-wrap: wrap;
+  }
+  .seg-tab {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--txt-2);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 6px 11px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.16s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .seg-tab:hover { color: var(--txt); }
+  .seg-tab.active {
+    background: var(--seg-thumb);
+    color: var(--txt);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14), 0 0.5px 1px rgba(0, 0, 0, 0.08);
+  }
+  .seg-tab .rec-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .seg-tab.compare-tab { color: var(--txt-3); }
+  .seg-tab.compare-tab.active { color: #D97706; }
+
+  .theme-toggle {
+    display: inline-flex;
+    background: var(--seg-track);
+    padding: 3px;
+    border-radius: 8px;
+    gap: 2px;
+  }
+  .theme-btn {
+    border: 0;
+    background: transparent;
+    color: var(--txt-2);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .theme-btn.active {
+    background: var(--seg-thumb);
+    color: var(--txt);
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  }
+
+  /* Rationale strip */
+  .rationale-strip {
+    max-width: 1000px;
+    margin: 0 auto 12px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: var(--card-subtle);
+    backdrop-filter: blur(12px);
+    border: 0.5px solid var(--card-brd);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    font-size: 12.5px;
+    color: var(--txt-2);
+    line-height: 1.45;
+  }
+  .rationale-strip strong { color: var(--txt); font-weight: 600; }
+  .metrics-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .m-pill {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(0, 122, 255, 0.09);
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .m-pill.warn {
+    background: rgba(245, 158, 11, 0.14);
+    color: #B45309;
+  }
+  body[data-theme="dark"] .m-pill.warn { color: #FBBF24; }
+
+  /* ================= MACOS WINDOW SHELL (1000 × 680) ================= */
+  /* Viewport math:
+     Window = 680px -> Toolbar = 46px -> Scroll viewport = 634px.
+     Top pad (22px) + Tall Hero (496px) + Section gap (24px) + Cases Header (30px) = 572px.
+     634 - 572 = 62px natural bottom peek of the first Best Case row/card! */
+  .mac-window {
+    max-width: 1000px;
+    height: 680px;
+    margin: 0 auto;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--win-bg);
+    border: 0.5px solid var(--win-brd);
+    box-shadow: var(--win-shadow);
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    position: relative;
+  }
+
+  /* Left Sidebar */
+  .mac-sidebar {
+    background: var(--sidebar-bg);
+    border-right: 0.5px solid var(--sep);
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+  }
+  .sb-traffic {
+    height: 46px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+  }
+  .tl { width: 12px; height: 12px; border-radius: 50%; border: 0.5px solid rgba(0,0,0,0.12); }
+  .tl.r { background: #FF5F57; }
+  .tl.y { background: #FEBC2E; }
+  .tl.g { background: #28C840; }
+
+  .sb-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 16px 14px;
+  }
+  .app-squircle {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: linear-gradient(145deg, #2563EB, #0EA5E9);
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.28), inset 0 1px 0.5px rgba(255,255,255,0.35);
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-family: var(--rounded);
+    font-weight: 800;
+    font-size: 14px;
+  }
+  .sb-brand-meta .name { font-size: 13.5px; font-weight: 700; color: var(--txt); line-height: 1.2; }
+  .sb-brand-meta .ver  { font-size: 11px; color: var(--txt-3); margin-top: 1px; }
+
+  .sb-nav {
+    padding: 2px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+  }
+  .sb-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 6px 9px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--txt);
+  }
+  .sb-row.active {
+    background: var(--accent);
+    color: #FFFFFF;
+    font-weight: 600;
+  }
+  .sb-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: grid;
+    place-items: center;
+    color: #FFFFFF;
+    flex-shrink: 0;
+    box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.28);
+  }
+  .sb-icon svg { width: 13px; height: 13px; }
+  .ic-blue   { background: linear-gradient(180deg, #3B82F6, #2563EB); }
+  .ic-orange { background: linear-gradient(180deg, #FB923C, #EA580C); }
+  .ic-purple { background: linear-gradient(180deg, #A855F7, #7E22CE); }
+  .ic-green  { background: linear-gradient(180deg, #34D399, #059669); }
+  .ic-teal   { background: linear-gradient(180deg, #14B8A6, #0D9488); }
+  .ic-indigo { background: linear-gradient(180deg, #6366F1, #4F46E5); }
+  .ic-pink   { background: linear-gradient(180deg, #F472B6, #DB2777); }
+
+  .sb-footer {
+    padding: 11px 16px;
+    border-top: 0.5px solid var(--sep);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--txt-3);
+  }
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #28C840;
+    box-shadow: 0 0 0 3px rgba(40, 200, 64, 0.16);
+  }
+
+  /* Right Detail Pane */
+  .mac-detail {
+    display: flex;
+    flex-direction: column;
+    height: 680px;
+    background:
+      radial-gradient(540px 280px at 15% 0%, var(--aurora-1), transparent 72%),
+      radial-gradient(480px 280px at 90% 8%, var(--aurora-2), transparent 72%),
+      var(--detail-bg);
+    position: relative;
+  }
+  .detail-toolbar {
+    height: 46px;
+    padding: 0 18px 0 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 0.5px solid var(--sep);
+    background: var(--toolbar-bg);
+    backdrop-filter: blur(14px);
+    flex-shrink: 0;
+  }
+  .toolbar-left { display: flex; align-items: center; gap: 10px; }
+  .tb-icon-btn {
+    width: 28px;
+    height: 26px;
+    border-radius: 6px;
+    border: 0;
+    background: transparent;
+    color: var(--txt-2);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+  .tb-icon-btn:hover { background: var(--row-hover); color: var(--txt); }
+  .tb-icon-btn svg { width: 15px; height: 15px; }
+  .toolbar-title { font-size: 14.5px; font-weight: 600; color: var(--txt); letter-spacing: -0.01em; }
+
+  .detail-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 22px 28px 40px;
+    scroll-behavior: smooth;
+  }
+
+  /* Subtle bottom edge fade when at top to accentuate the peek */
+  .peek-edge-hint {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 26px;
+    background: var(--peek-fade);
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 10;
+  }
+  .peek-edge-hint.hidden { opacity: 0; }
+
+  .option-pane { display: none; animation: fadeIn 0.16s ease; }
+  .option-pane.active { display: block; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(3px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ================= SHARED CLEAN BUILDING BLOCKS ================= */
+  .surface-card {
+    background: var(--card-bg);
+    border: 0.5px solid var(--card-brd);
+    border-radius: 14px;
+    box-shadow: var(--card-shadow);
+  }
+
+  /* Every redesigned Hero is sized ~496px tall (~80% of the 634px scroll viewport)
+     so that at scrollTop=0, `最佳配置案例` + ~60px of the first case peeks naturally! */
+  .hero-tall {
+    min-height: 496px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .hero-squircle {
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+    background: linear-gradient(145deg, #0D9488, #2563EB);
+    box-shadow: 0 4px 14px rgba(13, 148, 136, 0.24), inset 0 1px 0.5px rgba(255, 255, 255, 0.35);
+    display: grid;
+    place-items: center;
+    color: #FFFFFF;
+    flex-shrink: 0;
+  }
+  .hero-squircle svg { width: 20px; height: 20px; }
+
+  .ai-badge {
+    font-family: var(--rounded);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--teal);
+    background: rgba(13, 148, 136, 0.10);
+    border: 0.5px solid rgba(13, 148, 136, 0.26);
+    padding: 2px 8px;
+    border-radius: 999px;
+    line-height: 1.3;
+  }
+
+  .btn-primary {
+    appearance: none;
+    border: 0;
+    background: linear-gradient(180deg, #1B87FF 0%, #007AFF 100%);
+    color: #FFFFFF;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 10px 18px;
+    border-radius: 9px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    box-shadow: 0 2px 6px rgba(0, 122, 255, 0.28), inset 0 0.5px 0 rgba(255, 255, 255, 0.32);
+    transition: transform 0.1s ease, background 0.15s ease, box-shadow 0.15s ease;
+    white-space: nowrap;
+  }
+  .btn-primary:hover {
+    background: linear-gradient(180deg, #0E7BF8 0%, #0068DB 100%);
+    box-shadow: 0 4px 12px rgba(0, 122, 255, 0.34), inset 0 0.5px 0 rgba(255, 255, 255, 0.32);
+  }
+  .btn-primary:active { transform: scale(0.985); }
+  .btn-primary.copied {
+    background: linear-gradient(180deg, #30D158 0%, #24B647 100%);
+    box-shadow: 0 2px 8px rgba(36, 182, 71, 0.32);
+  }
+  .btn-primary svg { width: 15px; height: 15px; }
+
+  /* Agent Pills (Claude Code · Codex · Cursor · Antigravity · WorkBuddy) */
+  .agent-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .agent-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--agent-txt);
+    background: var(--agent-bg);
+    border: 0.5px solid var(--agent-brd);
+    padding: 3.5px 9px;
+    border-radius: 6px;
+    line-height: 1.2;
+  }
+  .agent-pill::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--txt-3);
+    opacity: 0.65;
+  }
+  .agent-pill.featured::before {
+    background: var(--teal);
+    opacity: 0.9;
+  }
+
+  .tertiary-links {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--txt-3);
+  }
+  .t-link {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--txt-3);
+    font: inherit;
+    font-size: 12px;
+    padding: 3px 6px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: color 0.14s ease, background 0.14s ease;
+  }
+  .t-link:hover {
+    color: var(--accent);
+    background: rgba(0, 122, 255, 0.06);
+  }
+  .t-link.done { color: var(--green-ink); font-weight: 500; }
+  .dot-sep { color: var(--txt-4); }
+
+  /* Peeking Best Cases Header */
+  .cases-section {
+    margin-top: 24px;
+  }
+  .cases-header {
+    height: 20px;
+    margin: 0 2px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+  }
+  .cases-title {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--txt-2);
+    letter-spacing: 0.01em;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .cases-scroll-cue {
+    font-size: 11.5px;
+    color: var(--txt-3);
+    transition: color 0.14s ease;
+  }
+  .cases-header:hover .cases-scroll-cue { color: var(--accent); }
+
+  /* ================= 方案 A: 竖排时间轴主卡 + 单色紧凑案例列表 ================= */
+  .opt-a-hero {
+    padding: 28px 30px 24px;
+  }
+  .opt-a-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+  }
+  .hero-main-title {
+    font-size: 18px;
+    font-weight: 650;
+    color: var(--txt);
+    letter-spacing: -0.015em;
+  }
+  .hero-sub {
+    font-size: 13.5px;
+    color: var(--txt-2);
+    margin: 5px 0 0;
+    line-height: 1.5;
+  }
+
+  /* Vertical Timeline inside Hero A */
+  .v-timeline {
+    margin: 22px 0 18px;
+    padding: 20px 22px;
+    background: var(--card-soft);
+    border: 0.5px solid var(--sep-soft);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .vt-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    position: relative;
+  }
+  .vt-item:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 13.5px;
+    top: 30px;
+    bottom: -18px;
+    width: 1px;
+    background: var(--track-line);
+  }
+  .vt-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--card-bg);
+    border: 1px solid var(--step-circle-brd);
+    color: var(--step-circle-txt);
+    font-family: var(--rounded);
+    font-size: 12.5px;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    z-index: 1;
+  }
+  .vt-item.first .vt-num {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #FFFFFF;
+    box-shadow: 0 2px 6px rgba(0, 122, 255, 0.26);
+  }
+  .vt-body { flex: 1; padding-top: 2px; }
+  .vt-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--txt);
+    margin-bottom: 3px;
+  }
+  .vt-desc {
+    font-size: 12.5px;
+    color: var(--txt-3);
+    line-height: 1.48;
+  }
+
+  .opt-a-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .opt-a-safe-note {
+    font-size: 12px;
+    color: var(--txt-3);
+  }
+
+  /* Monochrome Grouped Case List (Option A) */
+  .mono-case-list {
+    background: var(--card-bg);
+    border: 0.5px solid var(--card-brd);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--card-shadow);
+  }
+  .mono-case-row {
+    min-height: 58px;
+    padding: 10px 14px 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.12s ease;
+  }
+  .mono-case-row:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 44px;
+    right: 0;
+    bottom: 0;
+    height: 0.5px;
+    background: var(--sep-soft);
+  }
+  .mono-case-row:hover { background: var(--row-hover); }
+  .mc-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--txt-3);
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+  .mc-icon svg { width: 16px; height: 16px; }
+  .mc-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .mc-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--txt);
+    margin-bottom: 2px;
+  }
+  .mc-prompt {
+    font-size: 12px;
+    color: var(--txt-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ghost-copy {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--txt-3);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 11px;
+    border-radius: 7px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.14s ease;
+  }
+  .mono-case-row:hover .ghost-copy {
+    background: rgba(0, 122, 255, 0.10);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .ghost-copy:hover {
+    background: var(--accent) !important;
+    color: #FFFFFF !important;
+  }
+  .ghost-copy.copied {
+    background: rgba(40, 205, 65, 0.14) !important;
+    color: var(--green-ink) !important;
+    font-weight: 600;
+  }
+
+  /* ================= 方案 B: 第一步内嵌主按钮 + 静谧双列案例卡 ================= */
+  .opt-b-hero {
+    padding: 26px 28px 22px;
+  }
+  .opt-b-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .b-stack {
+    margin: 18px 0 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+  }
+  .b-step-card {
+    padding: 15px 18px;
+    border-radius: 11px;
+    background: var(--card-soft);
+    border: 0.5px solid var(--sep-soft);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .b-step-card.step-1-focus {
+    padding: 15px 18px;
+  }
+  .b-step-left {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    flex: 1;
+  }
+  .b-num {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    font-family: var(--rounded);
+    font-size: 12.5px;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    background: rgba(0, 122, 255, 0.10);
+    border: 1px solid rgba(0, 122, 255, 0.20);
+    color: var(--accent);
+    margin-top: 1px;
+  }
+
+  /* Quiet 2-Column Cards (Zero neon squares, zero colored tags!) */
+  .quiet-2col-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .quiet-case-card {
+    background: var(--card-bg);
+    border: 0.5px solid var(--card-brd);
+    border-radius: 12px;
+    padding: 15px 16px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .quiet-case-card:hover {
+    border-color: rgba(0, 122, 255, 0.35);
+    box-shadow: 0 4px 14px rgba(0, 122, 255, 0.07);
+    transform: translateY(-1px);
+  }
+  .qcc-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .qcc-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .qcc-icon {
+    width: 16px;
+    height: 16px;
+    color: var(--txt-3);
+    flex-shrink: 0;
+  }
+  .qcc-icon svg { width: 15px; height: 15px; }
+  .qcc-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--txt);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .qcc-hover-copy {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--accent);
+    opacity: 0;
+    transition: opacity 0.14s ease;
+    flex-shrink: 0;
+  }
+  .quiet-case-card:hover .qcc-hover-copy { opacity: 1; }
+  .quiet-case-card.copied {
+    border-color: rgba(40, 205, 65, 0.5);
+  }
+  .quiet-case-card.copied .qcc-hover-copy {
+    opacity: 1;
+    color: var(--green-ink);
+  }
+  .qcc-desc {
+    font-size: 12px;
+    color: var(--txt-3);
+    line-height: 1.48;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin: 0;
+  }
+
+  /* ================= 方案 C: 左右分栏主卡（左焦点按钮 · 右竖排三步） ================= */
+  .opt-c-hero {
+    padding: 28px;
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    gap: 26px;
+    align-items: stretch;
+  }
+  .opt-c-left {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 4px 2px;
+  }
+  .opt-c-cta-block {
+    margin: 22px 0;
+  }
+  .opt-c-right {
+    background: var(--card-soft);
+    border: 0.5px solid var(--sep-soft);
+    border-radius: 12px;
+    padding: 22px 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 22px;
+  }
+
+  /* Expandable Best-Practice Rows (Option C) */
+  .exp-case-list {
+    background: var(--card-bg);
+    border: 0.5px solid var(--card-brd);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--card-shadow);
+  }
+  .exp-item:not(:last-child) {
+    border-bottom: 0.5px solid var(--sep-soft);
+  }
+  .exp-bar {
+    height: 54px;
+    padding: 0 14px 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+  .exp-bar:hover { background: var(--row-hover); }
+  .exp-chev {
+    font-size: 11px;
+    color: var(--txt-3);
+    transition: transform 0.18s ease;
+    width: 12px;
+  }
+  .exp-item.open .exp-chev { transform: rotate(90deg); color: var(--accent); }
+  .exp-detail {
+    display: none;
+    padding: 0 16px 14px 40px;
+    font-size: 12.5px;
+    color: var(--txt-2);
+    line-height: 1.55;
+  }
+  .exp-item.open .exp-detail { display: block; }
+
+  /* ================= 方案 D: 竖排居中留白主卡 + 原地填入预览 ================= */
+  .opt-d-hero {
+    padding: 28px 34px 24px;
+    align-items: center;
+    text-align: center;
+  }
+  .d-vert-steps {
+    width: 100%;
+    max-width: 560px;
+    margin: 14px auto 16px;
+    text-align: left;
+    background: var(--card-soft);
+    border: 0.5px solid var(--sep-soft);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .d-step-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  /* ================= CURRENT (BEFORE) CLUTTERED VIEW ================= */
+  .cur-hero {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+  }
+  .cur-top { display: flex; align-items: center; gap: 12px; }
+  .cur-hr { height: 1px; background: var(--sep); border: 0; margin: 0; }
+  .cur-steps {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto 1fr;
+    gap: 10px;
+    align-items: start;
+  }
+  .cur-step { display: flex; align-items: flex-start; gap: 8px; }
+  .cur-num {
+    width: 20px; height: 20px; border-radius: 50%;
+    font-family: var(--rounded); font-size: 11px; font-weight: 700;
+    display: grid; place-items: center; flex-shrink: 0;
+  }
+  .cur-num.t1 { background: rgba(13, 148, 136, 0.16); color: #0D9488; }
+  .cur-num.t2 { background: rgba(37, 99, 235, 0.16); color: #2563EB; }
+  .cur-num.t3 { background: rgba(147, 51, 234, 0.16); color: #9333EA; }
+  .cur-st-ttl { font-size: 12.5px; font-weight: 600; color: var(--txt); margin-bottom: 2px; }
+  .cur-st-dsc { font-size: 11.5px; color: var(--txt-3); line-height: 1.38; }
+
+  .cur-util-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .cur-bordered-btn {
+    appearance: none;
+    border: 0.5px solid rgba(0,0,0,0.16);
+    background: var(--card-bg);
+    color: var(--txt);
+    font: inherit;
+    font-size: 11.5px;
+    padding: 4px 9px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  body[data-theme="dark"] .cur-bordered-btn { border-color: rgba(255,255,255,0.18); }
+  .cur-grid { margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .cur-ex-card { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .cur-ex-top { display: flex; align-items: flex-start; gap: 10px; }
+  .cur-tile { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; color: #fff; flex-shrink: 0; }
+  .cur-tile svg { width: 14px; height: 14px; }
+  .cur-badge { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 1.5px 7px; border-radius: 999px; margin-top: 3px; }
+  .cur-quote { font-size: 12px; color: var(--txt-2); line-height: 1.48; margin: 0; flex: 1; }
+  .cur-copy-row { display: flex; justify-content: flex-end; }
+  .cur-tinted-btn { appearance: none; border: 0.5px solid; font: inherit; font-size: 11.5px; font-weight: 500; padding: 4px 10px; border-radius: 6px; cursor: pointer; }
+
+  /* ================= MACOS CAPSULE TOAST ================= */
+  .mac-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 22px;
+    transform: translate(-50%, 14px);
+    opacity: 0;
+    pointer-events: none;
+    background: var(--toast-bg);
+    color: var(--toast-txt);
+    backdrop-filter: blur(16px);
+    padding: 7px 15px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    z-index: 50;
+    white-space: nowrap;
+  }
+  .mac-toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .mac-toast .ok-dot { color: #30D158; font-weight: 700; }
+</style>
+</head>
+<body data-theme="light">
+
+  <!-- FLOATING TOP SWITCHER BAR -->
+  <div class="switcher-wrap">
+    <div class="switcher-bar">
+      <div class="seg-tabs" role="tablist" aria-label="AI 辅助配置重设计方案切换">
+        <button class="seg-tab active" data-tab="opt-a" role="tab" aria-selected="true">
+          <span class="rec-dot"></span>方案 A（竖排时间轴 + 单色窄列表）
+        </button>
+        <button class="seg-tab" data-tab="opt-b" role="tab" aria-selected="false">
+          方案 B（第一步嵌按钮 + 双列静谧卡）
+        </button>
+        <button class="seg-tab" data-tab="opt-c" role="tab" aria-selected="false">
+          方案 C（左右分栏 + 可展开案例）
+        </button>
+        <button class="seg-tab" data-tab="opt-d" role="tab" aria-selected="false">
+          方案 D（居中引导竖排 + 单色行）
+        </button>
+        <button class="seg-tab compare-tab" data-tab="current" role="tab" aria-selected="false">
+          当前页面（对比）
+        </button>
+      </div>
+
+      <div class="theme-toggle" aria-label="外观模式">
+        <button class="theme-btn active" data-theme-val="light">浅色</button>
+        <button class="theme-btn" data-theme-val="dark">深色</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DYNAMIC RATIONALE STRIP -->
+  <div class="rationale-strip" id="rationaleStrip">
+    <div id="rationaleText">
+      <strong>方案 A · 竖排时间轴主卡 + 底部微露案例（推荐）：</strong>主卡放大至首屏 ~82% 高度，三步改为舒展的竖向时间轴，兼容任意 AI 助手；底部刚好微露「参考配置案例」第一行，下滑才展开全部。
+    </div>
+    <div class="metrics-pills" id="rationaleMetrics">
+      <span class="m-pill">竖排 1→2→3 清晰聚焦</span>
+      <span class="m-pill">首屏底部微露案例</span>
+      <span class="m-pill">零花哨色块</span>
+    </div>
+  </div>
+
+  <!-- SIMULATED HYPERCAPSLOCK MACOS WINDOW (1000 × 680) -->
+  <div class="mac-window">
+    <!-- LEFT SIDEBAR -->
+    <aside class="mac-sidebar">
+      <div class="sb-traffic">
+        <span class="tl r"></span>
+        <span class="tl y"></span>
+        <span class="tl g"></span>
+      </div>
+
+      <div class="sb-brand">
+        <div class="app-squircle">⌘</div>
+        <div class="sb-brand-meta">
+          <div class="name">HyperCapslock</div>
+          <div class="ver">v2.1.0</div>
+        </div>
+      </div>
+
+      <nav class="sb-nav">
+        <div class="sb-row">
+          <span class="sb-icon ic-blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M9 15h6"/></svg>
+          </span>
+          <span>按键映射</span>
+        </div>
+        <div class="sb-row">
+          <span class="sb-icon ic-orange">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>
+          </span>
+          <span>动作</span>
+        </div>
+        <div class="sb-row">
+          <span class="sb-icon ic-purple">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 20V11M12 20V4M18 20v-7"/></svg>
+          </span>
+          <span>统计</span>
+        </div>
+        <div class="sb-row">
+          <span class="sb-icon ic-green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3.5 12h17M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+          </span>
+          <span>输入法</span>
+        </div>
+        <div class="sb-row active">
+          <span class="sb-icon ic-teal">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10.5 3l1.7 4.6L16.8 9.3l-4.6 1.7L10.5 15.6 8.8 11 4.2 9.3l4.6-1.7L10.5 3zm7.5 10l.9 2.5 2.5.9-2.5.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9.9-2.5z"/></svg>
+          </span>
+          <span>AI 辅助配置</span>
+        </div>
+        <div class="sb-row">
+          <span class="sb-icon ic-indigo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.77 1.02 1.51 1H21a2 2 0 1 1 0 4h-.09c-.74.02-1.25.44-1.51 1z"/></svg>
+          </span>
+          <span>设置</span>
+        </div>
+        <div class="sb-row">
+          <span class="sb-icon ic-pink">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
+          </span>
+          <span>关于</span>
+        </div>
+      </nav>
+
+      <div class="sb-footer">
+        <span class="status-dot"></span>
+        <span>引擎运行中 · CapsLock → F18</span>
+      </div>
+    </aside>
+
+    <!-- RIGHT CONTENT PANE -->
+    <main class="mac-detail">
+      <header class="detail-toolbar">
+        <div class="toolbar-left">
+          <button class="tb-icon-btn" title="切换边栏" aria-label="切换边栏">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/></svg>
+          </button>
+          <span class="toolbar-title">AI 辅助配置</span>
+        </div>
+        <button class="tb-icon-btn" id="toolbarFinderBtn" title="在访达中显示 Skill 文件" aria-label="在访达中显示">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.2h7.5A2.5 2.5 0 0 1 21 9.7v7.8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5v-10z"/></svg>
+        </button>
+      </header>
+
+      <div class="detail-scroll" id="detailScroll">
+
+        <!-- =============================================================== -->
+        <!-- 方案 A · 竖排时间轴主卡 + 单色紧凑案例列表（推荐 · 默认选中）   -->
+        <!-- =============================================================== -->
+        <section class="option-pane active" id="opt-a">
+          <div class="surface-card hero-tall opt-a-hero">
+            <div class="opt-a-head">
+              <div style="display:flex; gap:14px; align-items:flex-start;">
+                <div class="hero-squircle">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10.5 3l1.7 4.6L16.8 9.3l-4.6 1.7L10.5 15.6 8.8 11 4.2 9.3l4.6-1.7L10.5 3zm7.5 10l.9 2.5 2.5.9-2.5.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9.9-2.5z"/></svg>
+                </div>
+                <div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="hero-main-title">一键交给 AI 配置</span>
+                    <span class="ai-badge">AI-NATIVE</span>
+                  </div>
+                  <p class="hero-sub">无需记配置语法、也无需填 API Key，直接用大白话让本地 AI 帮你改键或查功能。</p>
+                </div>
+              </div>
+
+              <button class="btn-primary js-copy-base" data-label="一键复制配置指令">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>一键复制配置指令</span>
+              </button>
+            </div>
+
+            <!-- VERTICAL 1 -> 2 -> 3 TIMELINE -->
+            <div class="v-timeline">
+              <div class="vt-item first">
+                <div class="vt-num">1</div>
+                <div class="vt-body">
+                  <div class="vt-title">复制配置指令</div>
+                  <div class="vt-desc">点击右上角主按钮复制基础引导词（已自动附带本机配置目录与操作规范），或向下滑动点选现成案例。</div>
+                </div>
+              </div>
+
+              <div class="vt-item">
+                <div class="vt-num">2</div>
+                <div class="vt-body">
+                  <div class="vt-title">粘贴给你常用的 AI 工具，直接说出想法</div>
+                  <div class="vt-desc">把指令发给任意本地 Agent，用日常说话的方式描述你想增加或修改的快捷键：</div>
+                  <div class="agent-pills js-agent-pills"></div>
+                </div>
+              </div>
+
+              <div class="vt-item">
+                <div class="vt-num">3</div>
+                <div class="vt-body">
+                  <div class="vt-title">自动预检、备份并立即生效</div>
+                  <div class="vt-desc">AI 修改前会自动备份当前配置并做语法预检，通过后秒级热刷新生效，无需重启应用，随时可回退。</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="opt-a-foot">
+              <span class="opt-a-safe-note">进阶可选：将内置 Skill 链接到本地 Agent 目录后，连引导词都不用复制即可随时调用</span>
+              <div class="tertiary-links">
+                <button class="t-link js-install-skill">安装到本地 Agent</button>
+                <span class="dot-sep">·</span>
+                <button class="t-link js-reveal-skill">在访达中显示</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- PEEKING BOTTOM SECTION: 最佳配置案例 -->
+          <div class="cases-section">
+            <div class="cases-header js-scroll-cases">
+              <span class="cases-title">参考配置案例</span>
+              <span class="cases-scroll-cue">向下滑动查看全部 6 个场景 · 点击即复制 ↓</span>
+            </div>
+            <div class="mono-case-list" id="optACases"></div>
+          </div>
+        </section>
+
+        <!-- =============================================================== -->
+        <!-- 方案 B · 第一步内嵌主按钮（竖排三步）+ 轻量双列静谧案例卡        -->
+        <!-- =============================================================== -->
+        <section class="option-pane" id="opt-b">
+          <div class="surface-card hero-tall opt-b-hero">
+            <div class="opt-b-top">
+              <div style="display:flex; gap:14px; align-items:center;">
+                <div class="hero-squircle">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10.5 3l1.7 4.6L16.8 9.3l-4.6 1.7L10.5 15.6 8.8 11 4.2 9.3l4.6-1.7L10.5 3zm7.5 10l.9 2.5 2.5.9-2.5.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9.9-2.5z"/></svg>
+                </div>
+                <div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="hero-main-title">三步交给 AI 定制你的快捷键</span>
+                    <span class="ai-badge">AI-NATIVE</span>
+                  </div>
+                  <p class="hero-sub">不写一行配置代码，把想法告诉桌面上的 AI 助手就能安全改好。</p>
+                </div>
+              </div>
+
+              <div class="tertiary-links">
+                <button class="t-link js-install-skill">安装到本地 Agent</button>
+                <span class="dot-sep">·</span>
+                <button class="t-link js-reveal-skill">访达查看</button>
+              </div>
+            </div>
+
+            <!-- VERTICAL STACKED 3 STEPS (Button embedded right inside Step 1!) -->
+            <div class="b-stack">
+              <div class="b-step-card step-1-focus">
+                <div class="b-step-left">
+                  <div class="b-num">1</div>
+                  <div>
+                    <div class="vt-title">复制配置指令</div>
+                    <div class="vt-desc">自带本机 CLI 路径、当前配置目录与完整配置规范。</div>
+                  </div>
+                </div>
+                <button class="btn-primary js-copy-base" data-label="一键复制配置指令">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  <span>一键复制配置指令</span>
+                </button>
+              </div>
+
+              <div class="b-step-card">
+                <div class="b-step-left">
+                  <div class="b-num">2</div>
+                  <div>
+                    <div class="vt-title">粘贴到 AI 助手，直接说出想法</div>
+                    <div class="vt-desc">可使用你喜欢的任意 AI 助手</div>
+                    <div class="agent-pills js-agent-pills"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="b-step-card">
+                <div class="b-step-left">
+                  <div class="b-num">3</div>
+                  <div>
+                    <div class="vt-title">自动校验、备份并立即生效</div>
+                    <div class="vt-desc">AI 修改前会自动校验配置并保存历史版本快照，通过后实时热重载生效，无需重启。</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style="font-size:12px; color:var(--txt-3); display:flex; justify-content:space-between; align-items:center;">
+              <span>进阶可选：将内置 Skill 链接到本地 Agent 目录后，无需每次复制引导词。</span>
+            </div>
+          </div>
+
+          <!-- PEEKING BOTTOM SECTION: Muted 2-Column Quiet Cards -->
+          <div class="cases-section">
+            <div class="cases-header js-scroll-cases">
+              <span class="cases-title">参考配置案例</span>
+              <span class="cases-scroll-cue">点击任意案例即可复制包含环境引导头的完整指令 ↓</span>
+            </div>
+            <div class="quiet-2col-grid" id="optBCases"></div>
+          </div>
+        </section>
+
+        <!-- =============================================================== -->
+        <!-- 方案 C · 分栏式主卡（左焦点行动 · 右竖排三步）+ 折叠式案例      -->
+        <!-- =============================================================== -->
+        <section class="option-pane" id="opt-c">
+          <div class="surface-card hero-tall opt-c-hero">
+            <!-- Left Column: Brand + Value + Big CTA + Agent Pills -->
+            <div class="opt-c-left">
+              <div>
+                <div class="hero-squircle" style="width:46px; height:46px; border-radius:12px; margin-bottom:16px;">
+                  <svg viewBox="0 0 24 24" fill="currentColor" style="width:22px;height:22px;"><path d="M10.5 3l1.7 4.6L16.8 9.3l-4.6 1.7L10.5 15.6 8.8 11 4.2 9.3l4.6-1.7L10.5 3zm7.5 10l.9 2.5 2.5.9-2.5.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9.9-2.5z"/></svg>
+                </div>
+
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                  <span style="font-size:20px; font-weight:700; letter-spacing:-0.02em;">一键交给 AI 配置</span>
+                  <span class="ai-badge">AI-NATIVE</span>
+                </div>
+
+                <p class="hero-sub" style="font-size:13.5px; line-height:1.6;">
+                  复制引导词发给本地 AI，直接用自然语言定制 CapsLock 组合键、双击输入法切换或按应用区分规则。
+                </p>
+
+                <div class="opt-c-cta-block">
+                  <button class="btn-primary js-copy-base" data-label="一键复制配置指令" style="padding:11px 22px; font-size:14px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    <span>一键复制配置指令</span>
+                  </button>
+                </div>
+
+                <div style="font-size:11.5px; color:var(--txt-3); margin-bottom:4px;">可使用你喜欢的任意 AI 助手：</div>
+                <div class="agent-pills js-agent-pills"></div>
+              </div>
+
+              <div class="tertiary-links" style="margin-top:16px;">
+                <button class="t-link js-install-skill" style="padding-left:0;">安装到本地 Agent</button>
+                <span class="dot-sep">·</span>
+                <button class="t-link js-reveal-skill">在访达中显示</button>
+              </div>
+            </div>
+
+            <!-- Right Column: Crisp Vertical 1-2-3 Stepper -->
+            <div class="opt-c-right">
+              <div class="vt-item first">
+                <div class="vt-num">1</div>
+                <div class="vt-body">
+                  <div class="vt-title">复制引导词（或下滑选案例）</div>
+                  <div class="vt-desc">自动打包当前配置目录路径、CLI 工具地址与 YAML 结构说明。</div>
+                </div>
+              </div>
+
+              <div class="vt-item">
+                <div class="vt-num">2</div>
+                <div class="vt-body">
+                  <div class="vt-title">粘贴给 Claude Code / Codex / Cursor / WorkBuddy 等</div>
+                  <div class="vt-desc">无需配置任何密钥，在对话框里直接用大白话告诉它你想怎么改。</div>
+                </div>
+              </div>
+
+              <div class="vt-item">
+                <div class="vt-num">3</div>
+                <div class="vt-body">
+                  <div class="vt-title">预检无误后自动热重载生效</div>
+                  <div class="vt-desc">每次修改前自动保存历史备份，秒级刷新生效，不满意随时一键回滚。</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PEEKING BOTTOM SECTION: Quiet Expandable Best-Practice Rows -->
+          <div class="cases-section">
+            <div class="cases-header js-scroll-cases">
+              <span class="cases-title">参考配置案例</span>
+              <span class="cases-scroll-cue">点击行可展开完整提示词 · 右侧一键复制 ↓</span>
+            </div>
+            <div class="exp-case-list" id="optCCases"></div>
+          </div>
+        </section>
+
+        <!-- =============================================================== -->
+        <!-- 方案 D · 居中引导式竖排三步大卡 + 单色静谧案例列表              -->
+        <!-- =============================================================== -->
+        <section class="option-pane" id="opt-d">
+          <div class="surface-card hero-tall opt-d-hero">
+            <div style="display:flex; flex-direction:column; align-items:center;">
+              <div class="hero-squircle" style="width:46px; height:46px; border-radius:12px; margin-bottom:12px;">
+                <svg viewBox="0 0 24 24" fill="currentColor" style="width:22px;height:22px;"><path d="M10.5 3l1.7 4.6L16.8 9.3l-4.6 1.7L10.5 15.6 8.8 11 4.2 9.3l4.6-1.7L10.5 3zm7.5 10l.9 2.5 2.5.9-2.5.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9.9-2.5z"/></svg>
+              </div>
+              <div style="display:inline-flex; align-items:center; gap:8px;">
+                <span style="font-size:19px; font-weight:650; letter-spacing:-0.015em;">一键交给 AI 配置</span>
+                <span class="ai-badge">AI-NATIVE</span>
+              </div>
+              <p class="hero-sub" style="max-width:500px;">
+                复制引导词粘贴给本地 AI 助手，直接用大白话改快捷键、查现有配置或回退历史版本。
+              </p>
+            </div>
+
+            <div class="d-vert-steps">
+              <div class="d-step-line">
+                <div class="b-num" style="background:var(--accent);border-color:var(--accent);color:#fff;">1</div>
+                <div>
+                  <div class="vt-title" style="font-size:13.5px;">复制下方 AI 配置指令</div>
+                  <div class="vt-desc">自带本机环境路径与配置规范，也可下滑直接点选现成最佳案例。</div>
+                </div>
+              </div>
+              <div class="d-step-line">
+                <div class="b-num">2</div>
+                <div>
+                  <div class="vt-title" style="font-size:13.5px;">粘贴给任意 AI 工具并说出需求</div>
+                  <div class="agent-pills js-agent-pills" style="margin-top:5px;"></div>
+                </div>
+              </div>
+              <div class="d-step-line">
+                <div class="b-num">3</div>
+                <div>
+                  <div class="vt-title" style="font-size:13.5px;">自动校验、备份并实时热生效</div>
+                  <div class="vt-desc">全程自动预检 YAML 与留存备份快照，改完立即生效。</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+              <button class="btn-primary js-copy-base" data-label="一键复制 AI 配置指令" style="padding:10px 26px; font-size:14px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>一键复制 AI 配置指令</span>
+              </button>
+              <div class="tertiary-links">
+                <button class="t-link js-install-skill">安装到本地 Agent</button>
+                <span class="dot-sep">·</span>
+                <button class="t-link js-reveal-skill">在访达中显示</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- PEEKING BOTTOM SECTION -->
+          <div class="cases-section">
+            <div class="cases-header js-scroll-cases">
+              <span class="cases-title">参考配置案例</span>
+              <span class="cases-scroll-cue">向下滑动查看全部 6 个场景 · 点击即复制 ↓</span>
+            </div>
+            <div class="mono-case-list" id="optDCases"></div>
+          </div>
+        </section>
+
+        <!-- =============================================================== -->
+        <!-- 当前页面（对比）· 原样还原修改前的拥挤视觉                       -->
+        <!-- =============================================================== -->
+        <section class="option-pane" id="current">
+          <div class="surface-card cur-hero">
+            <div class="cur-top">
+              <div class="hero-squircle" style="width:34px;height:34px;border-radius:9px;">
+                <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M10.5 3l1.7 4.6L16.8 9.3l-4.6 1.7L10.5 15.6 8.8 11 4.2 9.3l4.6-1.7L10.5 3zm7.5 10l.9 2.5 2.5.9-2.5.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9.9-2.5z"/></svg>
+              </div>
+              <div style="flex:1;">
+                <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;">
+                  <span style="font-size:15px;font-weight:600;">一键交给 AI 配置</span>
+                  <span class="ai-badge">AI-NATIVE</span>
+                </div>
+                <div style="font-size:12.5px;color:var(--txt-2);line-height:1.45;">
+                  无需任何 API Key —— 内置 Agent Skill、确定性配置校验器与 IPC 实时热重载，粘贴给 Claude Code、Codex、Cursor、Antigravity 等本地 Agent 即可自动校验、备份并实时生效。
+                </div>
+              </div>
+              <button class="btn-primary js-copy-base" data-label="一键复制基础配置指令" style="padding:7px 13px;font-size:12.5px;">
+                <span>一键复制基础配置指令</span>
+              </button>
+            </div>
+
+            <hr class="cur-hr">
+
+            <div class="cur-steps">
+              <div class="cur-step">
+                <span class="cur-num t1">1</span>
+                <div>
+                  <div class="cur-st-ttl">复制引导词或下方示例</div>
+                  <div class="cur-st-dsc">自带当前环境路径与操作规范，也可直接选用下方现成场景。</div>
+                </div>
+              </div>
+              <span style="color:var(--txt-4);padding-top:3px;">›</span>
+              <div class="cur-step">
+                <span class="cur-num t2">2</span>
+                <div>
+                  <div class="cur-st-ttl">粘贴给本地 AI Agent</div>
+                  <div class="cur-st-dsc">发送至 Claude Code、Codex、Cursor、Antigravity 等工具。</div>
+                </div>
+              </div>
+              <span style="color:var(--txt-4);padding-top:3px;">›</span>
+              <div class="cur-step">
+                <span class="cur-num t3">3</span>
+                <div>
+                  <div class="cur-st-ttl">自动校验、备份并热生效</div>
+                  <div class="cur-st-dsc">AI 自动预检 YAML、生成历史备份并热刷新运行中的配置。</div>
+                </div>
+              </div>
+            </div>
+
+            <hr class="cur-hr">
+
+            <div class="cur-util-row">
+              <button class="cur-bordered-btn js-install-skill">↓ 安装 Skill 到本地 Agent</button>
+              <button class="cur-bordered-btn js-reveal-skill">📁 在访达中显示</button>
+              <span style="font-size:11.5px;color:var(--txt-3);">可选：把内置 Skill 链接到本地各 Agent 技能目录，随时免路径调用</span>
+            </div>
+          </div>
+
+          <div style="margin-top:18px;">
+            <div style="padding:0 4px;">
+              <div style="font-size:13px;font-weight:600;color:var(--txt);">实战提示词示例</div>
+              <div style="font-size:11.5px;color:var(--txt-3);margin-top:2px;">点击任意卡片的「复制此示例」，即包含完整环境引导头 + 具体需求，切到 AI 直接粘贴回车即可执行。</div>
+            </div>
+            <div class="cur-grid" id="currentGrid"></div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Subtle fade cue along bottom viewport edge -->
+      <div class="peek-edge-hint" id="peekEdgeHint"></div>
+
+      <!-- MACOS BOTTOM CAPSULE TOAST -->
+      <div class="mac-toast" id="macToast" role="status" aria-live="polite">
+        <span class="ok-dot">✓</span>
+        <span id="macToastText">已复制到剪贴板</span>
+      </div>
+    </main>
+  </div>
+
+<script>
+  const AGENTS = [
+    { name: "Claude Code", featured: false },
+    { name: "Codex", featured: false },
+    { name: "Cursor", featured: false },
+    { name: "Antigravity", featured: false },
+    { name: "WorkBuddy", featured: false }
+  ];
+
+  // Populate Agent Pills across all redesigned Hero cards
+  document.querySelectorAll(".js-agent-pills").forEach((wrap) => {
+    wrap.innerHTML = AGENTS
+      .map((a) => `<span class="agent-pill${a.featured ? " featured" : ""}">${a.name}</span>`)
+      .join("");
+  });
+
+  const BASE_HEADER = [
+    "请读取 HyperCapslock 内置配置规范：/Applications/HyperCapslock.app/Contents/Resources/skill/SKILL.zh.md",
+    "CLI 路径：/Applications/HyperCapslock.app/Contents/MacOS/HyperCapslock",
+    "当前配置目录：~/Library/Application Support/me.xueshi.hypercapslock/",
+    ""
+  ].join("\n");
+
+  const SCENARIOS = [
+    {
+      slug: "explore",
+      title: "查询现有配置与支持能力",
+      curTag: "只读分析",
+      curColor: "#2563EB",
+      svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.8-3.8"/></svg>',
+      prompt: "帮我看一下我现在配了哪些快捷键和动作？顺便介绍一下 HyperCapslock 都支持哪些触发方式和高级映射功能，给我几个适合日常效率的推荐方案（先只分析不改配置）。"
+    },
+    {
+      slug: "vim_nav",
+      title: "经典 Vim 光标移动与快速跳行",
+      curTag: "光标导航",
+      curColor: "#4F46E5",
+      svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M8 7l4-4 4 4M8 17l4 4 4-4M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg>',
+      prompt: "帮我设置一套经典 Vim 导航（保留我不冲突的已有配置）：CapsLock + H/J/K/L 映射为左/下/上/右方向键，CapsLock + U/D 为向上/向下跳 10 行，CapsLock + I/A 为跳到行首/行尾，CapsLock + W/B 为按词前进/后退。"
+    },
+    {
+      slug: "input_source",
+      title: "双击修饰键秒切中英文输入法",
+      curTag: "输入法",
+      curColor: "#9333EA",
+      svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M3.5 12h17M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
+      prompt: "先用 CLI 查一下我这台 Mac 当前安装了哪些输入法，然后帮我配置：双击左 Shift 切换到英文输入法，双击右 Shift 切换到我的主力中文输入法。"
+    },
+    {
+      slug: "open_app",
+      title: "一键呼出或隐藏常用终端与 App",
+      curTag: "启动应用",
+      curColor: "#0D9488",
+      svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 10l3 3-3 3M13 16h3"/></svg>',
+      prompt: "帮我配置快速启动/切换应用：按 CapsLock + T 打开或切换到我电脑上安装的终端（如 Ghostty / iTerm / Terminal，若已在最前则自动隐藏），按 CapsLock + E 打开或切换访达（Finder）。"
+    },
+    {
+      slug: "per_app",
+      title: "按当前应用差异化快捷键（Per-App 规则）",
+      curTag: "按 App 规则",
+      curColor: "#EA580C",
+      svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 12l10 5 10-5M2 17l10 5 10-5"/></svg>',
+      prompt: "帮我给 CapsLock + R 配置按前台应用区分的规则：在浏览器（Safari / Chrome / Arc）里触发刷新页面 Cmd+R，在代码编辑器（Cursor / VS Code / Xcode）里触发运行快捷键，在其他应用里保持不触发或保留默认动作。"
+    },
+    {
+      slug: "backups_rollback",
+      title: "查看历史配置版本与一键安全回滚",
+      curTag: "安全回滚",
+      curColor: "#16A34A",
+      svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>',
+      prompt: "用 CLI 列出我最近的 HyperCapslock 配置备份记录，告诉我最近一次备份是什么时候生成的；如果我想退回上一版，帮我回滚到最新的一份备份并热刷新生效。"
+    }
+  ];
+
+  const RATIONALE_MAP = {
+    "opt-a": {
+      html: "<strong>方案 A · 竖排时间轴主卡 + 底部微露案例（推荐）：</strong>主卡放大至首屏 ~82% 高度，三步改为舒展的竖向时间轴，兼容任意 AI 助手；底部刚好微露「参考配置案例」第一行，下滑才展开全部。",
+      pills: [
+        { text: "竖排 1→2→3 清晰聚焦", warn: false },
+        { text: "首屏底部微露案例", warn: false },
+        { text: "零花哨色块", warn: false }
+      ]
+    },
+    "opt-b": {
+      html: "<strong>方案 B · 第一步内嵌主按钮 + 静谧双列案例卡：</strong>把「一键复制配置指令」直接嵌在竖排第 1 步右侧，1/2/3 同款编号圆标不误导；下方微露双列去色静谧「参考配置案例」卡片。",
+      pills: [
+        { text: "按钮内嵌第 1 步超顺手", warn: false },
+        { text: "微露双列静谧卡片", warn: false },
+        { text: "兼容任意 AI 助手", warn: false }
+      ]
+    },
+    "opt-c": {
+      html: "<strong>方案 C · 左右分栏主卡 + 可展开案例列表：</strong>宽屏下左侧聚焦品牌标题、大号主按钮与 AI 助手标签，右侧竖排展示 1-2-3 流程；底部微露可点击展开详情的单色案例行。",
+      pills: [
+        { text: "左右分栏主次分明", warn: false },
+        { text: "右侧竖排三步", warn: false },
+        { text: "案例可展开预览", warn: false }
+      ]
+    },
+    "opt-d": {
+      html: "<strong>方案 D · 居中 Onboarding 竖排大卡 + 单色案例行：</strong>采用 Apple 引导页式居中留白构图，竖排三步居中收纳 + 底部醒目主按钮，首屏底部同样自然微露参考案例。",
+      pills: [
+        { text: "Onboarding 居中呼吸感", warn: false },
+        { text: "竖排三步不拥挤", warn: false },
+        { text: "下滑看完整案例", warn: false }
+      ]
+    },
+    "current": {
+      html: "<strong>当前页面（对比参照）：</strong>主卡被 2 条分割线切碎且三步横排显得局促；下方 6 张高饱和彩色大卡片挤占首屏过半面积，7 个复制按钮互相抢视线。",
+      pills: [
+        { text: "三步横排局促", warn: true },
+        { text: "7 个按钮抢视线", warn: true },
+        { text: "彩色大卡喧宾夺主", warn: true }
+      ]
+    }
+  };
+
+  const CHECK_ICON_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+  const DOC_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+
+  let toastTimer = null;
+  function showToast(msg) {
+    const toast = document.getElementById("macToast");
+    const txt = document.getElementById("macToastText");
+    txt.textContent = msg;
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove("show"), 2100);
+  }
+
+  function copyText(text, toastMsg) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+    showToast(toastMsg || "已复制完整配置指令，可直接粘贴给 AI");
+  }
+
+  // Build Option A & Option D Monochrome Case Rows
+  function buildMonoRows(container) {
+    SCENARIOS.forEach((sc) => {
+      const row = document.createElement("div");
+      row.className = "mono-case-row";
+      row.innerHTML = `
+        <span class="mc-icon">${sc.svg}</span>
+        <div class="mc-text">
+          <div class="mc-title">${sc.title}</div>
+          <div class="mc-prompt">“${sc.prompt}”</div>
+        </div>
+        <button class="ghost-copy" type="button">复制</button>
+      `;
+      const btn = row.querySelector(".ghost-copy");
+      row.addEventListener("click", () => {
+        copyText(`${BASE_HEADER}我的需求：${sc.prompt}`, `已复制案例「${sc.title}」`);
+        btn.classList.add("copied");
+        btn.textContent = "✓ 已复制";
+        setTimeout(() => {
+          btn.classList.remove("copied");
+          btn.textContent = "复制";
+        }, 1600);
+      });
+      container.appendChild(row);
+    });
+  }
+  buildMonoRows(document.getElementById("optACases"));
+  buildMonoRows(document.getElementById("optDCases"));
+
+  // Build Option B Quiet 2-Column Cards
+  const optBCases = document.getElementById("optBCases");
+  SCENARIOS.forEach((sc) => {
+    const card = document.createElement("div");
+    card.className = "quiet-case-card";
+    card.innerHTML = `
+      <div class="qcc-top">
+        <div class="qcc-title-wrap">
+          <span class="qcc-icon">${sc.svg}</span>
+          <span class="qcc-title">${sc.title}</span>
+        </div>
+        <span class="qcc-hover-copy">复制案例</span>
+      </div>
+      <p class="qcc-desc">“${sc.prompt}”</p>
+    `;
+    const copyLbl = card.querySelector(".qcc-hover-copy");
+    card.addEventListener("click", () => {
+      copyText(`${BASE_HEADER}我的需求：${sc.prompt}`, `已复制案例「${sc.title}」`);
+      card.classList.add("copied");
+      copyLbl.textContent = "✓ 已复制";
+      setTimeout(() => {
+        card.classList.remove("copied");
+        copyLbl.textContent = "复制案例";
+      }, 1600);
+    });
+    optBCases.appendChild(card);
+  });
+
+  // Build Option C Expandable Best-Practice Rows
+  const optCCases = document.getElementById("optCCases");
+  SCENARIOS.forEach((sc) => {
+    const item = document.createElement("div");
+    item.className = "exp-item";
+    item.innerHTML = `
+      <div class="exp-bar">
+        <span class="exp-chev">▸</span>
+        <span class="mc-icon">${sc.svg}</span>
+        <span class="mc-title" style="flex:1;margin:0;">${sc.title}</span>
+        <button class="ghost-copy" type="button">复制</button>
+      </div>
+      <div class="exp-detail">“${sc.prompt}”</div>
+    `;
+    const bar = item.querySelector(".exp-bar");
+    const btn = item.querySelector(".ghost-copy");
+    bar.addEventListener("click", (e) => {
+      if (e.target === btn) return;
+      item.classList.toggle("open");
+    });
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      copyText(`${BASE_HEADER}我的需求：${sc.prompt}`, `已复制案例「${sc.title}」`);
+      btn.classList.add("copied");
+      btn.textContent = "✓ 已复制";
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.textContent = "复制";
+      }, 1600);
+    });
+    optCCases.appendChild(item);
+  });
+
+  // Build Current (Before) Cluttered Grid
+  const currentGrid = document.getElementById("currentGrid");
+  SCENARIOS.forEach((sc) => {
+    const card = document.createElement("div");
+    card.className = "surface-card cur-ex-card";
+    card.innerHTML = `
+      <div class="cur-ex-top">
+        <div class="cur-tile" style="background:${sc.curColor};">${sc.svg}</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--txt);">${sc.title}</div>
+          <span class="cur-badge" style="color:${sc.curColor};background:${sc.curColor}1F;border:0.5px solid ${sc.curColor}4D;">${sc.curTag}</span>
+        </div>
+      </div>
+      <p class="cur-quote">“${sc.prompt}”</p>
+      <div class="cur-copy-row">
+        <button class="cur-tinted-btn" type="button" style="color:${sc.curColor};background:${sc.curColor}14;border-color:${sc.curColor}40;">复制此示例</button>
+      </div>
+    `;
+    const btn = card.querySelector(".cur-tinted-btn");
+    btn.addEventListener("click", () => {
+      copyText(`${BASE_HEADER}我的需求：${sc.prompt}`, "已复制示例提示词");
+      btn.textContent = "已复制！";
+      setTimeout(() => { btn.textContent = "复制此示例"; }, 1500);
+    });
+    currentGrid.appendChild(card);
+  });
+
+  // Primary Base Copy buttons
+  document.querySelectorAll(".js-copy-base").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const originalLabel = btn.getAttribute("data-label");
+      copyText(`${BASE_HEADER}我的需求：`, "已复制配置指令，可直接粘贴给你常用的任意 AI 助手");
+      btn.classList.add("copied");
+      btn.innerHTML = `${CHECK_ICON_SVG}<span>✓ 已复制</span>`;
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = `${DOC_ICON_SVG}<span>${originalLabel}</span>`;
+      }, 1700);
+    });
+  });
+
+  // Secondary Actions (Install / Reveal)
+  document.querySelectorAll(".js-install-skill").forEach((el) => {
+    el.addEventListener("click", () => {
+      showToast("已安装 Skill 至 Claude Code、Codex、Cursor、Antigravity、WorkBuddy");
+      if (el.classList.contains("t-link")) {
+        const prev = el.textContent;
+        el.classList.add("done");
+        el.textContent = "✓ 已安装到本地 Agent";
+        setTimeout(() => {
+          el.classList.remove("done");
+          el.textContent = prev;
+        }, 2200);
+      }
+    });
+  });
+
+  function handleReveal() {
+    showToast("已在访达中定位 SKILL.zh.md");
+  }
+  document.querySelectorAll(".js-reveal-skill").forEach((el) => el.addEventListener("click", handleReveal));
+  document.getElementById("toolbarFinderBtn").addEventListener("click", handleReveal);
+
+  // Smooth scroll down when clicking `最佳配置案例` header
+  const detailScroll = document.getElementById("detailScroll");
+  const peekEdgeHint = document.getElementById("peekEdgeHint");
+  document.querySelectorAll(".js-scroll-cases").forEach((hdr) => {
+    hdr.addEventListener("click", () => {
+      detailScroll.scrollTo({ top: 420, behavior: "smooth" });
+    });
+  });
+
+  detailScroll.addEventListener("scroll", () => {
+    peekEdgeHint.classList.toggle("hidden", detailScroll.scrollTop > 120);
+  });
+
+  // Switcher Tab Logic
+  const tabs = document.querySelectorAll(".seg-tab");
+  const panes = document.querySelectorAll(".option-pane");
+  const rationaleText = document.getElementById("rationaleText");
+  const rationaleMetrics = document.getElementById("rationaleMetrics");
+
+  function activateTab(tabId) {
+    tabs.forEach((t) => {
+      const isMatch = t.dataset.tab === tabId;
+      t.classList.toggle("active", isMatch);
+      t.setAttribute("aria-selected", String(isMatch));
+    });
+    panes.forEach((p) => p.classList.toggle("active", p.id === tabId));
+    detailScroll.scrollTo({ top: 0, behavior: "instant" });
+    peekEdgeHint.classList.remove("hidden");
+
+    const info = RATIONALE_MAP[tabId];
+    if (info) {
+      rationaleText.innerHTML = info.html;
+      rationaleMetrics.innerHTML = info.pills
+        .map((p) => `<span class="m-pill${p.warn ? " warn" : ""}">${p.text}</span>`)
+        .join("");
+    }
+  }
+
+  tabs.forEach((t) => t.addEventListener("click", () => activateTab(t.dataset.tab)));
+
+  // Keyboard shortcuts 1-5
+  const keyOrder = ["opt-a", "opt-b", "opt-c", "opt-d", "current"];
+  document.addEventListener("keydown", (e) => {
+    const idx = parseInt(e.key, 10) - 1;
+    if (idx >= 0 && idx < keyOrder.length) {
+      activateTab(keyOrder[idx]);
+    }
+  });
+
+  // Light / Dark Mode Toggle
+  const themeBtns = document.querySelectorAll(".theme-btn");
+  themeBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const val = btn.dataset.themeVal;
+      document.body.setAttribute("data-theme", val);
+      themeBtns.forEach((b) => b.classList.toggle("active", b === btn));
+    });
+  });
+</script>
+</body>
+</html>
