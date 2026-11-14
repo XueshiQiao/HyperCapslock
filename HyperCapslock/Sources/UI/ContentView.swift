@@ -78,7 +78,7 @@ struct ContentView: View {
             Group {
                 switch page ?? .mappings {
                 case .settings: SettingsPage().accessibilityIdentifier("page.settings")
-                case .mappings: MappingsPage().accessibilityIdentifier("page.mappings")
+                case .mappings: MappingsPage(onOpenAISkill: { page = .aiSkill }).accessibilityIdentifier("page.mappings")
                 case .actions: ActionsPage().accessibilityIdentifier("page.actions")
                 case .statistics: StatisticsPage().accessibilityIdentifier("page.statistics")
                 case .inputSource: InputSourcePage().accessibilityIdentifier("page.input_source")

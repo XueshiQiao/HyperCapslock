@@ -127,4 +127,62 @@ final class BehaviorUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["settings.ai_skill.section"].exists,
                        "Settings should no longer expose 'settings.ai_skill.section'")
     }
+
+    /// Verify Option 2 on the Mappings landing screen: permanent `mappings.toolbar.ai_skill`
+    /// button + first-time dismissible `mappings.ai_banner` (`mappings.ai_banner.dismiss`).
+    func testMappingsAIBannerDismissAndToolbarShortcut() throws {
+        let app = launchedApp()
+
+        let toolbarShortcut = app.descendants(matching: .any)["mappings.toolbar.ai_skill"]
+        XCTAssertTrue(toolbarShortcut.waitForExistence(timeout: 10),
+                      "Mappings toolbar should expose 'mappings.toolbar.ai_skill'")
+
+        let banner = app.descendants(matching: .any)["mappings.ai_banner"]
+        XCTAssertTrue(banner.waitForExistence(timeout: 5),
+                      "Mappings page should show 'mappings.ai_banner' on a clean launch")
+
+        let openCTA = app.descendants(matching: .any)["mappings.ai_banner.open"]
+        XCTAssertTrue(openCTA.waitForExistence(timeout: 5),
+                      "AI banner should expose 'mappings.ai_banner.open'")
+
+        let dismissBtn = app.descendants(matching: .any)["mappings.ai_banner.dismiss"]
+        XCTAssertTrue(dismissBtn.waitForExistence(timeout: 5),
+                      "AI banner should expose 'mappings.ai_banner.dismiss'")
+        dismissBtn.click()
+
+        XCTAssertTrue(banner.waitForNonExistence(timeout: 5),
+                      "Clicking 'mappings.ai_banner.dismiss' should hide the banner")
+        XCTAssertTrue(toolbarShortcut.exists,
+                      "Permanent toolbar shortcut 'mappings.toolbar.ai_skill' must remain visible after dismissing banner")
+        attach(app, "mappings-ai-banner-dismissed")
+
+        toolbarShortcut.click()
+        XCTAssertTrue(app.descendants(matching: .any)["page.ai_skill"].waitForExistence(timeout: 5),
+                      "Clicking 'mappings.toolbar.ai_skill' should navigate to 'page.ai_skill'")
+    }
+
+    /// Verify clicking `mappings.ai_banner.open` navigates to `.aiSkill` AND dismisses
+    /// the banner for subsequent visits to the Mappings page.
+    func testMappingsAIBannerOpenNavigatesToAISkillAndDismisses() throws {
+        let app = launchedApp()
+
+        let banner = app.descendants(matching: .any)["mappings.ai_banner"]
+        XCTAssertTrue(banner.waitForExistence(timeout: 10),
+                      "Fresh -uitest launch should start with 'mappings.ai_banner' visible")
+
+        let openCTA = app.descendants(matching: .any)["mappings.ai_banner.open"]
+        XCTAssertTrue(openCTA.waitForExistence(timeout: 5))
+        openCTA.click()
+
+        XCTAssertTrue(app.descendants(matching: .any)["page.ai_skill"].waitForExistence(timeout: 5),
+                      "Clicking 'mappings.ai_banner.open' should navigate to 'page.ai_skill'")
+
+        let mappingsNav = app.descendants(matching: .any)["nav.mappings"]
+        XCTAssertTrue(mappingsNav.waitForExistence(timeout: 5))
+        mappingsNav.click()
+
+        XCTAssertTrue(app.descendants(matching: .any)["page.mappings"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["mappings.ai_banner"].exists,
+                       "Banner should remain dismissed after returning to Mappings")
+    }
 }

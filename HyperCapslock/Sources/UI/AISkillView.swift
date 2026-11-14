@@ -703,3 +703,195 @@ private struct AgentFlowLayout: Layout {
     }
   }
 }
+
+// MARK: - Mappings Page AI Entry (Toolbar Shortcut + Dismissible First-Run Tip Banner)
+
+/// Persists whether the single-line AI onboarding tip banner on the Mappings page
+/// has been dismissed (`UserDefaults` key `mappings.ai_banner_dismissed`).
+/// Under `-uitest`, each process starts in a deterministic clean state without
+/// reading or mutating the host developer's persistent `UserDefaults`.
+@MainActor
+final class MappingsAIBannerStore: ObservableObject {
+  static let dismissedDefaultsKey = "mappings.ai_banner_dismissed"
+
+  static let shared = MappingsAIBannerStore(
+    defaults: .standard,
+    isUITest: AppEnvironment.isUITest,
+    launchArguments: CommandLine.arguments
+  )
+
+  @Published private(set) var isDismissed: Bool
+
+  private let defaults: UserDefaults
+  private let isUITest: Bool
+
+  init(
+    defaults: UserDefaults = .standard,
+    isUITest: Bool = false,
+    launchArguments: [String] = []
+  ) {
+    self.defaults = defaults
+    self.isUITest = isUITest
+    if isUITest {
+      self.isDismissed = launchArguments.contains("-uitest-ai-banner-dismissed")
+    } else {
+      self.isDismissed = defaults.bool(forKey: Self.dismissedDefaultsKey)
+    }
+  }
+
+  func dismiss() {
+    guard !isDismissed else { return }
+    isDismissed = true
+    if !isUITest {
+      defaults.set(true, forKey: Self.dismissedDefaultsKey)
+    }
+  }
+}
+
+/// Permanent top-right toolbar shortcut on the Mappings page (`✨ AI 配置` / `AI Setup`).
+struct MappingsAIToolbarButton: View {
+  let title: String
+  let helpText: String
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: 4) {
+        Image(systemName: "sparkles")
+          .symbolRenderingMode(.palette)
+          .foregroundStyle(Color.teal)
+          .font(.system(size: 11.5, weight: .semibold))
+        Text(title)
+          .font(.system(size: 12, weight: .medium))
+      }
+      .padding(.horizontal, 3)
+    }
+    .help(helpText)
+    .accessibilityIdentifier("mappings.toolbar.ai_skill")
+  }
+}
+
+/// Single-line dismissible onboarding banner at the top of the Mappings page.
+/// Zero nested sub-boxes: one subtle blue/teal rounded banner containing typography,
+/// a plain CTA action (`mappings.ai_banner.open`), and a close button (`mappings.ai_banner.dismiss`).
+struct MappingsAITipBanner: View {
+  let leadText: String
+  let bodyText: String
+  let ctaText: String
+  let dismissHelp: String
+  let onOpen: () -> Void
+  let onDismiss: () -> Void
+
+  @Environment(\.colorScheme) private var colorScheme
+  @State private var isCTAHovered = false
+  @State private var isDismissHovered = false
+
+  var body: some View {
+    let dark = colorScheme == .dark
+    HStack(alignment: .center, spacing: 10) {
+      HStack(alignment: .center, spacing: 8) {
+        Image(systemName: "sparkles")
+          .font(.system(size: 13, weight: .semibold))
+          .foregroundStyle(
+            dark
+              ? Color(red: 0.18, green: 0.83, blue: 0.75)
+              : Color(red: 0.05, green: 0.58, blue: 0.53)
+          )
+
+        (
+          Text(leadText)
+            .font(.system(size: 12.5, weight: .semibold))
+            .foregroundColor(.primary)
+          + Text(" ")
+            .font(.system(size: 12.5))
+          + Text(bodyText)
+            .font(.system(size: 12.5))
+            .foregroundColor(.secondary)
+        )
+        .lineLimit(1)
+        .truncationMode(.tail)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+      HStack(alignment: .center, spacing: 8) {
+        Button(action: onOpen) {
+          Text(ctaText)
+            .font(.system(size: 12.5, weight: .semibold))
+            .underline(isCTAHovered)
+            .foregroundStyle(
+              dark
+                ? Color(red: 0.22, green: 0.74, blue: 0.97)
+                : Color.accentColor
+            )
+            .padding(.horizontal, 4)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .onHover { hovering in
+          withAnimation(.easeOut(duration: 0.12)) {
+            isCTAHovered = hovering
+          }
+        }
+        .accessibilityIdentifier("mappings.ai_banner.open")
+
+        Rectangle()
+          .fill(Color.primary.opacity(dark ? 0.12 : 0.09))
+          .frame(width: 1, height: 12)
+          .accessibilityHidden(true)
+
+        Button(action: onDismiss) {
+          Image(systemName: "xmark")
+            .font(.system(size: 10.5, weight: .semibold))
+            .foregroundStyle(isDismissHovered ? Color.primary : Color.secondary)
+            .frame(width: 22, height: 22)
+            .background(
+              RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(isDismissHovered ? Color.primary.opacity(dark ? 0.12 : 0.07) : Color.clear)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+          withAnimation(.easeOut(duration: 0.12)) {
+            isDismissHovered = hovering
+          }
+        }
+        .help(dismissHelp)
+        .accessibilityLabel(dismissHelp)
+        .accessibilityIdentifier("mappings.ai_banner.dismiss")
+      }
+      .fixedSize()
+    }
+    .padding(.leading, 14)
+    .padding(.trailing, 10)
+    .frame(maxWidth: .infinity, minHeight: 44, maxHeight: 44)
+    .background(
+      RoundedRectangle(cornerRadius: 10, style: .continuous)
+        .fill(Color(nsColor: .controlBackgroundColor))
+        .overlay(
+          RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(
+              LinearGradient(
+                colors: [
+                  Color.accentColor.opacity(dark ? 0.13 : 0.068),
+                  Color.teal.opacity(dark ? 0.13 : 0.082),
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+              )
+            )
+        )
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 10, style: .continuous)
+        .strokeBorder(
+          Color.teal.opacity(dark ? 0.25 : 0.18),
+          lineWidth: 0.75
+        )
+    )
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("mappings.ai_banner")
+  }
+}

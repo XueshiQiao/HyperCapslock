@@ -543,4 +543,67 @@ final class Issue29CLISkillTests: XCTestCase {
     XCTAssertFalse(FileManager.default.fileExists(atPath: cursorLink.path))
     XCTAssertEqual(res.symlinks.filter { $0.status == "linked" }.count, 2)
   }
+
+  func testMappingsAISetupShortcutAndBannerLocalizationAndPersistence() throws {
+    // 1. Localization keys across en / zh / ja / de
+    XCTAssertEqual(LocalizationManager.tables[.en]?["mappings.ai_setup"], "AI Setup")
+    XCTAssertEqual(LocalizationManager.tables[.zh]?["mappings.ai_setup"], "AI 配置")
+    XCTAssertEqual(LocalizationManager.tables[.ja]?["mappings.ai_setup"], "AI 設定")
+    XCTAssertEqual(LocalizationManager.tables[.de]?["mappings.ai_setup"], "KI-Setup")
+
+    XCTAssertEqual(LocalizationManager.tables[.en]?["mappings.ai_banner.lead"], "Skip manual one-by-one setup?")
+    XCTAssertEqual(LocalizationManager.tables[.zh]?["mappings.ai_banner.lead"], "不想一个个手动添加？")
+    XCTAssertEqual(
+      LocalizationManager.tables[.en]?["mappings.ai_banner.body"],
+      "Ask Claude Code, Cursor, WorkBuddy, or any AI in plain language to set up your mappings"
+    )
+    XCTAssertEqual(
+      LocalizationManager.tables[.zh]?["mappings.ai_banner.body"],
+      "可以直接用大白话让 Claude Code、Cursor、WorkBuddy 等 AI 一键配好整套映射"
+    )
+    XCTAssertEqual(LocalizationManager.tables[.en]?["mappings.ai_banner.cta"], "Try AI Setup →")
+    XCTAssertEqual(LocalizationManager.tables[.zh]?["mappings.ai_banner.cta"], "去试试 →")
+
+    let bannerKeys = [
+      "mappings.ai_setup",
+      "mappings.ai_banner.lead",
+      "mappings.ai_banner.body",
+      "mappings.ai_banner.cta",
+      "mappings.ai_banner.dismiss",
+    ]
+    for locale in AppLocale.allCases {
+      for key in bannerKeys {
+        let val = LocalizationManager.tables[locale]?[key] ?? ""
+        XCTAssertFalse(val.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                       "Missing or empty key '\(key)' for locale '\(locale)'")
+      }
+    }
+
+    // 2. Persistent UserDefaults behavior vs deterministic -uitest behavior
+    let suiteName = "hc-ai-banner-test-\(UUID().uuidString.lowercased())"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let store1 = MappingsAIBannerStore(defaults: defaults, isUITest: false)
+    XCTAssertFalse(store1.isDismissed)
+    store1.dismiss()
+    XCTAssertTrue(store1.isDismissed)
+    XCTAssertTrue(defaults.bool(forKey: MappingsAIBannerStore.dismissedDefaultsKey))
+
+    let store2 = MappingsAIBannerStore(defaults: defaults, isUITest: false)
+    XCTAssertTrue(store2.isDismissed, "Dismissed state must persist across app launches")
+
+    // Under -uitest, pre-existing UserDefaults is ignored so each test launch starts clean
+    let uiTestFresh = MappingsAIBannerStore(defaults: defaults, isUITest: true, launchArguments: ["-uitest"])
+    XCTAssertFalse(uiTestFresh.isDismissed)
+    uiTestFresh.dismiss()
+    XCTAssertTrue(uiTestFresh.isDismissed)
+
+    let uiTestPreset = MappingsAIBannerStore(
+      defaults: defaults,
+      isUITest: true,
+      launchArguments: ["-uitest", "-uitest-ai-banner-dismissed"]
+    )
+    XCTAssertTrue(uiTestPreset.isDismissed)
+  }
 }

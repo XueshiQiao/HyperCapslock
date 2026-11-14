@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HyperCapslock ·「按键映射」页跳转 AI 辅助配置入口方案对比</title>
+<style>
+  :root {
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
+    --rounded: "SF Pro Rounded", -apple-system, "PingFang SC", system-ui, sans-serif;
+    --mono: "SF Mono", ui-monospace, Menlo, Monaco, monospace;
+    --accent: #007AFF;
+    --teal: #0D9488;
+  }
+
+  body[data-theme="light"] {
+    --canvas-bg: #DFDFE5;
+    --canvas-dot: rgba(0, 0, 0, 0.045);
+    --float-bar: rgba(255, 255, 255, 0.86);
+    --float-brd: rgba(0, 0, 0, 0.09);
+    --float-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.05);
+
+    --win-bg: #F5F5F7;
+    --win-brd: rgba(0, 0, 0, 0.16);
+    --win-shadow: 0 26px 68px rgba(0, 0, 0, 0.22), 0 4px 14px rgba(0, 0, 0, 0.09);
+    --sidebar-bg: rgba(235, 235, 240, 0.95);
+    --toolbar-bg: rgba(246, 246, 249, 0.92);
+    --detail-bg: #F2F3F6;
+    --aurora-1: rgba(0, 122, 255, 0.042);
+    --aurora-2: rgba(13, 148, 136, 0.048);
+
+    --card-bg: #FFFFFF;
+    --card-brd: rgba(0, 0, 0, 0.075);
+    --sep: rgba(0, 0, 0, 0.08);
+    --sep-soft: rgba(0, 0, 0, 0.06);
+
+    --txt: #1D1D1F;
+    --txt-2: #48484F;
+    --txt-3: #86868B;
+
+    --seg-track: rgba(0, 0, 0, 0.068);
+    --seg-thumb: #FFFFFF;
+    --tb-btn-bg: #FFFFFF;
+    --tb-btn-brd: rgba(0, 0, 0, 0.11);
+    --tb-btn-shadow: 0 0.5px 1.5px rgba(0, 0, 0, 0.07);
+
+    --ai-btn-bg: linear-gradient(180deg, rgba(13, 148, 136, 0.115) 0%, rgba(0, 122, 255, 0.095) 100%);
+    --ai-btn-brd: rgba(13, 148, 136, 0.28);
+    --ai-btn-txt: #0F6E66;
+    --ai-btn-icon: #0D9488;
+
+    --banner-bg: linear-gradient(90deg, rgba(0, 122, 255, 0.068) 0%, rgba(13, 148, 136, 0.082) 100%);
+    --banner-brd: rgba(13, 148, 136, 0.17);
+    --banner-cta: #007AFF;
+
+    --kb-bezel: #CCCED4;
+    --kb-bezel-brd: rgba(0, 0, 0, 0.11);
+    --cap-bg-top: #FFFFFF;
+    --cap-bg-bot: #EBEDF0;
+    --cap-brd: rgba(0, 0, 0, 0.13);
+    --cap-txt: #3F424A;
+    --cap-shadow: 0 1px 1.5px rgba(0, 0, 0, 0.11);
+
+    --raised-bg: linear-gradient(180deg, #FFFFFF 0%, #ECEEF2 100%);
+    --raised-brd: rgba(0, 0, 0, 0.14);
+    --raised-shadow: 0 1px 0 rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
+  }
+
+  body[data-theme="dark"] {
+    --canvas-bg: #121215;
+    --canvas-dot: rgba(255, 255, 255, 0.04);
+    --float-bar: rgba(38, 38, 42, 0.88);
+    --float-brd: rgba(255, 255, 255, 0.12);
+    --float-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+
+    --win-bg: #1E1E20;
+    --win-brd: rgba(255, 255, 255, 0.14);
+    --win-shadow: 0 28px 72px rgba(0, 0, 0, 0.65), 0 2px 10px rgba(0, 0, 0, 0.4);
+    --sidebar-bg: rgba(36, 36, 39, 0.96);
+    --toolbar-bg: rgba(34, 34, 37, 0.93);
+    --detail-bg: #1B1B1E;
+    --aurora-1: rgba(10, 132, 255, 0.075);
+    --aurora-2: rgba(45, 212, 191, 0.055);
+
+    --card-bg: #252529;
+    --card-brd: rgba(255, 255, 255, 0.085);
+    --sep: rgba(255, 255, 255, 0.09);
+    --sep-soft: rgba(255, 255, 255, 0.065);
+
+    --txt: #F5F5F7;
+    --txt-2: #C7C7CC;
+    --txt-3: #8E8E93;
+
+    --seg-track: rgba(255, 255, 255, 0.09);
+    --seg-thumb: #46464C;
+    --tb-btn-bg: rgba(255, 255, 255, 0.08);
+    --tb-btn-brd: rgba(255, 255, 255, 0.13);
+    --tb-btn-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+
+    --ai-btn-bg: linear-gradient(180deg, rgba(45, 212, 191, 0.16) 0%, rgba(10, 132, 255, 0.14) 100%);
+    --ai-btn-brd: rgba(45, 212, 191, 0.35);
+    --ai-btn-txt: #5EEAD4;
+    --ai-btn-icon: #2DD4BF;
+
+    --banner-bg: linear-gradient(90deg, rgba(10, 132, 255, 0.13) 0%, rgba(45, 212, 191, 0.13) 100%);
+    --banner-brd: rgba(45, 212, 191, 0.25);
+    --banner-cta: #38BDF8;
+
+    --kb-bezel: #0F141C;
+    --kb-bezel-brd: rgba(255, 255, 255, 0.09);
+    --cap-bg-top: #29303D;
+    --cap-bg-bot: #1B212B;
+    --cap-brd: rgba(255, 255, 255, 0.085);
+    --cap-txt: #ABB5C4;
+    --cap-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+
+    --raised-bg: linear-gradient(180deg, #353840 0%, #282B32 100%);
+    --raised-brd: rgba(255, 255, 255, 0.14);
+    --raised-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--sans);
+    background-color: var(--canvas-bg);
+    background-image: radial-gradient(var(--canvas-dot) 1px, transparent 1px);
+    background-size: 18px 18px;
+    color: var(--txt);
+    -webkit-font-smoothing: antialiased;
+    padding: 16px 30px 28px;
+  }
+
+  /* Clean screenshot mode (?mode=1 or ?mode=2) fits 1060x720 with zero scroll */
+  body.clean-shot {
+    padding: 18px 30px 22px;
+    overflow: hidden;
+  }
+  body.clean-shot .switcher-wrap {
+    display: none !important;
+  }
+
+  /* ================= INTERACTIVE TOP BAR (Browser Preview Only) ================= */
+  .switcher-wrap {
+    max-width: 1000px;
+    margin: 0 auto 10px;
+  }
+  .switcher-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 12px;
+    background: var(--float-bar);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 0.5px solid var(--float-brd);
+    box-shadow: var(--float-shadow);
+  }
+  .seg-tabs {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    background: var(--seg-track);
+    padding: 3px;
+    border-radius: 9px;
+  }
+  .seg-tab {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--txt-2);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .seg-tab.active {
+    background: var(--seg-thumb);
+    color: var(--txt);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.13);
+  }
+  .bar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .reset-banner-btn {
+    appearance: none;
+    border: 0;
+    background: rgba(0, 122, 255, 0.10);
+    color: var(--accent);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    display: none;
+  }
+  .reset-banner-btn.visible { display: inline-block; }
+
+  /* ================= OPTION CAPTION HEADER ABOVE WINDOW ================= */
+  .mode-caption {
+    max-width: 1000px;
+    height: 36px;
+    margin: 0 auto 12px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: var(--float-bar);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 0.5px solid var(--float-brd);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .mc-left {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--txt);
+    letter-spacing: -0.01em;
+  }
+  .mc-badge {
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 2.5px 8px;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #FFFFFF;
+    letter-spacing: 0.01em;
+  }
+  .mc-badge.opt2 {
+    background: #0D9488;
+  }
+  .mc-right {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--txt-3);
+    white-space: nowrap;
+  }
+
+  /* ================= MACOS WINDOW SHELL (1000 × 632) ================= */
+  .mac-window {
+    max-width: 1000px;
+    height: 632px;
+    margin: 0 auto;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--win-bg);
+    border: 0.5px solid var(--win-brd);
+    box-shadow: var(--win-shadow);
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    position: relative;
+  }
+
+  /* Left Sidebar */
+  .mac-sidebar {
+    background: var(--sidebar-bg);
+    border-right: 0.5px solid var(--sep);
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+  }
+  .sb-traffic {
+    height: 46px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+  }
+  .tl { width: 12px; height: 12px; border-radius: 50%; border: 0.5px solid rgba(0,0,0,0.12); }
+  .tl.r { background: #FF5F57; }
+  .tl.y { background: #FEBC2E; }
+  .tl.g { background: #28C840; }
+
+  .sb-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 16px 14px 13px;
+  }
+  .sb-app-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+  .sb-brand-meta .name { font-size: 14px; font-weight: 700; color: var(--txt); line-height: 1.2; }
+  .sb-brand-meta .ver  { font-size: 11px; color: var(--txt-3); margin-top: 1px; }
+
+  .sb-nav {
+    padding: 2px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+  }
+  .sb-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 6px 9px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--txt);
+    cursor: pointer;
+    transition: background 0.14s ease;
+  }
+  .sb-row:hover:not(.active) {
+    background: rgba(128, 128, 136, 0.09);
+  }
+  .sb-row.active {
+    background: var(--accent);
+    color: #FFFFFF;
+    font-weight: 600;
+  }
+  .sb-row.pulse-target {
+    box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.45);
+    background: rgba(13, 148, 136, 0.12);
+  }
+  .sb-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    display: grid;
+    place-items: center;
+    color: #FFFFFF;
+    flex-shrink: 0;
+  }
+  .sb-icon svg { width: 14px; height: 14px; }
+  .ic-blue   { background: linear-gradient(180deg, #3B82F6, #2563EB); }
+  .ic-orange { background: linear-gradient(180deg, #FB923C, #EA580C); }
+  .ic-purple { background: linear-gradient(180deg, #A855F7, #7E22CE); }
+  .ic-green  { background: linear-gradient(180deg, #34D399, #059669); }
+  .ic-teal   { background: linear-gradient(180deg, #2DD4BF, #0D9488); }
+  .ic-indigo { background: linear-gradient(180deg, #818CF8, #4F46E5); }
+  .ic-pink   { background: linear-gradient(180deg, #F472B6, #DB2777); }
+
+  .sb-footer {
+    padding: 9px 16px;
+    border-top: 0.5px solid var(--sep-soft);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    color: var(--txt-3);
+  }
+  .status-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #28CD41;
+    flex-shrink: 0;
+  }
+
+  /* ================= RIGHT DETAIL PANE ================= */
+  .mac-detail {
+    display: flex;
+    flex-direction: column;
+    background:
+      radial-gradient(480px 260px at 88% 0%, var(--aurora-2), transparent 72%),
+      radial-gradient(520px 300px at 12% 8%, var(--aurora-1), transparent 75%),
+      var(--detail-bg);
+    min-width: 0;
+    position: relative;
+  }
+
+  /* Native macOS Window Toolbar */
+  .detail-toolbar {
+    height: 48px;
+    padding: 0 16px;
+    border-bottom: 0.5px solid var(--sep);
+    background: var(--toolbar-bg);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .toolbar-title {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--txt);
+  }
+  .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  /* Segmented style switcher [ list | keyboard ] */
+  .style-seg {
+    display: inline-flex;
+    align-items: center;
+    background: var(--seg-track);
+    padding: 2px;
+    border-radius: 7px;
+    height: 28px;
+  }
+  .style-seg-item {
+    width: 30px;
+    height: 24px;
+    border-radius: 5.5px;
+    display: grid;
+    place-items: center;
+    color: var(--txt-2);
+  }
+  .style-seg-item.active {
+    background: var(--seg-thumb);
+    color: var(--txt);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  }
+  .style-seg-item svg { width: 14px; height: 14px; }
+
+  /* Standard toolbar icon buttons */
+  .tb-icon-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 0;
+    background: transparent;
+    color: var(--txt-2);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+  .tb-icon-btn:hover { background: rgba(128, 128, 136, 0.12); color: var(--txt); }
+  .tb-icon-btn svg { width: 15px; height: 15px; }
+
+  .tb-divider {
+    width: 1px;
+    height: 16px;
+    background: var(--sep);
+    margin: 0 2px;
+  }
+
+  /* ✨ AI 配置 — Refined capsule/toolbar button */
+  .tb-ai-btn {
+    height: 28px;
+    padding: 0 11px;
+    border-radius: 999px;
+    background: var(--ai-btn-bg);
+    border: 0.5px solid var(--ai-btn-brd);
+    color: var(--ai-btn-txt);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    transition: transform 0.12s ease, filter 0.12s ease;
+    letter-spacing: -0.01em;
+  }
+  .tb-ai-btn:hover {
+    filter: brightness(0.97);
+    transform: translateY(-0.5px);
+  }
+  .tb-ai-btn svg {
+    width: 13.5px;
+    height: 13.5px;
+    color: var(--ai-btn-icon);
+    flex-shrink: 0;
+  }
+
+  /* + 添加 — Crisp native toolbar button */
+  .tb-add-btn {
+    height: 28px;
+    padding: 0 10px 0 8px;
+    border-radius: 7px;
+    background: var(--tb-btn-bg);
+    border: 0.5px solid var(--tb-btn-brd);
+    box-shadow: var(--tb-btn-shadow);
+    color: var(--txt);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+  }
+  .tb-add-btn svg { width: 13.5px; height: 13.5px; }
+
+  /* ================= MAPPINGS SCROLL CONTENT ================= */
+  .mappings-body {
+    flex: 1;
+    padding: 16px 20px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow: hidden;
+  }
+
+  /* Option 2: First-open single-line dismissible AI guide banner */
+  .ai-tip-banner {
+    height: 44px;
+    padding: 0 12px 0 14px;
+    border-radius: 10px;
+    background: var(--banner-bg);
+    border: 0.5px solid var(--banner-brd);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-shrink: 0;
+    transition: opacity 0.18s ease, margin 0.18s ease;
+  }
+  .ai-tip-banner.hidden {
+    display: none;
+  }
+  .atb-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .atb-sparkle {
+    width: 15px;
+    height: 15px;
+    color: var(--ai-btn-icon);
+    flex-shrink: 0;
+  }
+  .atb-copy {
+    font-size: 12.5px;
+    color: var(--txt-2);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+  .atb-copy strong {
+    color: var(--txt);
+    font-weight: 600;
+  }
+  .atb-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .atb-cta {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    padding: 4px 4px;
+    color: var(--banner-cta);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .atb-cta:hover { text-decoration: underline; }
+  .atb-sep {
+    width: 1px;
+    height: 12px;
+    background: var(--sep);
+  }
+  .atb-close {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    border: 0;
+    background: transparent;
+    color: var(--txt-3);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .atb-close:hover {
+    background: rgba(128, 128, 136, 0.14);
+    color: var(--txt);
+  }
+  .atb-close svg { width: 12px; height: 12px; }
+
+  /* Layer bar: [ Caps + 按键 | Caps + Shift + 按键 ] + hint */
+  .kb-layer-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    height: 28px;
+    flex-shrink: 0;
+  }
+  .layer-seg {
+    display: inline-flex;
+    background: var(--seg-track);
+    padding: 2px;
+    border-radius: 7px;
+  }
+  .layer-seg span {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--txt-2);
+    padding: 3.5px 11px;
+    border-radius: 5.5px;
+  }
+  .layer-seg span.active {
+    background: var(--seg-thumb);
+    color: var(--txt);
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.11);
+  }
+  .kb-hint {
+    font-size: 11.5px;
+    color: var(--txt-3);
+    white-space: nowrap;
+  }
+
+  /* ================= APPLE MAGIC KEYBOARD VIEW ================= */
+  .magic-kb-bezel {
+    background: var(--kb-bezel);
+    border: 0.5px solid var(--kb-bezel-brd);
+    border-radius: 15px;
+    padding: 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    user-select: none;
+    flex-shrink: 0;
+  }
+  .kb-row {
+    display: flex;
+    gap: 5px;
+    width: 100%;
+    height: 41px;
+  }
+  .kb-row.fn-row {
+    height: 33px;
+  }
+
+  /* Flex grow equals key.units so every 15-unit row aligns flush left & right */
+  .kcap {
+    flex: var(--u, 1) 0 0%;
+    min-width: 0;
+    border-radius: 6.5px;
+    background: linear-gradient(180deg, var(--cap-bg-top) 0%, var(--cap-bg-bot) 100%);
+    border: 1px solid var(--cap-brd);
+    box-shadow: var(--cap-shadow);
+    color: var(--cap-txt);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  .fn-row .kcap { font-size: 11px; }
+  .kcap.mod { opacity: 0.76; font-size: 12px; }
+
+  /* Hyper CapsLock Key */
+  .kcap.hyper {
+    background: linear-gradient(180deg, #1F4F87 0%, #14304F 100%);
+    border-color: rgba(13, 133, 255, 0.60);
+    box-shadow: 0 0 10px rgba(13, 133, 255, 0.35);
+    color: #FFFFFF;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .kcap.hyper .hy-main { font-size: 12px; font-weight: 700; line-height: 1; }
+  .kcap.hyper .hy-sub  { font-size: 7.5px; font-weight: 800; color: #8CC7FF; letter-spacing: 0.04em; line-height: 1; }
+
+  /* Mapped Keys (Category Tints matching MappingsKeyboardStyle.swift) */
+  .kcap.mapped {
+    color: var(--txt);
+  }
+  .kcap .corner-lbl {
+    position: absolute;
+    top: 3px;
+    left: 5px;
+    font-size: 8.5px;
+    font-weight: 700;
+    opacity: 0.56;
+    font-family: var(--rounded);
+    line-height: 1;
+  }
+  .kcap .center-glyph {
+    font-size: 14px;
+    font-weight: 700;
+    transform: translateY(1.5px);
+    letter-spacing: -0.02em;
+  }
+  .kcap .center-glyph.sm {
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .kcap .cap-bar {
+    position: absolute;
+    left: 5px;
+    right: 5px;
+    bottom: 2.5px;
+    height: 2.5px;
+    border-radius: 2px;
+  }
+
+  /* Category: Navigation (Blue #3B9CFF) */
+  .kcap.cat-nav {
+    background: linear-gradient(180deg, rgba(59, 156, 255, 0.27), rgba(59, 156, 255, 0.13)), var(--cap-bg-top);
+    border-color: rgba(59, 156, 255, 0.42);
+  }
+  .kcap.cat-nav .cap-bar { background: #3B9CFF; }
+
+  /* Category: Editing (Amber #F5A623) */
+  .kcap.cat-edit {
+    background: linear-gradient(180deg, rgba(245, 166, 35, 0.28), rgba(245, 166, 35, 0.13)), var(--cap-bg-top);
+    border-color: rgba(245, 166, 35, 0.44);
+  }
+  .kcap.cat-edit .cap-bar { background: #F5A623; }
+
+  /* Category: KeyCombo (Pink #F573B5) */
+  .kcap.cat-combo {
+    background: linear-gradient(180deg, rgba(245, 115, 181, 0.27), rgba(245, 115, 181, 0.13)), var(--cap-bg-top);
+    border-color: rgba(245, 115, 181, 0.44);
+  }
+  .kcap.cat-combo .cap-bar { background: #F573B5; }
+
+  /* Category: OpenApp (Cyan #21D4ED) */
+  .kcap.cat-app {
+    background: linear-gradient(180deg, rgba(33, 212, 237, 0.26), rgba(33, 212, 237, 0.12)), var(--cap-bg-top);
+    border-color: rgba(33, 212, 237, 0.44);
+  }
+  .kcap.cat-app .cap-bar { background: #14B8D4; }
+
+  /* Inverted-T Arrow Stack */
+  .arrow-stack {
+    flex: 1 0 0%;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .arrow-stack .kcap {
+    flex: 1;
+    border-radius: 5px;
+    font-size: 10px;
+  }
+
+  /* ================= OTHER TRIGGERS SECTION ================= */
+  .other-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .other-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--txt-3);
+    padding-left: 4px;
+  }
+  .other-card {
+    background: var(--card-bg);
+    border: 0.5px solid var(--card-brd);
+    border-radius: 9px;
+    overflow: hidden;
+  }
+  .other-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7.5px 14px;
+    font-size: 13px;
+  }
+  .other-row + .other-row {
+    border-top: 0.5px solid var(--sep-soft);
+  }
+  .or-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .raised-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    border-radius: 6px;
+    background: var(--raised-bg);
+    border: 0.5px solid var(--raised-brd);
+    box-shadow: var(--raised-shadow);
+    font-family: var(--rounded);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--txt);
+  }
+  .or-arrow {
+    color: var(--txt-3);
+    font-size: 12px;
+  }
+  .or-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--txt);
+    font-weight: 500;
+    font-size: 12.5px;
+  }
+  .or-action svg {
+    width: 14px;
+    height: 14px;
+    color: var(--txt-2);
+  }
+  .or-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--txt-3);
+    font-size: 11.5px;
+  }
+  .stat-pill {
+    font-family: var(--rounded);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--txt-3);
+    background: var(--seg-track);
+    padding: 2px 7px;
+    border-radius: 999px;
+  }
+
+  /* Simulated Toast */
+  .sim-toast {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(14px);
+    padding: 9px 16px;
+    border-radius: 11px;
+    background: rgba(28, 28, 30, 0.92);
+    color: #FFFFFF;
+    font-size: 12.5px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  }
+  .sim-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body data-theme="light">
+
+  <!-- Interactive Switcher (Hidden automatically when ?mode=1 or ?mode=2) -->
+  <div class="switcher-wrap">
+    <div class="switcher-bar">
+      <div class="seg-tabs">
+        <button class="seg-tab active" data-mode="1">方案 1 · 仅右上角工具栏常驻「✨ AI 配置」按钮</button>
+        <button class="seg-tab" data-mode="2">方案 2 · 右上角按钮 + 首次打开可关闭引导条</button>
+      </div>
+      <div class="bar-right">
+        <button class="reset-banner-btn" id="resetBannerBtn">恢复引导条</button>
+        <div class="seg-tabs">
+          <button class="seg-tab active" data-theme-btn="light">浅色</button>
+          <button class="seg-tab" data-theme-btn="dark">深色</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clean Caption Header Above Window (Visible in screenshots so mobile viewer knows immediately) -->
+  <div class="mode-caption" id="modeCaption">
+    <div class="mc-left">
+      <span class="mc-badge" id="captionBadge">方案 1</span>
+      <span id="captionTitle">仅右上角工具栏常驻「✨ AI 配置」按钮（零占地、极简清爽）</span>
+    </div>
+    <span class="mc-right" id="captionNote">零内容区打扰 · 随时一键直达「AI 辅助配置」</span>
+  </div>
+
+  <!-- MACOS HYPERCAPSLOCK WINDOW -->
+  <div class="mac-window">
+    <!-- LEFT SIDEBAR -->
+    <aside class="mac-sidebar">
+      <div class="sb-traffic">
+        <span class="tl r"></span>
+        <span class="tl y"></span>
+        <span class="tl g"></span>
+      </div>
+
+      <div class="sb-brand">
+        <img class="sb-app-icon" src="../../HyperCapslock/Resources/Assets.xcassets/AppIcon.appiconset/icon_128.png" alt="HyperCapslock">
+        <div class="sb-brand-meta">
+          <div class="name">HyperCapslock</div>
+          <div class="ver">v26.11.111</div>
+        </div>
+      </div>
+
+      <nav class="sb-nav">
+        <div class="sb-row active" id="navMappings">
+          <span class="sb-icon ic-blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M9 15h6"/></svg>
+          </span>
+          <span>按键映射</span>
+        </div>
+        <div class="sb-row">
+          <span class="sb-icon ic-orange">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>
+          </span>
+          <span>动作</span>
+        </div>
+        <div class="sb-row">
+          <span class="sb-icon ic-purple">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 20V11M12 20V4M18 20v-7"/></svg>
+          </span>
+          <span>统计</span>
+        </div>
+        <div class="sb-row">
+          <span class="sb-icon ic-green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3.5 12h17M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+          </span>
+          <span>输入法</span>
+        </div>
+        <div class="sb-row" id="navAiSkill">
+          <span class="sb-icon ic-teal">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10.5 3l1.7 4.6L16.8 9.3l-4.6 1.7L10.5 15.6 8.8 11 4.2 9.3l4.6-1.7L10.5 3zm7.5 10l.9 2.5 2.5.9-2.5.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9.9-2.5z"/></svg>
+          </span>
+          <span>AI 辅助配置</span>
+        </div>
+        <div class="sb-row">
+          <span class="sb-icon ic-indigo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.77 1.02 1.51 1H21a2 2 0 1 1 0 4h-.09c-.74.02-1.25.44-1.51 1z"/></svg>
+          </span>
+          <span>设置</span>
+        </div>
+        <div class="sb-row">
+          <span class="sb-icon ic-pink">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
+          </span>
+          <span>关于</span>
+        </div>
+      </nav>
+
+      <div class="sb-footer">
+        <span class="status-dot"></span>
+        <span>运行中</span>
+      </div>
+    </aside>
+
+    <!-- RIGHT DETAIL PANE: 按键映射 (Mappings) -->
+    <main class="mac-detail">
+      <header class="detail-toolbar">
+        <div class="toolbar-left">
+          <button class="tb-icon-btn" title="切换边栏" aria-label="切换边栏">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/></svg>
+          </button>
+          <span class="toolbar-title">按键映射</span>
+        </div>
+
+        <div class="toolbar-right">
+          <!-- Existing View Switcher: Grouped List vs Keyboard Map -->
+          <div class="style-seg" title="显示样式">
+            <span class="style-seg-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+            </span>
+            <span class="style-seg-item active">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M9 15h6"/></svg>
+            </span>
+          </div>
+
+          <!-- Import / Export buttons -->
+          <button class="tb-icon-btn" title="导入配置">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+          </button>
+          <button class="tb-icon-btn" title="导出配置">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3m0 0L8 7m4-4l4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+          </button>
+
+          <span class="tb-divider"></span>
+
+          <!-- NEW: ✨ AI 配置 Toolbar Entry Button -->
+          <button class="tb-ai-btn js-jump-ai" title="打开 AI 辅助配置">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10.5 2.5l1.8 4.8 4.8 1.8-4.8 1.8-1.8 4.8-1.8-4.8-4.8-1.8 4.8-1.8 1.8-4.8zm8 10.5l1 2.7 2.7 1-2.7 1-1 2.7-1-2.7-2.7-1 2.7-1 1-2.7z"/></svg>
+            <span>AI 配置</span>
+          </button>
+
+          <!-- Existing + 添加 Button -->
+          <button class="tb-add-btn" title="添加映射">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            <span>添加</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="mappings-body">
+        <!-- OPTION 2 ONLY: First-Open Single-Line Dismissible AI Tip Banner -->
+        <div class="ai-tip-banner hidden" id="aiTipBanner">
+          <div class="atb-left">
+            <svg class="atb-sparkle" viewBox="0 0 24 24" fill="currentColor"><path d="M10.5 2.5l1.8 4.8 4.8 1.8-4.8 1.8-1.8 4.8-1.8-4.8-4.8-1.8 4.8-1.8 1.8-4.8zm8 10.5l1 2.7 2.7 1-2.7 1-1 2.7-1-2.7-2.7-1 2.7-1 1-2.7z"/></svg>
+            <span class="atb-copy"><strong>不想一个个手动添加？</strong> 可以直接用大白话让 Claude Code、Cursor、WorkBuddy 等 AI 一键配好整套映射</span>
+          </div>
+          <div class="atb-right">
+            <button class="atb-cta js-jump-ai">去试试 →</button>
+            <span class="atb-sep"></span>
+            <button class="atb-close" id="dismissBannerBtn" title="不再提示" aria-label="关闭提示">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Keyboard Layer Bar -->
+        <div class="kb-layer-bar">
+          <div class="layer-seg">
+            <span class="active">Caps + 按键</span>
+            <span>Caps + Shift + 按键</span>
+          </div>
+          <span class="kb-hint">点击任意键即可查看或编辑它的映射。</span>
+        </div>
+
+        <!-- Apple Magic Keyboard Map (15-column exact layout from MappingsKeyboardStyle.swift) -->
+        <div class="magic-kb-bezel" id="magicKeyboard"></div>
+
+        <!-- Other Triggers Section -->
+        <div class="other-section">
+          <div class="other-title">其它触发方式</div>
+          <div class="other-card">
+            <div class="other-row">
+              <div class="or-left">
+                <span class="raised-chip">单击 Caps</span>
+                <span class="or-arrow">→</span>
+                <span class="or-action">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M3.5 12h17M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+                  <span>切换输入法</span>
+                </span>
+              </div>
+              <div class="or-right">
+                <span class="stat-pill">1,284</span>
+              </div>
+            </div>
+            <div class="other-row">
+              <div class="or-left">
+                <span class="raised-chip">双击 Caps</span>
+                <span class="or-arrow">→</span>
+                <span class="or-action">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l7 8h-4v5H9v-5H5l7-8zM9 20h6"/></svg>
+                  <span>切换大写锁定</span>
+                </span>
+              </div>
+              <div class="or-right">
+                <span class="stat-pill">46</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sim-toast" id="simToast">
+        <span>✨ 已跳转至左侧「AI 辅助配置」页</span>
+      </div>
+    </main>
+  </div>
+
+<script>
+  // Clean vector mini app squircles (replaces emoji for 100% native macOS fidelity)
+  const APP_ICONS = {
+    safari: `<svg width="17" height="17" viewBox="0 0 24 24"><rect width="24" height="24" rx="5.5" fill="url(#gSaf)"/><defs><linearGradient id="gSaf" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38BDF8"/><stop offset="100%" stop-color="#0284C7"/></linearGradient></defs><circle cx="12" cy="12" r="8.2" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="1.2"/><polygon points="15.8,8.2 13.3,13.3 8.2,15.8 10.7,10.7" fill="#fff"/><polygon points="15.8,8.2 13.3,13.3 10.7,10.7" fill="#EF4444"/></svg>`,
+    finder: `<svg width="17" height="17" viewBox="0 0 24 24"><rect width="24" height="24" rx="5.5" fill="url(#gFin)"/><defs><linearGradient id="gFin" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#60A5FA"/><stop offset="100%" stop-color="#2563EB"/></linearGradient></defs><path d="M12.6 4.5c-1.1 3.6-1.4 6.5-1.4 8.5h2.1c-.1 2.2.2 4.4.8 6.5" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8.2" cy="9.5" r="1.1" fill="#fff"/><circle cx="16.2" cy="9.5" r="1.1" fill="#fff"/><path d="M7.5 15.2c2.5 2.1 6.5 2.1 9 0" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+    xcode: `<svg width="17" height="17" viewBox="0 0 24 24"><rect width="24" height="24" rx="5.5" fill="url(#gXc)"/><defs><linearGradient id="gXc" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38BDF8"/><stop offset="100%" stop-color="#1D4ED8"/></linearGradient></defs><path d="M7.5 16.5l7.2-7.2M12.5 7l4.5 4.5-2.1 2.1-4.5-4.5L12.5 7z" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
+    chrome: `<svg width="17" height="17" viewBox="0 0 24 24"><rect width="24" height="24" rx="5.5" fill="#FFFFFF"/><circle cx="12" cy="12" r="7.5" fill="#EA4335"/><path d="M12 12L18.5 8.2A7.5 7.5 0 0 1 12 19.5L12 12z" fill="#FBBC05"/><path d="M5.5 8.2L12 12L12 19.5A7.5 7.5 0 0 1 5.5 8.2z" fill="#34A853"/><circle cx="12" cy="12" r="3.3" fill="#4285F4" stroke="#fff" stroke-width="1.2"/></svg>`,
+    notes: `<svg width="17" height="17" viewBox="0 0 24 24"><rect width="24" height="24" rx="5.5" fill="#FFFFFF" stroke="rgba(0,0,0,0.08)" stroke-width="0.8"/><path d="M0 5.5A5.5 5.5 0 0 1 5.5 0h13A5.5 5.5 0 0 1 24 5.5V7.5H0V5.5z" fill="#FACC15"/><path d="M5.5 12h13M5.5 15.5h13M5.5 19h8.5" stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round"/></svg>`
+  };
+
+  // Render exact 15-unit Apple Magic Keyboard with ConfigStore.defaultMappings()
+  const MAPPED = {
+    '4': { cat: 'cat-combo', glyph: '⇧⌘4', sm: true },
+    'E': { cat: 'cat-nav',   glyph: '行尾', sm: true },
+    'T': { cat: 'cat-app',   glyph: '>_',   sm: false },
+    'U': { cat: 'cat-nav',   glyph: '↑10',  sm: true },
+    'I': { cat: 'cat-edit',  glyph: '⌫',    sm: false },
+    'O': { cat: 'cat-edit',  glyph: '↵',    sm: false },
+    'A': { cat: 'cat-nav',   glyph: '行首', sm: true },
+    'S': { cat: 'cat-app',   svg: APP_ICONS.safari },
+    'D': { cat: 'cat-nav',   glyph: '↓10',  sm: true },
+    'F': { cat: 'cat-app',   svg: APP_ICONS.finder },
+    'H': { cat: 'cat-nav',   glyph: '←',    sm: false },
+    'J': { cat: 'cat-nav',   glyph: '↓',    sm: false },
+    'K': { cat: 'cat-nav',   glyph: '↑',    sm: false },
+    'L': { cat: 'cat-nav',   glyph: '→',    sm: false },
+    'X': { cat: 'cat-app',   svg: APP_ICONS.xcode },
+    'C': { cat: 'cat-app',   svg: APP_ICONS.chrome },
+    'N': { cat: 'cat-app',   svg: APP_ICONS.notes }
+  };
+
+  const ROWS = [
+    { fn: true, keys: [
+      { l: 'esc', u: 1.5 }, { l: 'F1' }, { l: 'F2' }, { l: 'F3' }, { l: 'F4' }, { l: 'F5' }, { l: 'F6' },
+      { l: 'F7' }, { l: 'F8' }, { l: 'F9' }, { l: 'F10' }, { l: 'F11' }, { l: 'F12' }, { l: '⏻', u: 1.5, mod: true }
+    ]},
+    { keys: [
+      { l: '`' }, { l: '1' }, { l: '2' }, { l: '3' }, { l: '4' }, { l: '5' }, { l: '6' },
+      { l: '7' }, { l: '8' }, { l: '9' }, { l: '0' }, { l: '-' }, { l: '=' }, { l: '⌫', u: 2 }
+    ]},
+    { keys: [
+      { l: '⇥', u: 1.5 }, { l: 'Q' }, { l: 'W' }, { l: 'E' }, { l: 'R' }, { l: 'T' }, { l: 'Y' }, { l: 'U' },
+      { l: 'I' }, { l: 'O' }, { l: 'P' }, { l: '[' }, { l: ']' }, { l: '\\', u: 1.5 }
+    ]},
+    { keys: [
+      { l: 'caps', u: 1.75, hyper: true }, { l: 'A' }, { l: 'S' }, { l: 'D' }, { l: 'F' }, { l: 'G' }, { l: 'H' }, { l: 'J' },
+      { l: 'K' }, { l: 'L' }, { l: ';' }, { l: "'" }, { l: 'return', u: 2.25 }
+    ]},
+    { keys: [
+      { l: '⇧', u: 2.25, mod: true }, { l: 'Z' }, { l: 'X' }, { l: 'C' }, { l: 'V' }, { l: 'B' }, { l: 'N' }, { l: 'M' },
+      { l: ',' }, { l: '.' }, { l: '/' }, { l: '⇧', u: 2.75, mod: true }
+    ]}
+  ];
+
+  const BOTTOM_KEYS = [
+    { l: 'fn', u: 1, mod: true }, { l: '⌃', u: 1, mod: true }, { l: '⌥', u: 1, mod: true },
+    { l: '⌘', u: 1.25, mod: true }, { l: '', u: 5.5 }, { l: '⌘', u: 1.25, mod: true }, { l: '⌥', u: 1, mod: true }
+  ];
+
+  function makeCap(k) {
+    const u = k.u || 1;
+    if (k.hyper) {
+      return `<div class="kcap hyper" style="--u:${u}"><span class="hy-main">caps</span><span class="hy-sub">HYPER</span></div>`;
+    }
+    const m = MAPPED[k.l];
+    if (m) {
+      const inner = m.svg
+        ? `<span class="center-glyph" style="display:inline-flex;align-items:center;">${m.svg}</span>`
+        : `<span class="center-glyph ${m.sm ? 'sm' : ''}">${m.glyph}</span>`;
+      return `<div class="kcap mapped ${m.cat}" style="--u:${u}">
+        <span class="corner-lbl">${k.l}</span>
+        ${inner}
+        <span class="cap-bar"></span>
+      </div>`;
+    }
+    return `<div class="kcap ${k.mod ? 'mod' : ''}" style="--u:${u}">${k.l}</div>`;
+  }
+
+  const kbEl = document.getElementById('magicKeyboard');
+  let html = '';
+  for (const r of ROWS) {
+    html += `<div class="kb-row ${r.fn ? 'fn-row' : ''}">${r.keys.map(makeCap).join('')}</div>`;
+  }
+  html += `<div class="kb-row">
+    ${BOTTOM_KEYS.map(makeCap).join('')}
+    <div class="kcap" style="--u:1">←</div>
+    <div class="arrow-stack">
+      <div class="kcap">↑</div>
+      <div class="kcap">↓</div>
+    </div>
+    <div class="kcap" style="--u:1">→</div>
+  </div>`;
+  kbEl.innerHTML = html;
+
+  // Mode switching (?mode=1 or ?mode=2)
+  const banner = document.getElementById('aiTipBanner');
+  const badge = document.getElementById('captionBadge');
+  const title = document.getElementById('captionTitle');
+  const note = document.getElementById('captionNote');
+  const resetBtn = document.getElementById('resetBannerBtn');
+  let currentMode = '1';
+
+  function applyMode(mode) {
+    currentMode = String(mode);
+    document.querySelectorAll('[data-mode]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === currentMode);
+    });
+    if (currentMode === '2') {
+      banner.classList.remove('hidden');
+      resetBtn.classList.remove('visible');
+      badge.textContent = '方案 2';
+      badge.classList.add('opt2');
+      title.textContent = '右上角常驻按钮 + 首次打开单行引导条（点「去试试」或「✕」后永久收起）';
+      note.textContent = '新用户一眼发现 AI 改键 · 关闭后即退化为方案 1';
+    } else {
+      banner.classList.add('hidden');
+      resetBtn.classList.remove('visible');
+      badge.textContent = '方案 1';
+      badge.classList.remove('opt2');
+      title.innerHTML = '仅右上角工具栏常驻「<svg style="width:13px;height:13px;vertical-align:-2px;color:#0D9488;margin-right:2px;" viewBox="0 0 24 24" fill="currentColor"><path d="M10.5 2.5l1.8 4.8 4.8 1.8-4.8 1.8-1.8 4.8-1.8-4.8-4.8-1.8 4.8-1.8 1.8-4.8zm8 10.5l1 2.7 2.7 1-2.7 1-1 2.7-1-2.7-2.7-1 2.7-1 1-2.7z"/></svg>AI 配置」按钮（零占地、极简清爽）';
+      note.textContent = '零内容区打扰 · 随时一键直达「AI 辅助配置」';
+    }
+  }
+
+  document.querySelectorAll('[data-mode]').forEach(btn => {
+    btn.addEventListener('click', () => applyMode(btn.dataset.mode));
+  });
+
+  document.getElementById('dismissBannerBtn').addEventListener('click', () => {
+    banner.classList.add('hidden');
+    if (currentMode === '2') resetBtn.classList.add('visible');
+  });
+
+  resetBtn.addEventListener('click', () => {
+    banner.classList.remove('hidden');
+    resetBtn.classList.remove('visible');
+  });
+
+  document.querySelectorAll('[data-theme-btn]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.body.dataset.theme = btn.dataset.themeBtn;
+      document.querySelectorAll('[data-theme-btn]').forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
+
+  // Simulate jump to AI Setup
+  let toastTimer = null;
+  document.querySelectorAll('.js-jump-ai').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const navAi = document.getElementById('navAiSkill');
+      const toast = document.getElementById('simToast');
+      navAi.classList.add('pulse-target');
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        navAi.classList.remove('pulse-target');
+        toast.classList.remove('show');
+      }, 1800);
+    });
+  });
+
+  // Parse URL query ?mode=1 / ?mode=2 & ?theme=dark
+  const params = new URLSearchParams(window.location.search);
+  const qMode = params.get('mode');
+  const qTheme = params.get('theme');
+  if (qTheme === 'dark' || qTheme === 'light') {
+    document.body.dataset.theme = qTheme;
+  }
+  if (qMode === '1' || qMode === '2') {
+    document.body.classList.add('clean-shot');
+    applyMode(qMode);
+  } else {
+    applyMode('1');
+  }
+</script>
+</body>
+</html>

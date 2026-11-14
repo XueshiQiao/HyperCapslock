@@ -153,6 +153,8 @@ struct MappingsPage: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var config: ConfigStore
     @EnvironmentObject var loc: LocalizationManager
+    @ObservedObject private var aiBanner = MappingsAIBannerStore.shared
+    var onOpenAISkill: () -> Void = {}
     @State private var sheet: MappingSheetMode?
     /// id→source map for input-source rows (name + icon), and to flag a removed
     /// source with ⚠️. Seeded from the cache, refreshed on appear (re-renders rows).
@@ -192,9 +194,39 @@ struct MappingsPage: View {
                         .help("Import release config (debug)")
                     #endif
                     Button { exportConfig() } label: { Image(systemName: "square.and.arrow.up") }.help(loc.t("config.export"))
+                    MappingsAIToolbarButton(
+                        title: loc.t("mappings.ai_setup"),
+                        helpText: loc.t("nav.ai_skill"),
+                        action: onOpenAISkill
+                    )
                     Button { sheet = .add } label: { Image(systemName: "plus") }
                         .help(loc.t("mappings.add"))
                         .accessibilityIdentifier("mappings.add")
+                }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if !aiBanner.isDismissed {
+                    MappingsAITipBanner(
+                        leadText: loc.t("mappings.ai_banner.lead"),
+                        bodyText: loc.t("mappings.ai_banner.body"),
+                        ctaText: loc.t("mappings.ai_banner.cta"),
+                        dismissHelp: loc.t("mappings.ai_banner.dismiss"),
+                        onOpen: {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                aiBanner.dismiss()
+                            }
+                            onOpenAISkill()
+                        },
+                        onDismiss: {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                aiBanner.dismiss()
+                            }
+                        }
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 2)
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
             .sheet(item: $sheet) { mode in
