@@ -170,9 +170,9 @@ func triggerCategory(_ t: Trigger) -> TriggerCategory {
 // MARK: - Action pill
 
 /// The action half of a row / tooltip: the action icon in its category color +
-/// label, inside a faint category-tinted capsule so it reads as one distinct
-/// unit. Shared by the grouped rows, the keyboard's Other Triggers, and the
-/// keyboard hover tooltip.
+/// label, inside a solid category-tinted capsule so it reads as one distinct,
+/// high-contrast unit. Shared by the grouped rows, the keyboard's Other Triggers,
+/// the per-app rules popover, and the keyboard hover tooltip.
 struct ActionPill: View {
     let display: ActionDisplay
     let accent: Color
@@ -187,7 +187,7 @@ struct ActionPill: View {
             }
             Text(display.text).font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.white)
-                .lineLimit(1).truncationMode(.middle)
+                .lineLimit(1).truncationMode(.tail)
         }
         .padding(.horizontal, 9).padding(.vertical, 4)
         .background(
@@ -195,6 +195,7 @@ struct ActionPill: View {
                                           startPoint: .topLeading, endPoint: .bottomTrailing))
         )
         .overlay(Capsule().strokeBorder(.white.opacity(0.18)))
+        .help(display.text)
     }
 }
 
@@ -210,71 +211,583 @@ func actionAccent(_ entry: ActionMappingEntry, invalid: Bool) -> Color {
         .map(actionCategoryColor) ?? .secondary
 }
 
-/// The "🪟 N" badge counting a mapping's per-app rules (orange ⚠️ when any rule's
-/// action is unresolved). Shared by the Mappings rows and the Statistics rows so
-/// a mapping reads identically on both pages.
+// MARK: - Cached app metadata & read-only Per-App rules popover
+
+@MainActor
+private enum AppMetadataCache {
+    struct Entry { let name: String; let icon: NSImage? }
+    private static var cache: [String: Entry] = [:]
+
+    static func lookup(_ bundleID: String) -> Entry {
+        let key = bundleID.lowercased()
+        if let hit = cache[key] { return hit }
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+            let raw = FileManager.default.displayName(atPath: url.path)
+            let name = raw.hasSuffix(".app") ? String(raw.dropLast(4)) : raw
+            let icon = NSWorkspace.shared.icon(forFile: url.path)
+            let entry = Entry(name: name, icon: icon)
+            cache[key] = entry
+            return entry
+        }
+        let fallback = Entry(name: bundleID, icon: nil)
+        cache[key] = fallback
+        return fallback
+    }
+}
+
+private struct NSViewAnchor: NSViewRepresentable {
+    let onResolve: (NSView) -> Void
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        DispatchQueue.main.async { onResolve(v) }
+        return v
+    }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async { onResolve(nsView) }
+    }
+}
+
+/// Coordinates both click-to-pin and dwell-hover presentation for `PerAppRulesBadge`
+/// without flickering when AppKit transfers key-window focus to `NSPopover`.
+@MainActor
+private final class HoverPopoverCoordinator: ObservableObject {
+    @Published var isPresented = false
+    weak var badgeNSView: NSView?
+    weak var popoverNSView: NSView?
+    private var isPinned = false
+    private var openTimer: DispatchWorkItem?
+    private var eventMonitor: Any?
+
+    func togglePin() {
+        openTimer?.cancel()
+        openTimer = nil
+        if isPresented {
+            isPinned = false
+            isPresented = false
+            stopMonitor()
+        } else {
+            isPinned = true
+            isPresented = true
+            stopMonitor()
+        }
+    }
+
+    func setBadgeHover(_ hovering: Bool) {
+        if hovering {
+            guard !isPresented else { return }
+            openTimer?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self, !self.isPresented else { return }
+                self.isPinned = false
+                self.isPresented = true
+                self.startMonitor()
+            }
+            openTimer = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
+        } else {
+            openTimer?.cancel()
+            openTimer = nil
+        }
+    }
+
+    func handlePresentationChanged(_ open: Bool) {
+        if !open {
+            isPinned = false
+            openTimer?.cancel()
+            openTimer = nil
+            stopMonitor()
+        }
+    }
+
+    func teardown() {
+        openTimer?.cancel()
+        openTimer = nil
+        stopMonitor()
+    }
+
+    private func startMonitor() {
+        stopMonitor()
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .scrollWheel]) { [weak self] event in
+            MainActor.assumeIsolated {
+                self?.handleEvent(event)
+            }
+            return event
+        }
+    }
+
+    private func stopMonitor() {
+        if let m = eventMonitor {
+            NSEvent.removeMonitor(m)
+            eventMonitor = nil
+        }
+    }
+
+    private func handleEvent(_ event: NSEvent) {
+        guard isPresented, !isPinned else { stopMonitor(); return }
+        let loc = NSEvent.mouseLocation
+        let inBadge: Bool = {
+            guard let v = badgeNSView, let w = v.window else { return false }
+            let screenRect = w.convertToScreen(v.convert(v.bounds, to: nil)).insetBy(dx: -12, dy: -12)
+            return screenRect.contains(loc)
+        }()
+        let inPopover: Bool = {
+            guard let w = popoverNSView?.window else { return false }
+            return w.frame.insetBy(dx: -12, dy: -12).contains(loc)
+        }()
+        if event.type == .scrollWheel && !inPopover {
+            isPresented = false
+            stopMonitor()
+            return
+        }
+        if !inBadge && !inPopover {
+            isPresented = false
+            stopMonitor()
+        }
+    }
+
+    deinit {
+        openTimer?.cancel()
+        if let m = eventMonitor {
+            NSEvent.removeMonitor(m)
+        }
+    }
+}
+
+/// Compact inline indicator for a mapping's per-app rules (Slot ①, placed just
+/// left of `ActionPill`). Shows miniature real app icons + rule count (or ⚠️ in
+/// orange when a rule action is unresolved) without ever increasing single-line
+/// row height. Clicking or hovering opens the read-only `PerAppRulesPopover`.
 struct PerAppRulesBadge: View {
-    let bindings: [MappingBinding]
+    let entry: ActionMappingEntry
+    let availableInputSources: [String: InputSourceFix.AvailableSource]
     @EnvironmentObject var loc: LocalizationManager
+    @Environment(\.colorScheme) private var scheme
+    @StateObject private var popover = HoverPopoverCoordinator()
+
+    private var bindings: [MappingBinding] { entry.bindings }
+
+    private var distinctAppIcons: [NSImage] {
+        var seen = Set<String>()
+        var icons: [NSImage] = []
+        for binding in bindings {
+            for cond in binding.when {
+                if case .frontmostApp(let include, let exclude) = cond {
+                    for bid in include + exclude where seen.insert(bid.lowercased()).inserted {
+                        if let icon = AppMetadataCache.lookup(bid).icon {
+                            icons.append(icon)
+                            if icons.count >= 3 { return icons }
+                        }
+                    }
+                }
+            }
+        }
+        return icons
+    }
 
     var body: some View {
         let invalid = bindings.contains { ActionsRegistry.shared.resolve($0) == nil }
-        HStack(spacing: 3) {
-            Image(systemName: invalid ? "exclamationmark.triangle.fill" : "macwindow")
-            Text("\(bindings.count)")
+        let dark = scheme == .dark
+        let icons = invalid ? [] : distinctAppIcons
+        let triggerID = triggerUniqueID(entry.trigger)
+
+        Button {
+            popover.togglePin()
+        } label: {
+            HStack(spacing: 4) {
+                if invalid {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                } else if !icons.isEmpty {
+                    HStack(spacing: -3) {
+                        ForEach(Array(icons.enumerated()), id: \.offset) { _, icon in
+                            Image(nsImage: icon)
+                                .resizable()
+                                .interpolation(.high)
+                                .frame(width: 14, height: 14)
+                                .clipShape(RoundedRectangle(cornerRadius: 3.5, style: .continuous))
+                        }
+                    }
+                } else {
+                    Image(systemName: "macwindow")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                Text("\(bindings.count)")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+            }
+            .padding(.horizontal, 6).padding(.vertical, 2.5)
+            .background(
+                Capsule().fill((invalid ? Color.orange : Color.accentColor).opacity(dark ? 0.18 : 0.12))
+            )
+            .overlay(
+                Capsule().strokeBorder((invalid ? Color.orange : Color.accentColor).opacity(dark ? 0.28 : 0.18), lineWidth: 0.5)
+            )
+            .foregroundStyle(invalid ? Color.orange : Color.accentColor)
+            .background(NSViewAnchor { popover.badgeNSView = $0 })
         }
-        .font(.caption2)
-        .padding(.horizontal, 6).padding(.vertical, 2)
-        .background(Capsule().fill((invalid ? Color.orange : Color.accentColor).opacity(0.15)))
-        .foregroundStyle(invalid ? Color.orange : Color.accentColor)
-        .help(invalid ? loc.t("mappings.invalid") : loc.t("mappings.app_rules"))
+        .buttonStyle(.plain)
+        .onHover { popover.setBadgeHover($0) }
+        .onChange(of: popover.isPresented) { _, open in popover.handlePresentationChanged(open) }
+        .onDisappear { popover.teardown() }
+        .popover(isPresented: $popover.isPresented, arrowEdge: .bottom) {
+            PerAppRulesPopover(entry: entry, availableInputSources: availableInputSources)
+                .environmentObject(loc)
+                .background(NSViewAnchor { popover.popoverNSView = $0 })
+        }
+        .accessibilityIdentifier("mapping.app_rules.\(triggerID)")
+    }
+}
+
+/// Read-only popover listing a mapping's global default action alongside each
+/// ordered per-app override rule (with real app icons and localized names).
+private struct PerAppRulesPopover: View {
+    let entry: ActionMappingEntry
+    let availableInputSources: [String: InputSourceFix.AvailableSource]
+    @EnvironmentObject var loc: LocalizationManager
+
+    private struct AppTag: Identifiable {
+        let id: String
+        let name: String
+        let icon: NSImage?
+        let excluded: Bool
+    }
+
+    private func appTags(for binding: MappingBinding) -> [AppTag]? {
+        guard !binding.when.isEmpty else { return nil }
+        var tags: [AppTag] = []
+        for cond in binding.when {
+            switch cond {
+            case .frontmostApp(let include, let exclude):
+                for bid in include {
+                    let meta = AppMetadataCache.lookup(bid)
+                    tags.append(AppTag(id: "in:\(bid)", name: meta.name, icon: meta.icon, excluded: false))
+                }
+                for bid in exclude {
+                    let meta = AppMetadataCache.lookup(bid)
+                    tags.append(AppTag(id: "ex:\(bid)", name: meta.name, icon: meta.icon, excluded: true))
+                }
+            case .unknown:
+                return nil
+            }
+        }
+        return tags.isEmpty ? nil : tags
+    }
+
+    var body: some View {
+        let defaultDisplay = actionRefDisplay(entry.actionId, entry.inlineAction, loc,
+                                              availableInputSources: availableInputSources)
+        let defaultAccent: Color = {
+            if defaultDisplay.invalid { return .orange }
+            return ActionsRegistry.shared.resolve(entry).map(actionCategoryColor) ?? .secondary
+        }()
+
+        VStack(alignment: .leading, spacing: 9) {
+            // Header: trigger keycaps + per-app rule count
+            HStack(spacing: 8) {
+                TriggerChips(trigger: entry.trigger, style: .raised)
+                Spacer(minLength: 8)
+                Text(loc.t("mappings.app_rules"))
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Text("\(entry.bindings.count)")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .padding(.horizontal, 6).padding(.vertical, 1.5)
+                    .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                    .foregroundStyle(Color.accentColor)
+            }
+
+            // Global default action row
+            HStack(spacing: 8) {
+                Image(systemName: "globe")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16, height: 16)
+                Text(loc.t("mappings.default_action"))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Spacer(minLength: 10)
+                ActionPill(display: defaultDisplay, accent: defaultAccent)
+            }
+            .padding(.horizontal, 9).padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.primary.opacity(0.05)))
+
+            Divider().opacity(0.55)
+
+            // Per-app override rows
+            if entry.bindings.count > 5 {
+                ScrollView {
+                    rulesList
+                }
+                .frame(maxHeight: 240)
+            } else {
+                rulesList
+            }
+        }
+        .padding(12)
+        .frame(width: 336)
+        .accessibilityIdentifier("mapping.app_rules.popover")
+    }
+
+    private var rulesList: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(entry.bindings.enumerated()), id: \.offset) { idx, binding in
+                if idx > 0 {
+                    Divider().opacity(0.35)
+                }
+                ruleRow(binding)
+            }
+        }
+    }
+
+    private func ruleRow(_ binding: MappingBinding) -> some View {
+        let display = actionRefDisplay(binding.actionId, binding.inlineAction, loc,
+                                       availableInputSources: availableInputSources)
+        let accent: Color = {
+            if display.invalid { return .orange }
+            return ActionsRegistry.shared.resolve(binding).map(actionCategoryColor) ?? .secondary
+        }()
+
+        return HStack(alignment: .center, spacing: 10) {
+            if let tags = appTags(for: binding) {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(tags) { tag in
+                        HStack(spacing: 6) {
+                            if tag.excluded {
+                                Text("≠")
+                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(.orange)
+                            }
+                            if let icon = tag.icon {
+                                Image(nsImage: icon)
+                                    .resizable()
+                                    .interpolation(.high)
+                                    .frame(width: 16, height: 16)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                            } else {
+                                Image(systemName: "app.dashed")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 16, height: 16)
+                            }
+                            Text(tag.name)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
+                    }
+                }
+            } else {
+                Label(loc.t("mappings.advanced_rule"), systemImage: "curlybraces")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            ActionPill(display: display, accent: accent)
+        }
+        .padding(.horizontal, 4).padding(.vertical, 2)
+    }
+}
+
+// MARK: - Inline Pill Meter (Slot ③)
+
+/// Non-linear fill fraction in `0...1` for a mapping row's inline Pill Meter.
+/// Uses `sqrt(count / maxCount)` so low-frequency mappings (e.g. 2 or 47 presses)
+/// still render a visible liquid fill alongside a 10,000+ press navigation key,
+/// while `count <= 0` returns `0` (empty fixed-width capsule slot).
+func sparkBarFraction(count: Int, maxCount: Int) -> Double {
+    guard count > 0, maxCount > 0 else { return 0 }
+    let clamped = min(Double(count) / Double(maxCount), 1.0)
+    return sqrt(clamped)
+}
+
+/// Non-linear liquid fill width in points (`0...pillWidth`) for `MappingSparkBar`.
+func sparkBarFillWidth(count: Int, maxCount: Int,
+                       pillWidth: CGFloat = MappingSparkBar.pillWidth,
+                       minFillWidth: CGFloat = MappingSparkBar.minFillWidth) -> CGFloat {
+    let frac = sparkBarFraction(count: count, maxCount: maxCount)
+    guard frac > 0 else { return 0 }
+    return min(pillWidth, max(minFillWidth, pillWidth * CGFloat(frac)))
+}
+
+/// Equal-height (`62pt × 23pt`) inline Pill Meter (Variant A: left-aligned category-
+/// colored liquid fill + left-aligned tabular count) placed at the trailing edge of
+/// every `MappingRow`. Matches the exact `23pt` height of the adjacent `ActionPill`
+/// and locks every row's trailing slot to an identical fixed width so all
+/// `ActionPill` trailing edges align along one vertical axis. Hovering the row or
+/// pill brightens the category liquid, tints the `1pt` capsule rim, and raises the
+/// count to full contrast — 100% self-contained with zero overhanging popovers.
+struct MappingSparkBar: View {
+    let count: Int
+    let maxCount: Int
+    var accent: Color = Self.defaultAccent
+    var isRowHovered: Bool = false
+
+    static let pillWidth: CGFloat = 62
+    static let pillHeight: CGFloat = 23
+    static let minFillWidth: CGFloat = 8
+    static let leadingTextPadding: CGFloat = 8
+    static let trailingTextPadding: CGFloat = 5
+    static let defaultAccent = Color(red: 0.23, green: 0.61, blue: 1.00)
+
+    @EnvironmentObject var loc: LocalizationManager
+    @Environment(\.colorScheme) private var scheme
+    @State private var isPillHovered = false
+
+    private var isHighlighted: Bool { isRowHovered || isPillHovered }
+
+    private var accessibilityText: String {
+        if count <= 0 { return loc.t("stats.spark_help_zero") }
+        if count == 1 { return loc.t("stats.spark_help_one") }
+        return loc.t("stats.spark_help", ["count": formatCount(count)])
+    }
+
+    var body: some View {
+        let dark = scheme == .dark
+        let hi = isHighlighted
+        let fillW = sparkBarFillWidth(count: count, maxCount: maxCount)
+
+        ZStack(alignment: .leading) {
+            Capsule()
+                .fill(dark ? Color.white.opacity(hi ? 0.075 : 0.06)
+                           : Color.black.opacity(hi ? 0.055 : 0.045))
+
+            if fillW > 0 {
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: dark
+                                ? [accent.opacity(hi ? 0.52 : 0.36), accent.opacity(hi ? 0.38 : 0.25)]
+                                : [accent.opacity(hi ? 0.44 : 0.29), accent.opacity(hi ? 0.30 : 0.20)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: fillW, height: Self.pillHeight)
+            }
+
+            Text(formatCount(max(0, count)))
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .foregroundStyle(
+                    (dark ? Color(red: 0.96, green: 0.97, blue: 1.0)
+                          : Color(red: 0.08, green: 0.09, blue: 0.12))
+                        .opacity(numberOpacity(dark: dark, highlighted: hi))
+                )
+                .shadow(
+                    color: count > 0
+                        ? (dark ? Color.black.opacity(0.36) : Color.white.opacity(0.50))
+                        : .clear,
+                    radius: dark ? 1.0 : 0.5,
+                    x: 0,
+                    y: 0.5
+                )
+                .padding(.leading, Self.leadingTextPadding)
+                .padding(.trailing, Self.trailingTextPadding)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(width: Self.pillWidth, height: Self.pillHeight)
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(
+                    hi ? accent.opacity(dark ? 0.58 : 0.50)
+                       : (dark ? Color.white.opacity(0.095) : Color.black.opacity(0.085)),
+                    lineWidth: 1
+                )
+        )
+        .shadow(
+            color: hi ? accent.opacity(dark ? (count > 0 ? 0.24 : 0.12) : (count > 0 ? 0.16 : 0.08)) : .clear,
+            radius: 4,
+            x: 0,
+            y: 0
+        )
+        .contentShape(Capsule())
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.15)) {
+                isPillHovered = hovering
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: hi)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(loc.t("nav.statistics"))
+        .accessibilityValue(accessibilityText)
+    }
+
+    private func numberOpacity(dark: Bool, highlighted: Bool) -> Double {
+        if highlighted { return 1.0 }
+        if count <= 0 { return dark ? 0.28 : 0.30 }
+        return dark ? 0.56 : 0.58
     }
 }
 
 // MARK: - Shared mapping row
 
-/// One mapping row: trigger chips on the left, the resolved action on the right,
-/// the per-app-rules badge, and hover edit/delete. Designed to live inside a
-/// `Form` (used by both the list and grouped styles).
+/// One mapping row: trigger keycaps on the left, and a clean 3-slot trailing
+/// cluster (`PerAppRulesBadge` → solid `ActionPill` → fixed-width `MappingSparkBar`)
+/// with zero permanent inline action buttons. Double-click edits; right-click opens
+/// the native macOS context menu (`Edit…` / `Delete`).
 struct MappingRow: View {
     let entry: ActionMappingEntry
     let availableInputSources: [String: InputSourceFix.AvailableSource]
     var keycapStyle: KeycapStyle = .raised
-    /// All-time press count, shown as a subtle inline badge when non-nil and > 0
-    /// (gated by the `stats_show_inline` setting at the call site).
-    var usageCount: Int? = nil
+    var usageCount: Int = 0
+    var maxUsageCount: Int = 0
+    var showInlineStats: Bool = true
     let onEdit: () -> Void
     let onDelete: () -> Void
     @EnvironmentObject var loc: LocalizationManager
+    @State private var isRowHovered = false
 
     var body: some View {
         let d = mappingActionDisplay(entry, loc, availableInputSources: availableInputSources)
+        let accent = actionAccent(entry, invalid: d.invalid)
+        let triggerID = triggerUniqueID(entry.trigger)
         // Explicit HStack (not LabeledContent) so the trigger sits left and the
-        // action sits right in EVERY context — LabeledContent only spreads that
-        // way inside a Form; elsewhere (e.g. the keyboard style's Other Triggers)
-        // it would center.
+        // action cluster sits right in EVERY context — LabeledContent only spreads
+        // that way inside a Form; elsewhere (e.g. the keyboard style's Other
+        // Triggers) it would center.
         return HStack(spacing: 8) {
             TriggerChips(trigger: entry.trigger, style: keycapStyle)
+                .fixedSize()
             Spacer(minLength: 12)
-            ActionPill(display: d, accent: actionAccent(entry, invalid: d.invalid))
-            if let n = usageCount, n > 0 {
-                UsageCountBadge(count: n)
-                    .help(loc.t("stats.inline_help"))
-                    .accessibilityIdentifier("mapping.usage.\(triggerUniqueID(entry.trigger))")
-            }
             if !entry.bindings.isEmpty {
-                PerAppRulesBadge(bindings: entry.bindings)
+                PerAppRulesBadge(entry: entry, availableInputSources: availableInputSources)
+                    .fixedSize()
             }
-            Button(action: onEdit) { Image(systemName: "pencil") }.buttonStyle(.borderless)
-                .accessibilityIdentifier("mapping.edit.\(triggerUniqueID(entry.trigger))")
-            Button(action: onDelete) { Image(systemName: "trash") }.buttonStyle(.borderless)
-                .accessibilityIdentifier("mapping.delete.\(triggerUniqueID(entry.trigger))")
+            ActionPill(display: d, accent: accent)
+            if showInlineStats {
+                MappingSparkBar(count: usageCount, maxCount: maxUsageCount,
+                                accent: accent, isRowHovered: isRowHovered)
+                    .fixedSize()
+                    .accessibilityIdentifier("mapping.sparkbar.\(triggerID)")
+            }
         }
         // Fill the row width so the Spacer actually spreads trigger-left /
         // action-right — needed outside a Form (Form rows already get full width).
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
+        .onHover { hovering in
+            isRowHovered = hovering
+        }
         .onTapGesture(count: 2, perform: onEdit)
+        .contextMenu {
+            Button(action: onEdit) {
+                Label(loc.t("mappings.edit_ellipsis"), systemImage: "pencil")
+            }
+            .accessibilityIdentifier("mapping.context.edit.\(triggerID)")
+            Divider()
+            Button(role: .destructive, action: onDelete) {
+                Label(loc.t("mappings.delete"), systemImage: "trash")
+            }
+            .accessibilityIdentifier("mapping.context.delete.\(triggerID)")
+        }
+        .accessibilityIdentifier("mapping.row.\(triggerID)")
     }
 }
 
@@ -286,6 +799,8 @@ struct MappingsGroupedStyleView: View {
     var keycapStyle: KeycapStyle = .glass
     /// triggerID → all-time press count; empty when inline counts are disabled.
     var usageTotals: [String: Int] = [:]
+    var maxUsageCount: Int = 0
+    var showInlineStats: Bool = true
     let onEdit: (ActionMappingEntry) -> Void
     let onDelete: (ActionMappingEntry) -> Void
     @EnvironmentObject var loc: LocalizationManager
@@ -304,7 +819,9 @@ struct MappingsGroupedStyleView: View {
                             ForEach(items, id: \.trigger) { entry in
                                 MappingRow(entry: entry, availableInputSources: availableInputSources,
                                            keycapStyle: keycapStyle,
-                                           usageCount: usageTotals[triggerUniqueID(entry.trigger)],
+                                           usageCount: usageTotals[triggerUniqueID(entry.trigger)] ?? 0,
+                                           maxUsageCount: maxUsageCount,
+                                           showInlineStats: showInlineStats,
                                            onEdit: { onEdit(entry) }, onDelete: { onDelete(entry) })
                             }
                         } header: {

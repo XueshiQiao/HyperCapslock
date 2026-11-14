@@ -60,8 +60,8 @@ func mappingActionDisplay(_ entry: ActionMappingEntry, _ loc: LocalizationManage
 }
 
 @MainActor
-private func actionRefDisplay(_ actionId: String?, _ inlineAction: ActionConfig?, _ loc: LocalizationManager,
-                              availableInputSources: [String: InputSourceFix.AvailableSource]) -> ActionDisplay {
+func actionRefDisplay(_ actionId: String?, _ inlineAction: ActionConfig?, _ loc: LocalizationManager,
+                      availableInputSources: [String: InputSourceFix.AvailableSource]) -> ActionDisplay {
     if let id = actionId {
         if let action = ActionsRegistry.shared.action(byID: id) {
             let name = action.nameKey.map { loc.t($0) } ?? action.name
@@ -168,8 +168,13 @@ struct MappingsPage: View {
         config.mappings.sorted { triggerSortKey($0.trigger) < triggerSortKey($1.trigger) }
     }
 
+    private var maxUsageCount: Int {
+        sorted.compactMap { usageTotals[triggerUniqueID($0.trigger)] }.max() ?? 0
+    }
+
     private func refreshUsageTotals() {
-        usageTotals = config.appConfig.statsShowInline ? UsageStats.shared.totals(in: .all) : [:]
+        let next = config.appConfig.statsShowInline ? UsageStats.shared.totals(in: .all) : [:]
+        if next != usageTotals { usageTotals = next }
     }
 
     var body: some View {
@@ -207,6 +212,15 @@ struct MappingsPage: View {
                 refreshUsageTotals()
             }
             .onChange(of: config.appConfig.statsShowInline) { _, _ in refreshUsageTotals() }
+            .task(id: config.appConfig.statsShowInline) {
+                refreshUsageTotals()
+                guard config.appConfig.statsShowInline else { return }
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    if Task.isCancelled { break }
+                    refreshUsageTotals()
+                }
+            }
             .toolbar {
                 ToolbarItemGroup {
                     styleSwitcher
@@ -242,13 +256,17 @@ struct MappingsPage: View {
         case .grouped:
             MappingsGroupedStyleView(entries: sorted, availableInputSources: availableInputSources,
                                      usageTotals: usageTotals,
+                                     maxUsageCount: maxUsageCount,
+                                     showInlineStats: config.appConfig.statsShowInline,
                                      onEdit: { sheet = .edit($0) }, onDelete: deleteEntry)
         case .keyboard:
             MappingsKeyboardStyleView(entries: sorted, availableInputSources: availableInputSources,
                                       onEdit: { sheet = .edit($0) },
                                       onAddTrigger: { sheet = .addForTrigger($0) },
                                       onDelete: deleteEntry,
-                                      usageTotals: usageTotals)
+                                      usageTotals: usageTotals,
+                                      maxUsageCount: maxUsageCount,
+                                      showInlineStats: config.appConfig.statsShowInline)
         }
     }
 

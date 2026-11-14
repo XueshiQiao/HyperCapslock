@@ -235,8 +235,9 @@ struct AddEditMappingView: View {
                 if case .edit(let entry) = mode {
                     Button(role: .destructive) { showDeleteConfirm = true } label: {
                         Label(loc.t("mappings.delete"), systemImage: "trash")
+                            .foregroundStyle(.red)
                     }
-                    .foregroundStyle(.red)
+                    .tint(.red)
                     .accessibilityIdentifier("mapping.delete")
                     .confirmationDialog(loc.t("mappings.delete_title"), isPresented: $showDeleteConfirm,
                                         titleVisibility: .visible) {
@@ -249,6 +250,8 @@ struct AddEditMappingView: View {
                 }
                 Spacer()
                 Button(loc.t("update.cancel")) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                    .accessibilityIdentifier("mapping.cancel")
                 Button(loc.t("mappings.save")) { save() }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)

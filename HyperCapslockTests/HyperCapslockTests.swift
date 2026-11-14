@@ -315,4 +315,33 @@ final class HyperCapslockTests: XCTestCase {
         XCTAssertEqual(compactComboString(8, ctrl: false, alt: true, cmd: false, shift: false), "⌥⌫")
         XCTAssertEqual(compactComboString(112, ctrl: false, alt: false, cmd: false, shift: false), "F1")
     }
+
+    // MARK: Inline Spark-Bar scaling & localization
+
+    func testSparkBarFractionAndLocalization() throws {
+        XCTAssertEqual(sparkBarFraction(count: 0, maxCount: 3268), 0)
+        XCTAssertEqual(sparkBarFraction(count: 10, maxCount: 0), 0)
+        XCTAssertEqual(sparkBarFraction(count: 3268, maxCount: 3268), 1.0, accuracy: 1e-9)
+        XCTAssertEqual(sparkBarFraction(count: 5000, maxCount: 3268), 1.0, accuracy: 1e-9)
+        // Non-linear sqrt curve boosts small counts above linear proportion.
+        let small = sparkBarFraction(count: 47, maxCount: 3268)
+        XCTAssertGreaterThan(small, 47.0 / 3268.0)
+        XCTAssertEqual(small, sqrt(47.0 / 3268.0), accuracy: 1e-9)
+
+        XCTAssertEqual(MappingSparkBar.pillWidth, 62)
+        XCTAssertEqual(MappingSparkBar.pillHeight, 23)
+        XCTAssertEqual(MappingSparkBar.minFillWidth, 8)
+        XCTAssertEqual(MappingSparkBar.leadingTextPadding, 8)
+        XCTAssertEqual(sparkBarFillWidth(count: 0, maxCount: 12589), 0)
+        XCTAssertEqual(sparkBarFillWidth(count: 2, maxCount: 12589), MappingSparkBar.minFillWidth)
+        XCTAssertEqual(sparkBarFillWidth(count: 12589, maxCount: 12589), MappingSparkBar.pillWidth, accuracy: 1e-6)
+
+        for locale in AppLocale.allCases {
+            let table = LocalizationManager.tables[locale]
+            XCTAssertNotNil(table?["mappings.edit_ellipsis"], "Missing mappings.edit_ellipsis in \(locale)")
+            XCTAssertNotNil(table?["stats.spark_help"], "Missing stats.spark_help in \(locale)")
+            XCTAssertNotNil(table?["stats.spark_help_one"], "Missing stats.spark_help_one in \(locale)")
+            XCTAssertNotNil(table?["stats.spark_help_zero"], "Missing stats.spark_help_zero in \(locale)")
+        }
+    }
 }

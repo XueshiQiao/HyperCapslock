@@ -7,25 +7,10 @@ import AppKit
 // the edit/delete affordances. Data comes from `UsageStats` (per-day buckets),
 // summed over the selected range.
 
-// MARK: - Shared count helpers (also used by the Mappings-page inline badge)
+// MARK: - Shared count helpers
 
 /// Locale-grouped count string (e.g. "1,234").
 func formatCount(_ n: Int) -> String { n.formatted() }
-
-/// Subtle inline press-count badge shown on a Mappings row when the
-/// `stats_show_inline` setting is on.
-struct UsageCountBadge: View {
-    let count: Int
-    var body: some View {
-        HStack(spacing: 3) {
-            Image(systemName: "hand.tap.fill").font(.system(size: 9))
-            Text(formatCount(count)).font(.caption2).monospacedDigit()
-        }
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 6).padding(.vertical, 2)
-        .background(Capsule().fill(Color.secondary.opacity(0.12)))
-    }
-}
 
 /// Reconstruct a `Trigger` from its `triggerUniqueID` string. Lets the page show
 /// triggers that still carry a count but whose mapping was deleted. Returns nil
@@ -101,7 +86,7 @@ private struct StatRow: View {
                     .background(Capsule().fill(Color.secondary.opacity(0.12)))
             }
             if let entry, !entry.bindings.isEmpty {
-                PerAppRulesBadge(bindings: entry.bindings)
+                PerAppRulesBadge(entry: entry, availableInputSources: availableInputSources)
             }
             Spacer(minLength: 8)
             UsageBar(fraction: fraction, color: accent).frame(width: 84)
