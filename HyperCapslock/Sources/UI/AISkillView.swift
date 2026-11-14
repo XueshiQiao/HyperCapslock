@@ -810,6 +810,7 @@ struct MappingsAITipBanner: View {
         )
         .lineLimit(1)
         .truncationMode(.tail)
+        .accessibilityIdentifier("mappings.ai_banner")
       }
       .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -891,7 +892,5 @@ struct MappingsAITipBanner: View {
           lineWidth: 0.75
         )
     )
-    .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("mappings.ai_banner")
   }
 }

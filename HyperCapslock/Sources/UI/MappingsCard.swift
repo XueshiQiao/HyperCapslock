@@ -173,7 +173,33 @@ struct MappingsPage: View {
     }
 
     var body: some View {
-        styledContent
+        VStack(spacing: 0) {
+            if !aiBanner.isDismissed {
+                MappingsAITipBanner(
+                    leadText: loc.t("mappings.ai_banner.lead"),
+                    bodyText: loc.t("mappings.ai_banner.body"),
+                    ctaText: loc.t("mappings.ai_banner.cta"),
+                    dismissHelp: loc.t("mappings.ai_banner.dismiss"),
+                    onOpen: {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            aiBanner.dismiss()
+                        }
+                        onOpenAISkill()
+                    },
+                    onDismiss: {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            aiBanner.dismiss()
+                        }
+                    }
+                )
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 2)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            styledContent
+                .accessibilityIdentifier("page.mappings")
+        }
             .navigationTitle(loc.t("nav.mappings"))
             // Recompute installed input sources so names/icons are fresh and a removed one shows ⚠️.
             .onAppear {
@@ -202,31 +228,6 @@ struct MappingsPage: View {
                     Button { sheet = .add } label: { Image(systemName: "plus") }
                         .help(loc.t("mappings.add"))
                         .accessibilityIdentifier("mappings.add")
-                }
-            }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if !aiBanner.isDismissed {
-                    MappingsAITipBanner(
-                        leadText: loc.t("mappings.ai_banner.lead"),
-                        bodyText: loc.t("mappings.ai_banner.body"),
-                        ctaText: loc.t("mappings.ai_banner.cta"),
-                        dismissHelp: loc.t("mappings.ai_banner.dismiss"),
-                        onOpen: {
-                            withAnimation(.easeInOut(duration: 0.18)) {
-                                aiBanner.dismiss()
-                            }
-                            onOpenAISkill()
-                        },
-                        onDismiss: {
-                            withAnimation(.easeInOut(duration: 0.18)) {
-                                aiBanner.dismiss()
-                            }
-                        }
-                    )
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 2)
-                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
             .sheet(item: $sheet) { mode in
