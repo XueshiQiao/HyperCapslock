@@ -12,6 +12,20 @@
        bare form lands them in the release's Contributors avatar list and
        autolinks. Renders as plain text in Sparkle — acceptable. -->
 
+<h3>What's New in 26.11.112</h3>
+<ul>
+  <li><b>AI-Native setup (zero API keys)</b> — a dedicated <b>AI Setup</b> sidebar page, plus a permanent toolbar shortcut and a dismissible first-run tip banner on the Mappings page, let you copy a ready-to-send setup prompt or curated reference examples in one click. Paste into Claude Code, Codex, Cursor, Antigravity, WorkBuddy, or any AI assistant to inspect, add, or customize mappings in plain language.</li>
+  <li><b>Bundled bilingual Agent Skill</b> — ships with a built-in English and Chinese Agent Skill (<code>SKILL.md</code> / <code>SKILL.zh.md</code>) and reference docs that can be linked directly into your local AI agent folders.</li>
+  <li><b>Built-in CLI with validation, backups &amp; live hot-reload</b> — includes a full <code>cli</code> toolset (<code>info</code>, <code>list-keys</code>, <code>list-builtins</code>, <code>list-input-sources</code>, <code>validate</code>, <code>apply</code>, <code>reload</code>, <code>backups</code>, <code>rollback</code>, <code>install-skill</code>) featuring strict YAML and keyCode validation, automatic <code>&lt;timestamp&gt;-&lt;UUID&gt;</code> version snapshots before changes, and instant IPC hot-reload without restarting the app.</li>
+</ul>
+
+<h3>26.11.112 更新内容</h3>
+<ul>
+  <li><b>AI 原生辅助配置（无需 API Key）</b> —— 侧边栏新增独立的「<b>AI 辅助配置</b>」页面，并在「按键映射」页提供右上角常驻快捷入口与首次打开可关闭的引导提示条。一键复制包含本机环境信息的配置指令或参考配置案例，粘贴到 Claude Code、Codex、Cursor、Antigravity、WorkBuddy 等任意 AI 助手，即可直接用大白话查询、添加或修改整套映射。</li>
+  <li><b>内置中英双语 Agent Skill</b> —— 应用内置完整的中英文 Agent Skill（<code>SKILL.md</code> / <code>SKILL.zh.md</code>）与配置参考规范，支持一键安装链接到本地各 AI Agent 技能目录。</li>
+  <li><b>内置 CLI 工具链：严格校验、版本备份与实时热重载</b> —— 内置完整的命令行子命令（<code>cli info</code>、<code>list-keys</code>、<code>list-builtins</code>、<code>list-input-sources</code>、<code>validate</code>、<code>apply</code>、<code>reload</code>、<code>backups</code>、<code>rollback</code>、<code>install-skill</code>），支持严格的 YAML 结构与键码校验、变更前自动生成 <code>&lt;timestamp&gt;-&lt;UUID&gt;</code> 历史版本备份，并通过本地 IPC 实时热重载生效，无需重启应用。</li>
+</ul>
+
 <h3>What's New in 26.11.111</h3>
 <ul>
   <li><b>Fixed: CapsLock mappings sometimes stayed off after unlocking the Mac</b> — if the screen saver was running when the Mac locked, macOS sometimes didn't report that the screen saver had ended. HyperCapslock then kept the CapsLock key handed back to macOS, and every CapsLock mapping stayed off until HyperCapslock was restarted. Now, when you unlock the Mac, CapsLock mappings come back on their own.</li>
