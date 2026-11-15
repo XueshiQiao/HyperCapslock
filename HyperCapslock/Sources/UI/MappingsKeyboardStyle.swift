@@ -105,10 +105,6 @@ struct MappingsKeyboardStyleView: View {
     let onEdit: (ActionMappingEntry) -> Void
     let onAddTrigger: (Trigger) -> Void
     let onDelete: (ActionMappingEntry) -> Void
-    /// triggerID → all-time press count; empty when inline counts are disabled.
-    var usageTotals: [String: Int] = [:]
-    var maxUsageCount: Int = 0
-    var showInlineStats: Bool = true
     @EnvironmentObject var loc: LocalizationManager
 
     @State private var layerShift = false
@@ -170,9 +166,6 @@ struct MappingsKeyboardStyleView: View {
                     if idx > 0 { Divider().padding(.leading, 14) }
                     MappingRow(entry: e, availableInputSources: availableInputSources,
                                keycapStyle: .raised,
-                               usageCount: usageTotals[triggerUniqueID(e.trigger)] ?? 0,
-                               maxUsageCount: maxUsageCount,
-                               showInlineStats: showInlineStats,
                                onEdit: { onEdit(e) }, onDelete: { onDelete(e) })
                         .padding(.horizontal, 14).padding(.vertical, 8)
                 }

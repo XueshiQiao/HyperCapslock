@@ -592,157 +592,19 @@ private struct PerAppRulesPopover: View {
     }
 }
 
-// MARK: - Inline Pill Meter (Slot ③)
-
-/// Non-linear fill fraction in `0...1` for a mapping row's inline Pill Meter.
-/// Uses `sqrt(count / maxCount)` so low-frequency mappings (e.g. 2 or 47 presses)
-/// still render a visible liquid fill alongside a 10,000+ press navigation key,
-/// while `count <= 0` returns `0` (empty fixed-width capsule slot).
-func sparkBarFraction(count: Int, maxCount: Int) -> Double {
-    guard count > 0, maxCount > 0 else { return 0 }
-    let clamped = min(Double(count) / Double(maxCount), 1.0)
-    return sqrt(clamped)
-}
-
-/// Non-linear liquid fill width in points (`0...pillWidth`) for `MappingSparkBar`.
-func sparkBarFillWidth(count: Int, maxCount: Int,
-                       pillWidth: CGFloat = MappingSparkBar.pillWidth,
-                       minFillWidth: CGFloat = MappingSparkBar.minFillWidth) -> CGFloat {
-    let frac = sparkBarFraction(count: count, maxCount: maxCount)
-    guard frac > 0 else { return 0 }
-    return min(pillWidth, max(minFillWidth, pillWidth * CGFloat(frac)))
-}
-
-/// Equal-height (`62pt × 23pt`) inline Pill Meter (Variant A: left-aligned category-
-/// colored liquid fill + left-aligned tabular count) placed at the trailing edge of
-/// every `MappingRow`. Matches the exact `23pt` height of the adjacent `ActionPill`
-/// and locks every row's trailing slot to an identical fixed width so all
-/// `ActionPill` trailing edges align along one vertical axis. Hovering the row or
-/// pill brightens the category liquid, tints the `1pt` capsule rim, and raises the
-/// count to full contrast — 100% self-contained with zero overhanging popovers.
-struct MappingSparkBar: View {
-    let count: Int
-    let maxCount: Int
-    var accent: Color = Self.defaultAccent
-    var isRowHovered: Bool = false
-
-    static let pillWidth: CGFloat = 62
-    static let pillHeight: CGFloat = 23
-    static let minFillWidth: CGFloat = 8
-    static let leadingTextPadding: CGFloat = 8
-    static let trailingTextPadding: CGFloat = 5
-    static let defaultAccent = Color(red: 0.23, green: 0.61, blue: 1.00)
-
-    @EnvironmentObject var loc: LocalizationManager
-    @Environment(\.colorScheme) private var scheme
-    @State private var isPillHovered = false
-
-    private var isHighlighted: Bool { isRowHovered || isPillHovered }
-
-    private var accessibilityText: String {
-        if count <= 0 { return loc.t("stats.spark_help_zero") }
-        if count == 1 { return loc.t("stats.spark_help_one") }
-        return loc.t("stats.spark_help", ["count": formatCount(count)])
-    }
-
-    var body: some View {
-        let dark = scheme == .dark
-        let hi = isHighlighted
-        let fillW = sparkBarFillWidth(count: count, maxCount: maxCount)
-
-        ZStack(alignment: .leading) {
-            Capsule()
-                .fill(dark ? Color.white.opacity(hi ? 0.075 : 0.06)
-                           : Color.black.opacity(hi ? 0.055 : 0.045))
-
-            if fillW > 0 {
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: dark
-                                ? [accent.opacity(hi ? 0.52 : 0.36), accent.opacity(hi ? 0.38 : 0.25)]
-                                : [accent.opacity(hi ? 0.44 : 0.29), accent.opacity(hi ? 0.30 : 0.20)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(width: fillW, height: Self.pillHeight)
-            }
-
-            Text(formatCount(max(0, count)))
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-                .foregroundStyle(
-                    (dark ? Color(red: 0.96, green: 0.97, blue: 1.0)
-                          : Color(red: 0.08, green: 0.09, blue: 0.12))
-                        .opacity(numberOpacity(dark: dark, highlighted: hi))
-                )
-                .shadow(
-                    color: count > 0
-                        ? (dark ? Color.black.opacity(0.36) : Color.white.opacity(0.50))
-                        : .clear,
-                    radius: dark ? 1.0 : 0.5,
-                    x: 0,
-                    y: 0.5
-                )
-                .padding(.leading, Self.leadingTextPadding)
-                .padding(.trailing, Self.trailingTextPadding)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .frame(width: Self.pillWidth, height: Self.pillHeight)
-        .clipShape(Capsule())
-        .overlay(
-            Capsule()
-                .strokeBorder(
-                    hi ? accent.opacity(dark ? 0.58 : 0.50)
-                       : (dark ? Color.white.opacity(0.095) : Color.black.opacity(0.085)),
-                    lineWidth: 1
-                )
-        )
-        .shadow(
-            color: hi ? accent.opacity(dark ? (count > 0 ? 0.24 : 0.12) : (count > 0 ? 0.16 : 0.08)) : .clear,
-            radius: 4,
-            x: 0,
-            y: 0
-        )
-        .contentShape(Capsule())
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.15)) {
-                isPillHovered = hovering
-            }
-        }
-        .animation(.easeOut(duration: 0.15), value: hi)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(loc.t("nav.statistics"))
-        .accessibilityValue(accessibilityText)
-    }
-
-    private func numberOpacity(dark: Bool, highlighted: Bool) -> Double {
-        if highlighted { return 1.0 }
-        if count <= 0 { return dark ? 0.28 : 0.30 }
-        return dark ? 0.56 : 0.58
-    }
-}
-
 // MARK: - Shared mapping row
 
-/// One mapping row: trigger keycaps on the left, and a clean 3-slot trailing
-/// cluster (`PerAppRulesBadge` → solid `ActionPill` → fixed-width `MappingSparkBar`)
-/// with zero permanent inline action buttons. Double-click edits; right-click opens
-/// the native macOS context menu (`Edit…` / `Delete`).
+/// One mapping row: trigger keycaps on the left, and a clean trailing cluster
+/// (`PerAppRulesBadge` → solid `ActionPill`) with zero permanent inline action
+/// buttons. Double-click edits; right-click opens the native macOS context menu
+/// (`Edit…` / `Delete`).
 struct MappingRow: View {
     let entry: ActionMappingEntry
     let availableInputSources: [String: InputSourceFix.AvailableSource]
     var keycapStyle: KeycapStyle = .raised
-    var usageCount: Int = 0
-    var maxUsageCount: Int = 0
-    var showInlineStats: Bool = true
     let onEdit: () -> Void
     let onDelete: () -> Void
     @EnvironmentObject var loc: LocalizationManager
-    @State private var isRowHovered = false
 
     var body: some View {
         let d = mappingActionDisplay(entry, loc, availableInputSources: availableInputSources)
@@ -761,20 +623,11 @@ struct MappingRow: View {
                     .fixedSize()
             }
             ActionPill(display: d, accent: accent)
-            if showInlineStats {
-                MappingSparkBar(count: usageCount, maxCount: maxUsageCount,
-                                accent: accent, isRowHovered: isRowHovered)
-                    .fixedSize()
-                    .accessibilityIdentifier("mapping.sparkbar.\(triggerID)")
-            }
         }
         // Fill the row width so the Spacer actually spreads trigger-left /
         // action-right — needed outside a Form (Form rows already get full width).
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
-        .onHover { hovering in
-            isRowHovered = hovering
-        }
         .onTapGesture(count: 2, perform: onEdit)
         .contextMenu {
             Button(action: onEdit) {
@@ -797,10 +650,6 @@ struct MappingsGroupedStyleView: View {
     let entries: [ActionMappingEntry]
     let availableInputSources: [String: InputSourceFix.AvailableSource]
     var keycapStyle: KeycapStyle = .glass
-    /// triggerID → all-time press count; empty when inline counts are disabled.
-    var usageTotals: [String: Int] = [:]
-    var maxUsageCount: Int = 0
-    var showInlineStats: Bool = true
     let onEdit: (ActionMappingEntry) -> Void
     let onDelete: (ActionMappingEntry) -> Void
     @EnvironmentObject var loc: LocalizationManager
@@ -819,9 +668,6 @@ struct MappingsGroupedStyleView: View {
                             ForEach(items, id: \.trigger) { entry in
                                 MappingRow(entry: entry, availableInputSources: availableInputSources,
                                            keycapStyle: keycapStyle,
-                                           usageCount: usageTotals[triggerUniqueID(entry.trigger)] ?? 0,
-                                           maxUsageCount: maxUsageCount,
-                                           showInlineStats: showInlineStats,
                                            onEdit: { onEdit(entry) }, onDelete: { onDelete(entry) })
                             }
                         } header: {

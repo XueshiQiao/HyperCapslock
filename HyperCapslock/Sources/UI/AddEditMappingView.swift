@@ -146,30 +146,40 @@ struct AddEditMappingView: View {
         VStack(spacing: 0) {
             Form {
                 Section {
-                    Picker(loc.t("mappings.trigger"), selection: $triggerSel) {
-                        Text(loc.t("mappings.caps")).tag("plain")
-                        Text(loc.t("mappings.caps_shift")).tag("with_shift")
-                        Text(loc.t("trigger.single_tap_hyper")).tag("single_tap")
-                        Text(loc.t("trigger.double_tap_hyper")).tag("double_tap")
-                        Text(doubleTapModifierLabel).tag("dtm")
-                    }
-                    .disabled(editing)
-                    .accessibilityIdentifier("mapping.trigger")
+                    if case .edit(let entry) = mode {
+                        LabeledContent(loc.t("mappings.trigger")) {
+                            TriggerChips(trigger: entry.trigger, style: .raised)
+                                .fixedSize()
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(loc.t("mappings.trigger"))
+                        .accessibilityValue(ConfigStore.triggerLabel(entry.trigger))
+                        .accessibilityIdentifier("mapping.trigger_readonly")
+                    } else {
+                        Picker(loc.t("mappings.trigger"), selection: $triggerSel) {
+                            Text(loc.t("mappings.caps")).tag("plain")
+                            Text(loc.t("mappings.caps_shift")).tag("with_shift")
+                            Text(loc.t("trigger.single_tap_hyper")).tag("single_tap")
+                            Text(loc.t("trigger.double_tap_hyper")).tag("double_tap")
+                            Text(doubleTapModifierLabel).tag("dtm")
+                        }
+                        .accessibilityIdentifier("mapping.trigger")
 
-                    if triggerNeedsKey {
-                        HStack {
-                            Text(loc.t("mappings.key"))
-                            Spacer()
-                            KeyCaptureField(jsKeyCode: $key, enabled: !editing, placeholder: loc.t("mappings.press_key"),
-                                            accessibilityID: "mapping.key_field",
-                                            focusOnClickOnly: openedFromKey)
-                                .frame(width: 140, height: 28)
+                        if triggerNeedsKey {
+                            HStack {
+                                Text(loc.t("mappings.key"))
+                                Spacer()
+                                KeyCaptureField(jsKeyCode: $key, enabled: true, placeholder: loc.t("mappings.press_key"),
+                                                accessibilityID: "mapping.key_field",
+                                                focusOnClickOnly: openedFromKey)
+                                    .frame(width: 140, height: 28)
+                            }
+                        } else if triggerNeedsModifier {
+                            Picker(loc.t("mappings.key"), selection: $dtModifier) {
+                                ForEach(modifierOrder, id: \.self) { m in Text(modifierPickerLabel(m)).tag(m) }
+                            }
+                            .accessibilityIdentifier("mapping.modifier")
                         }
-                    } else if triggerNeedsModifier {
-                        Picker(loc.t("mappings.key"), selection: $dtModifier) {
-                            ForEach(modifierOrder, id: \.self) { m in Text(modifierPickerLabel(m)).tag(m) }
-                        }
-                        .disabled(editing)
                     }
                 }
 
@@ -301,6 +311,7 @@ struct AddEditMappingView: View {
     private func modifierPickerLabel(_ m: ModifierKey) -> String { modifierFullLabel(m, loc) }
 
     private var draftTrigger: Trigger? {
+        if case .edit(let entry) = mode { return entry.trigger }
         switch triggerSel {
         case "single_tap": return .singleTapHyper
         case "double_tap": return .doubleTapHyper

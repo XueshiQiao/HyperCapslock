@@ -159,22 +159,9 @@ struct MappingsPage: View {
     /// id→source map for input-source rows (name + icon), and to flag a removed
     /// source with ⚠️. Seeded from the cache, refreshed on appear (re-renders rows).
     @State private var availableInputSources: [String: InputSourceFix.AvailableSource] = InputSourceFix.availableSourcesByID()
-    /// All-time press counts (triggerID → count) for the inline row badges.
-    /// Empty when the `stats_show_inline` setting is off. Refreshed on appear, so
-    /// counts reflect the latest each time the Mappings page is shown.
-    @State private var usageTotals: [String: Int] = [:]
 
     private var sorted: [ActionMappingEntry] {
         config.mappings.sorted { triggerSortKey($0.trigger) < triggerSortKey($1.trigger) }
-    }
-
-    private var maxUsageCount: Int {
-        sorted.compactMap { usageTotals[triggerUniqueID($0.trigger)] }.max() ?? 0
-    }
-
-    private func refreshUsageTotals() {
-        let next = config.appConfig.statsShowInline ? UsageStats.shared.totals(in: .all) : [:]
-        if next != usageTotals { usageTotals = next }
     }
 
     var body: some View {
@@ -209,17 +196,6 @@ struct MappingsPage: View {
             // Recompute installed input sources so names/icons are fresh and a removed one shows ⚠️.
             .onAppear {
                 availableInputSources = InputSourceFix.refreshAvailableSourcesByID()
-                refreshUsageTotals()
-            }
-            .onChange(of: config.appConfig.statsShowInline) { _, _ in refreshUsageTotals() }
-            .task(id: config.appConfig.statsShowInline) {
-                refreshUsageTotals()
-                guard config.appConfig.statsShowInline else { return }
-                while !Task.isCancelled {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    if Task.isCancelled { break }
-                    refreshUsageTotals()
-                }
             }
             .toolbar {
                 ToolbarItemGroup {
@@ -255,18 +231,12 @@ struct MappingsPage: View {
         switch config.appConfig.mappingsViewStyle {
         case .grouped:
             MappingsGroupedStyleView(entries: sorted, availableInputSources: availableInputSources,
-                                     usageTotals: usageTotals,
-                                     maxUsageCount: maxUsageCount,
-                                     showInlineStats: config.appConfig.statsShowInline,
                                      onEdit: { sheet = .edit($0) }, onDelete: deleteEntry)
         case .keyboard:
             MappingsKeyboardStyleView(entries: sorted, availableInputSources: availableInputSources,
                                       onEdit: { sheet = .edit($0) },
                                       onAddTrigger: { sheet = .addForTrigger($0) },
-                                      onDelete: deleteEntry,
-                                      usageTotals: usageTotals,
-                                      maxUsageCount: maxUsageCount,
-                                      showInlineStats: config.appConfig.statsShowInline)
+                                      onDelete: deleteEntry)
         }
     }
 
