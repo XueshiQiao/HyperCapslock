@@ -165,33 +165,11 @@ struct MappingsPage: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if !aiBanner.isDismissed {
-                MappingsAITipBanner(
-                    leadText: loc.t("mappings.ai_banner.lead"),
-                    bodyText: loc.t("mappings.ai_banner.body"),
-                    ctaText: loc.t("mappings.ai_banner.cta"),
-                    dismissHelp: loc.t("mappings.ai_banner.dismiss"),
-                    onOpen: {
-                        withAnimation(.easeInOut(duration: 0.18)) {
-                            aiBanner.dismiss()
-                        }
-                        onOpenAISkill()
-                    },
-                    onDismiss: {
-                        withAnimation(.easeInOut(duration: 0.18)) {
-                            aiBanner.dismiss()
-                        }
-                    }
-                )
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 2)
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
-            styledContent
-                .accessibilityIdentifier("page.mappings")
-        }
+        // Keep the scroll container (Form / ScrollView) as the direct detail root —
+        // NOT wrapped in a VStack above a pinned banner — so its NSScrollView reaches
+        // the window's unified titlebar edge and engages automatic scroll-edge blur.
+        styledContent
+            .accessibilityIdentifier("page.mappings")
             .navigationTitle(loc.t("nav.mappings"))
             // Recompute installed input sources so names/icons are fresh and a removed one shows ⚠️.
             .onAppear {
@@ -225,15 +203,39 @@ struct MappingsPage: View {
             }
     }
 
+    private func makeAIBanner(showsCardChrome: Bool) -> MappingsAITipBanner? {
+        guard !aiBanner.isDismissed else { return nil }
+        return MappingsAITipBanner(
+            leadText: loc.t("mappings.ai_banner.lead"),
+            bodyText: loc.t("mappings.ai_banner.body"),
+            ctaText: loc.t("mappings.ai_banner.cta"),
+            dismissHelp: loc.t("mappings.ai_banner.dismiss"),
+            showsCardChrome: showsCardChrome,
+            onOpen: {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    aiBanner.dismiss()
+                }
+                onOpenAISkill()
+            },
+            onDismiss: {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    aiBanner.dismiss()
+                }
+            }
+        )
+    }
+
     /// Dispatch to the sub-view for the persisted style. Each style consumes the
     /// same `sorted` mappings + shared edit/delete actions, so they stay in sync.
     @ViewBuilder private var styledContent: some View {
         switch config.appConfig.mappingsViewStyle {
         case .grouped:
             MappingsGroupedStyleView(entries: sorted, availableInputSources: availableInputSources,
+                                     aiBanner: makeAIBanner(showsCardChrome: false),
                                      onEdit: { sheet = .edit($0) }, onDelete: deleteEntry)
         case .keyboard:
             MappingsKeyboardStyleView(entries: sorted, availableInputSources: availableInputSources,
+                                      aiBanner: makeAIBanner(showsCardChrome: true),
                                       onEdit: { sheet = .edit($0) },
                                       onAddTrigger: { sheet = .addForTrigger($0) },
                                       onDelete: deleteEntry)

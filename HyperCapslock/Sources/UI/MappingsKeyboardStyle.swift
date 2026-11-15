@@ -102,6 +102,7 @@ private enum KeycapIconCache {
 struct MappingsKeyboardStyleView: View {
     let entries: [ActionMappingEntry]
     let availableInputSources: [String: InputSourceFix.AvailableSource]
+    var aiBanner: MappingsAITipBanner? = nil
     let onEdit: (ActionMappingEntry) -> Void
     let onAddTrigger: (Trigger) -> Void
     let onDelete: (ActionMappingEntry) -> Void
@@ -128,6 +129,11 @@ struct MappingsKeyboardStyleView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                if let aiBanner {
+                    aiBanner
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
                 HStack {
                     Picker("", selection: $layerShift) {
                         Text(loc.t("mappings.group.caps_key")).tag(false)

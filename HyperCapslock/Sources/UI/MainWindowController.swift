@@ -24,9 +24,13 @@ final class MainWindowController: NSObject, NSWindowDelegate {
         // edge. With it hidden, the items sat on the left on first open, and jumped
         // right only after SwiftUI rebuilt the toolbar (style switch, button click).
         // Start with the first page's name; each page's navigationTitle takes over.
+        //
+        // Deliberately do NOT set titlebarAppearsTransparent = true: keeping the
+        // native unified titlebar gives macOS's automatic scroll-edge blur when
+        // right-pane content scrolls under the toolbar, while staying transparent
+        // at scroll offset 0 and keeping the sidebar full-height under traffic lights.
         window.title = AppState.shared.loc.t("nav.mappings")
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
-        window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
         window.toolbarStyle = .unified
         // Wide enough for the Mappings keyboard style to show a full Magic

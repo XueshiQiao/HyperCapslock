@@ -649,6 +649,7 @@ struct MappingRow: View {
 struct MappingsGroupedStyleView: View {
     let entries: [ActionMappingEntry]
     let availableInputSources: [String: InputSourceFix.AvailableSource]
+    var aiBanner: MappingsAITipBanner? = nil
     var keycapStyle: KeycapStyle = .glass
     let onEdit: (ActionMappingEntry) -> Void
     let onDelete: (ActionMappingEntry) -> Void
@@ -656,6 +657,11 @@ struct MappingsGroupedStyleView: View {
 
     var body: some View {
         Form {
+            if let aiBanner {
+                Section {
+                    aiBanner
+                }
+            }
             if entries.isEmpty {
                 Section { Text(loc.t("mappings.empty")).foregroundStyle(.secondary) }
             } else {

@@ -772,13 +772,17 @@ struct MappingsAIToolbarButton: View {
 }
 
 /// Single-line dismissible onboarding banner at the top of the Mappings page.
-/// Zero nested sub-boxes: one subtle blue/teal rounded banner containing typography,
-/// a plain CTA action (`mappings.ai_banner.open`), and a close button (`mappings.ai_banner.dismiss`).
+/// Zero nested sub-boxes: when standalone (`showsCardChrome == true`, e.g. inside
+/// `MappingsKeyboardStyleView`'s `ScrollView`), draws one subtle blue/teal rounded
+/// banner card; when hosted inside a grouped `Form` `Section` (`showsCardChrome == false`,
+/// `MappingsGroupedStyleView`), omits its own card box so the `Form` `Section` itself is
+/// the single card surface.
 struct MappingsAITipBanner: View {
   let leadText: String
   let bodyText: String
   let ctaText: String
   let dismissHelp: String
+  var showsCardChrome: Bool = true
   let onOpen: () -> Void
   let onDismiss: () -> Void
 
@@ -788,6 +792,43 @@ struct MappingsAITipBanner: View {
 
   var body: some View {
     let dark = colorScheme == .dark
+    if showsCardChrome {
+      rowContent(dark: dark)
+        .padding(.leading, 14)
+        .padding(.trailing, 10)
+        .frame(maxWidth: .infinity, minHeight: 44, maxHeight: 44)
+        .background(
+          RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Color(nsColor: .controlBackgroundColor))
+            .overlay(
+              RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(
+                  LinearGradient(
+                    colors: [
+                      Color.accentColor.opacity(dark ? 0.13 : 0.068),
+                      Color.teal.opacity(dark ? 0.13 : 0.082),
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                  )
+                )
+            )
+        )
+        .overlay(
+          RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .strokeBorder(
+              Color.teal.opacity(dark ? 0.25 : 0.18),
+              lineWidth: 0.75
+            )
+        )
+    } else {
+      rowContent(dark: dark)
+        .padding(.vertical, 2)
+        .frame(maxWidth: .infinity)
+    }
+  }
+
+  private func rowContent(dark: Bool) -> some View {
     HStack(alignment: .center, spacing: 10) {
       HStack(alignment: .center, spacing: 8) {
         Image(systemName: "sparkles")
@@ -865,32 +906,5 @@ struct MappingsAITipBanner: View {
       }
       .fixedSize()
     }
-    .padding(.leading, 14)
-    .padding(.trailing, 10)
-    .frame(maxWidth: .infinity, minHeight: 44, maxHeight: 44)
-    .background(
-      RoundedRectangle(cornerRadius: 10, style: .continuous)
-        .fill(Color(nsColor: .controlBackgroundColor))
-        .overlay(
-          RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(
-              LinearGradient(
-                colors: [
-                  Color.accentColor.opacity(dark ? 0.13 : 0.068),
-                  Color.teal.opacity(dark ? 0.13 : 0.082),
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-              )
-            )
-        )
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 10, style: .continuous)
-        .strokeBorder(
-          Color.teal.opacity(dark ? 0.25 : 0.18),
-          lineWidth: 0.75
-        )
-    )
   }
 }
