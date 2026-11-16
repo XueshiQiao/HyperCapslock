@@ -10,9 +10,13 @@ struct AboutPage: View {
         Form {
             Section {
                 VStack(spacing: 10) {
-                    Image(nsImage: NSApp.applicationIconImage)
-                        .resizable().frame(width: 84, height: 84)
-                        .clipShape(RoundedRectangle(cornerRadius: 19))
+                    Image("BrandMascot")
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(height: 98)
+                        .shadow(color: .black.opacity(0.16), radius: 8, x: 0, y: 4)
+                        .accessibilityIdentifier("about.logo")
                     VStack(spacing: 4) {
                         Text("HyperCapslock").font(.title2).fontWeight(.bold)
                         Text(loc.t("about.tagline"))

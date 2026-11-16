@@ -317,9 +317,13 @@ struct SettingsPage: View {
 
     private var statusRow: some View {
         HStack(spacing: 13) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable().frame(width: 42, height: 42)
-                .clipShape(RoundedRectangle(cornerRadius: 9))
+            Image("BrandMascot")
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(width: 50, height: 46)
+                .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
+                .accessibilityIdentifier("settings.about.logo")
             VStack(alignment: .leading, spacing: 3) {
                 Text("HyperCapslock").font(.headline)
                 Text(loc.t("about.tagline"))

@@ -130,20 +130,22 @@ struct ContentView: View {
 
     private var brand: some View {
         HStack(spacing: 10) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable().frame(width: 34, height: 34)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+            Image("BrandMascot")
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(width: 46, height: 42)
+                .shadow(color: .black.opacity(0.16), radius: 3, x: 0, y: 1.5)
+                .accessibilityIdentifier("nav.brand_logo")
             VStack(alignment: .leading, spacing: 1) {
                 Text("HyperCapslock").font(.system(size: 14, weight: .bold))
                 Text("v\(app.appVersion)").font(.system(size: 11)).foregroundColor(.secondary)
             }
             Spacer()
         }
-        // The app icon carries ~3pt of transparent margin inside its 34pt frame;
-        // 13 instead of 16 puts its visible edge on the same line as the row
-        // icons below (measured on a 2x screenshot: both at 16pt from the
-        // window edge).
-        .padding(.leading, 13).padding(.trailing, 16).padding(.top, 16).padding(.bottom, 12)
+        // BrandMascot is tightly cropped to its visible keycap edge, so 16pt
+        // aligns its leading edge directly with the SidebarIcon tiles below.
+        .padding(.leading, 16).padding(.trailing, 16).padding(.top, 14).padding(.bottom, 10)
     }
 
     private var statusFooter: some View {
