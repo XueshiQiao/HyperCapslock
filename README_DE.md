@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="./docs/assets/icon.png" alt="HyperCapslock" width="96" /><br/>
+  <img src="./docs/assets/logo.png" alt="HyperCapslock" width="136" /><br/>
   HyperCapslock
 </h1>
 
