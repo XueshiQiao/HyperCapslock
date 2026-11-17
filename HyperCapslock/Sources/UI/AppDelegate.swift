@@ -1,5 +1,4 @@
 import AppKit
-import MoreAppsKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var tray: TrayController?
@@ -16,11 +15,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // come after bootstrap so the persisted preference is loaded.
         Analytics.shared.configure(enabled: AppState.shared.analyticsEnabled)
         Analytics.shared.track("app_started")
-        // Set only when another of the author's apps installed and launched us
-        // from its More Apps page; tells us which one sent the user.
-        if let source = MoreApps.launchReferrer {
-            Analytics.shared.trackMoreApps(.referredLaunch(source: source))
-        }
         // Daily aggregate roll-up of local usage counts → anonymous feature_used
         // events (idempotent watermark; never per-keypress; no-op under -uitest).
         UsageRollup.shared.start()
