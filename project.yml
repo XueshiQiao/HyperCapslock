@@ -29,7 +29,7 @@ packages:
   # The shared "More Apps" page (the author's other apps, with in-place install).
   MoreAppsKit:
     url: https://github.com/XueshiQiao/MoreAppsKit
-    from: "1.1.0"
+    from: "1.2.1"
   Aptabase:
     url: https://github.com/aptabase/aptabase-swift
     from: "0.3.4"
