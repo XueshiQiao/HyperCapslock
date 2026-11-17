@@ -26,6 +26,10 @@ packages:
   Yams:
     url: https://github.com/jpsim/Yams
     from: "5.0.6"
+  # The shared "More Apps" page (the author's other apps, with in-place install).
+  MoreAppsKit:
+    url: https://github.com/XueshiQiao/MoreAppsKit
+    from: "1.1.0"
   Aptabase:
     url: https://github.com/aptabase/aptabase-swift
     from: "0.3.4"
@@ -86,6 +90,7 @@ targets:
       - package: Sparkle
       - package: Yams
       - package: Aptabase
+      - package: MoreAppsKit
 
   HyperCapslockTests:
     type: bundle.unit-test

@@ -64,7 +64,7 @@ editing a mapping migrates it to an id. Export writes the whole self-contained d
 
 ## Tech Stack
 - Swift 5 language mode, SwiftUI + AppKit, macOS 14.0+
-- XcodeGen (`project.yml`); SPM deps: **Sparkle** (auto-update), **Yams** (YAML)
+- XcodeGen (`project.yml`); SPM deps: **Sparkle** (auto-update), **Yams** (YAML), **Aptabase** (analytics), **MoreAppsKit** (More Apps page)
 - No App Sandbox (incompatible with CGEventTap / hidutil / IOKit / Carbon TIS)
 - Concurrency: Swift 5 mode (NOT Swift 6 strict). The CGEventTap callback is a
   C function pointer driving shared global state via `OSAllocatedUnfairLock` /
@@ -82,6 +82,14 @@ editing a mapping migrates it to an id. Export writes the whole self-contained d
 - `HyperCapslock/Sources/Support/` — `FileLog`, `Permissions`, `LaunchAtLogin`,
   `UpdaterManager`, `HudCenter`
 - `HyperCapslock/Sources/Localization/L10n.swift` — en/zh/ja/de
+- More Apps — the sidebar page listing the author's other apps, with a Get
+  button that downloads, verifies, installs and opens one. All of it (catalog,
+  installer, views, analytics event names) comes from the shared `MoreAppsKit`
+  Swift package, which the sibling apps embed too. This app adds only the
+  sidebar row + detail case in `ContentView`, the entry row on the About page,
+  `AppState.moreApps` / `sidebarPage` / `showMoreApps(from:)`, the tray item's
+  target (`MainWindowController.show(moreAppsFrom:)`) and
+  `Analytics.trackMoreApps`. See the package's README for the catalog format.
 - Config persisted to `~/Library/Application Support/me.xueshi.hypercapslock/`
 - Log file: `hypercapslock.log` in the same data dir — so the **Dev** build logs to
   `~/Library/Application Support/me.xueshi.hypercapslock.debug/hypercapslock.log`

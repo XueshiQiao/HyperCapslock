@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 import SwiftUI
 import Combine
+import MoreAppsKit
 
 /// Central UI state, bridging SwiftUI to the engine, config store, permissions,
 /// autostart, and activation policy. Mirrors the state the React `App.tsx` held.
@@ -48,7 +49,28 @@ final class AppState: ObservableObject {
     var isRunning: Bool { status == .running }
     var isPaused: Bool { status == .paused }
 
-    private init() {}
+    /// The page selected in the main window's sidebar. Mappings is the primary
+    /// screen: it opens first and sits at the top.
+    @Published var sidebarPage: SidebarPage? = .mappings
+
+    /// Model of the "More Apps" page (the author's other apps, with in-place
+    /// install). Lives here so the page and the About entry row share one state.
+    let moreApps = MoreAppsStore(configuration: .init(language: LocalizationManager.shared.locale.rawValue))
+
+    private init() {
+        moreApps.onEvent = { Analytics.shared.trackMoreApps($0) }
+        // The page follows the app's language setting, not the system's.
+        loc.$locale
+            .sink { [weak self] in self?.moreApps.language = $0.rawValue }
+            .store(in: &cancellables)
+    }
+
+    /// Jump to the More Apps page from inside the window. `source` says where
+    /// the user came from (`about`) and is reported with the page-view event.
+    func showMoreApps(from source: String) {
+        moreApps.nextViewSource = source
+        sidebarPage = .moreApps
+    }
 
     // MARK: - Bootstrap
 

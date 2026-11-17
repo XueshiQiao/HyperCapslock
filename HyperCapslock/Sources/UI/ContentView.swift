@@ -1,8 +1,9 @@
 import SwiftUI
 import AppKit
+import MoreAppsKit
 
 enum SidebarPage: Hashable, CaseIterable {
-    case settings, mappings, actions, statistics, inputSource, aiSkill, about
+    case settings, mappings, actions, statistics, inputSource, aiSkill, moreApps, about
 
     /// Stable, language-independent id stem for accessibility identifiers:
     /// `nav.<axID>` on the sidebar row, `page.<axID>` on the detail root. These
@@ -16,9 +17,17 @@ enum SidebarPage: Hashable, CaseIterable {
         case .statistics: return "statistics"
         case .inputSource: return "input_source"
         case .aiSkill: return "ai_skill"
+        case .moreApps: return "more_apps"
         case .about: return "about"
         }
     }
+}
+
+extension SidebarPage {
+    /// The More Apps page's icon, shared by its sidebar row and the entry row on
+    /// the About page.
+    static let moreAppsSymbol = "square.grid.2x2.fill"
+    static let moreAppsColor = Color.cyan
 }
 
 /// Stable identity for a trigger (ForEach id + edit-sheet identity).
@@ -56,19 +65,27 @@ struct ContentView: View {
     @EnvironmentObject var loc: LocalizationManager
     @EnvironmentObject var secureInput: SecureInputMonitor
 
-    // Mappings is the primary screen — it opens first and sits at the top.
-    @State private var page: SidebarPage? = .mappings
+    // The selected page lives in `AppState.sidebarPage` (not view state) so the
+    // tray menu and the About page's entry row can jump to More Apps.
 
     var body: some View {
         NavigationSplitView {
-            List(selection: $page) {
-                sidebarRow(.mappings, loc.t("nav.mappings"), "keyboard.fill", .blue)
-                sidebarRow(.actions, loc.t("nav.actions"), "bolt.fill", .orange)
-                sidebarRow(.statistics, loc.t("nav.statistics"), "chart.bar.fill", .purple)
-                sidebarRow(.inputSource, loc.t("nav.input_source"), "globe", .green)
-                sidebarRow(.aiSkill, loc.t("nav.ai_skill"), "sparkles", .teal)
-                sidebarRow(.settings, loc.t("nav.settings"), "gearshape.fill", .indigo)
-                sidebarRow(.about, loc.t("nav.about"), "info.circle.fill", .pink)
+            List(selection: $app.sidebarPage) {
+                Section {
+                    sidebarRow(.mappings, loc.t("nav.mappings"), "keyboard.fill", .blue)
+                    sidebarRow(.actions, loc.t("nav.actions"), "bolt.fill", .orange)
+                    sidebarRow(.statistics, loc.t("nav.statistics"), "chart.bar.fill", .purple)
+                    sidebarRow(.inputSource, loc.t("nav.input_source"), "globe", .green)
+                    sidebarRow(.aiSkill, loc.t("nav.ai_skill"), "sparkles", .teal)
+                    sidebarRow(.settings, loc.t("nav.settings"), "gearshape.fill", .indigo)
+                }
+                // Not features of this app: the author's other apps, and About.
+                // Kept in a group of their own so cross-promotion stays out of
+                // the feature list.
+                Section {
+                    sidebarRow(.moreApps, loc.t("nav.more_apps"), SidebarPage.moreAppsSymbol, SidebarPage.moreAppsColor)
+                    sidebarRow(.about, loc.t("nav.about"), "info.circle.fill", .pink)
+                }
             }
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 215, ideal: 220, max: 240)
@@ -76,13 +93,20 @@ struct ContentView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) { statusFooter }
         } detail: {
             Group {
-                switch page ?? .mappings {
+                switch app.sidebarPage ?? .mappings {
                 case .settings: SettingsPage().accessibilityIdentifier("page.settings")
-                case .mappings: MappingsPage(onOpenAISkill: { page = .aiSkill })
+                case .mappings: MappingsPage(onOpenAISkill: { app.sidebarPage = .aiSkill })
                 case .actions: ActionsPage().accessibilityIdentifier("page.actions")
                 case .statistics: StatisticsPage().accessibilityIdentifier("page.statistics")
                 case .inputSource: InputSourcePage().accessibilityIdentifier("page.input_source")
                 case .aiSkill: AISkillPage().accessibilityIdentifier("page.ai_skill")
+                // All content and behaviour come from the shared MoreAppsKit
+                // package; this app supplies only the title and the store.
+                case .moreApps:
+                    MoreAppsPage(store: app.moreApps)
+                        .navigationTitle(loc.t("nav.more_apps"))
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("page.more_apps")
                 case .about: AboutPage().accessibilityIdentifier("page.about")
                 }
             }

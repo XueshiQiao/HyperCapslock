@@ -1,5 +1,6 @@
 import Foundation
 import Aptabase
+import MoreAppsKit
 
 /// App-wide wrapper over the Aptabase SDK — the single place that knows the app
 /// key and owns the opt-out gate. Callers use `Analytics.shared` and never touch
@@ -15,6 +16,9 @@ import Aptabase
 ///     names, input-source ids). Aptabase itself attaches only coarse context
 ///     (app version, macOS version, locale, device class) — no PII, no cross-
 ///     session identifier.
+///   - The More Apps events name which of the author's own apps the user clicked
+///     on that page, by catalog id such as `qduo`. They say nothing about the
+///     apps the user runs or has installed.
 final class Analytics {
   static let shared = Analytics()
 
@@ -68,6 +72,15 @@ final class Analytics {
       Aptabase.shared.trackEvent(event, with: props)
     }
     FileLog.shared.info("Analytics event: \(event)\(props.isEmpty ? "" : " \(props)")")
+  }
+
+  // MARK: - More Apps events
+
+  /// Forwards an event from the shared More Apps page (page views, Get clicks,
+  /// install results). The names and properties are defined by MoreAppsKit so
+  /// every app that embeds the page reports them identically.
+  func trackMoreApps(_ event: MoreAppsEvent) {
+    track(event.name, event.properties)
   }
 
   // MARK: - Mapping events

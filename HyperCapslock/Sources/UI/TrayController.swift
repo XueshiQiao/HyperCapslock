@@ -162,7 +162,7 @@ final class TrayController: NSObject, NSMenuDelegate {
     @objc private func toggleService() { AppState.shared.togglePause() }
     @objc private func checkForUpdates() { UpdaterManager.shared.checkForUpdates() }
     @objc private func openMoreApps() {
-        if let url = URL(string: "https://xueshi.dev") { NSWorkspace.shared.open(url) }
+        MainWindowController.shared?.show(moreAppsFrom: "menu")
     }
     @objc private func openWindow() { MainWindowController.shared?.show() }
     @objc private func quit() { NSApp.terminate(nil) }

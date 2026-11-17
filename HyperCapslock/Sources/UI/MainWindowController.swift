@@ -42,9 +42,26 @@ final class MainWindowController: NSObject, NSWindowDelegate {
         window.delegate = self
     }
 
-    func show() {
+    /// Shows the window. With `moreAppsFrom` it also switches to the More Apps
+    /// page; the value says where the user came from (`menu`) and is reported
+    /// with the page-view analytics event.
+    func show(moreAppsFrom source: String? = nil) {
+        let app = AppState.shared
+        let wasVisible = window.isVisible
+        let wasOnMoreApps = app.sidebarPage == .moreApps
+        if let source { app.showMoreApps(from: source) }
+
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+
+        // SwiftUI calls a page's `onAppear` only when the page's view is
+        // created. When More Apps is already the current page, neither reopening
+        // the window nor asking for that page again creates it, so tell the page
+        // ourselves: it re-reads which apps are installed and reports the view.
+        if wasOnMoreApps, source != nil || !wasVisible {
+            if source == nil { app.moreApps.nextViewSource = "window" }
+            app.moreApps.pageAppeared()
+        }
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {

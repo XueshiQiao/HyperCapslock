@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import MoreAppsKit
 
 struct AboutPage: View {
     @EnvironmentObject var app: AppState
@@ -35,7 +36,16 @@ struct AboutPage: View {
             Section(loc.t("about.links")) {
                 linkRow(asset: "GitHubLogo", tint: Color(red: 0.16, green: 0.17, blue: 0.20), title: loc.t("footer.github"), url: "https://github.com/XueshiQiao/HyperCapslock")
                 linkRow(asset: "XLogo", tint: Color(red: 0.16, green: 0.17, blue: 0.20), title: "@XueshiQiao", url: "https://x.com/XueshiQiao")
-                linkRow(systemImage: "globe", tint: .blue, title: "\(loc.t("footer.more_apps_desc")) xueshi.dev", url: "https://xueshi.dev")
+            }
+
+            // One row leading to the More Apps page (icons of the author's
+            // other apps, how many there are, a chevron).
+            Section {
+                MoreAppsEntryRow(store: app.moreApps, title: loc.t("nav.more_apps")) {
+                    IconTile(symbol: SidebarPage.moreAppsSymbol, color: SidebarPage.moreAppsColor)
+                } action: {
+                    app.showMoreApps(from: "about")
+                }
             }
         }
         .formStyle(.grouped)
